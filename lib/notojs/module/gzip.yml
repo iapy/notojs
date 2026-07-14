@@ -1,0 +1,70 @@
+text: |-
+  `noto:gzip` provides the `gzip` function for reading and writing **gzip** files.
+
+  ###### Exports
+  - `function gzip`
+also:
+  - topic:gzip
+---
+exception: GZipException
+docs: GZipException
+text: |-
+  `GZipException` is thrown by functions in the `noto:gzip` library on failure.
+
+  Defines the following properties:
+  - `code` — error code
+  - `message` — explanatory string
+---
+class: GZip
+docs: GZip
+text: |-
+  Represents **gzip** file handle.
+methods:
+  blob:
+    args:
+      -
+        []
+    docs: GZip.blob
+    text: |-
+      Returns a `Promise` resolving to a `Blob` with decompressed content of the **gzip** file.
+      Rejects with `GZipException` on error.
+  json:
+    args:
+      -
+        []
+    docs: GZip.json
+    text: |-
+      Returns a `Promise` resolving to decompressed content of the **gzip** file parsed as JSON.
+      Rejects with `SyntaxError` if file content is not valid JSON.
+      Rejects with `GZipException` on error.
+  text:
+    args:
+      -
+        []
+    docs: GZip.text
+    text: |-
+      Returns a `Promise` resolving to a `String` containing the decompressed content of the **gzip** file.
+      Rejects with `GZipException` on error.
+  write:
+    args:
+      -
+        - String
+      -
+        - IBlob
+    docs: GZip.write
+    text: |-
+      Writes `Blob` or `String` to a **gzip** file.
+      Throws `GZipException` on error or if `Path` is read-only or any error occurs.
+      Returns a `Promise` resolving to a number of bytes written.
+---
+function: gzip
+args:
+  -
+    - fs::IPath
+docs: gzip
+text: |-
+  Creates a `GZip` instance.
+
+  Returns a `GZIP` instance with `arg0` as the path to the **gzip** file.
+
+  ###### Default export

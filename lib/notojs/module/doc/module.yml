@@ -1,0 +1,165 @@
+interface: noto::fs::Path
+docs: noto::fs::Path
+text: |-
+  Represents a *pointer* to JavaScript `Path` object owned by the host runtime.
+
+  ```c++
+  JSValue copy(JSContext *ctx, noto::fs::Path path) {
+    auto [path, writable] = path->native();
+    try {
+      return noto::fs::Path::make(ctx, noto::fs::Path::n2v(path));
+    } catch(std:::runtime_error const &) {
+      return NULL;
+    }
+  }
+  ```
+also:
+  - Path
+methods:
+  native:
+    sign:
+      - type: std::pair<std::filesystem::path, bool>
+        args:
+          []
+    docs: noto::fs::Path.native
+    text: |-
+      Returns a pair representing the native filesystem path and a boolean indicating whether the path is writable.
+statics:
+  make:
+    sign:
+      - type: JSValue
+        args:
+          - JSContext *
+          - "std::filesystem::path &&"
+    docs: noto::fs::Path.make
+    text: |-
+      Creates an returns an instance of `noto::fs.Path` from an absolute *virtual* filesystem path.
+      Returns a thrown JavaScript exception if the path is not mounted.
+  n2v:
+    sign:
+      - type: std::filesystem::path
+        args:
+          - "const std::filesystem::path &"
+    docs: noto::fs::Path.n2v
+    text: |-
+      Converts a native filesystem path to the corresponding mounted virtual **NotoJS** path.
+      Throws `std::runtime_error` if `path` is not absolute or cannot be mapped.
+  v2n:
+    sign:
+      - type: std::filesystem::path
+        args:
+          - "const std::filesystem::path &"
+    docs: noto::fs::Path.v2n
+    text: |-
+      Converts a mounted virtual **NotoJS** path to a native filesystem path.
+      Throws `std::runtime_error` if `path` is not absolute or cannot be mapped.
+---
+function: noto::core::html
+sign:
+  - type: JSValue
+    args:
+      - JSContext *
+      - "const std::string &"
+docs: noto::core::html
+text: |-
+  Creates a printable `HTML` object from string source.
+
+  ```c++
+  JSValue hello(JSContext *ctx) {
+    return noto::core::html(ctx, "<h1>Hello</h1>");
+  }
+  ```
+also:
+  - HTML
+---
+function: noto::core::image
+sign:
+  - type: JSValue
+    args:
+      - JSContext *
+      - "const boost::urls::url &"
+  - type: JSValue
+    args:
+      - JSContext *
+      - const std::uint8_t *
+      - std::size_t
+      - "const std::string &"
+docs: noto::core::image
+text: |-
+  Creates a printable `Image` object from url or binary data.
+
+  ```c++
+  JSValue logo(JSContext *ctx) {
+    if(auto url = noto::URL::parse(
+        'https://github.com/iapy/notojs/blob/main/lib/notojs/bundle/logo.png?raw=true'
+    ))
+        return noto::core::image(ctx, *url);
+    return JS_NULL;
+  }
+  ```
+also:
+  - Image
+---
+function: noto::core::markdown
+sign:
+  - type: JSValue
+    args:
+      - JSContext *
+      - "const std::string &"
+docs: noto::core::markdown
+text: |-
+  Creates a printable `Markdown` object from string source.
+
+  ```c++
+  JSValue hello(JSContext *ctx) {
+    return noto::core::markdown(ctx, "# Hello");
+  }
+  ```
+also:
+  - Markdown
+---
+function: noto::core::svg
+sign:
+  - type: JSValue
+    args:
+      - JSContext *
+      - "const std::string &"
+docs: noto::core::svg
+text: |-
+  Creates a printable `SVG` object from string source.
+
+  ```c++
+  JSValue svg(JSContext *ctx) {
+    return noto::core::svg(ctx, "<svg></svg>");
+  }
+  ```
+also:
+  - SVG
+---
+function: noto::core::xml
+sign:
+  - type: JSValue
+    args:
+      - JSContext *
+      - "const std::string &"
+docs: noto::core::xml
+text: |-
+  Creates a printable `XML` object from string source.
+
+  ```c++
+  JSValue data(JSContext *ctx) {
+    return noto::core::xml(ctx, "<root/>");
+  }
+  ```
+also:
+  - XML
+---
+function: noto::fs::init
+sign:
+  - type: void
+    args:
+      - JSContext *
+text: |-
+  Initializes the current native module with access to the `noto:fs` module.
+
+  > Call this from the native module's `int init(JSContext *, JSModuleDef *)` function before using functions or interfaces declared in the `noto::fs` namespace.{.warning}

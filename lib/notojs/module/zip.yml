@@ -1,0 +1,111 @@
+text: |-
+  `noto:zip` provides the `zip` function for reading and writing **zip** archives.
+
+  ###### Exports
+  - `function zip`
+also:
+  - topic:zip
+---
+exception: ZipException
+docs: ZipException
+text: |-
+  `ZipException` is thrown by functions in the `noto:zip` library on failure.
+
+  Defines the following properties:
+  - `code` — (optional) error code
+  - `message` — explanatory string
+---
+class: Zip
+docs: Zip
+text: |-
+  Represents **zip** file handle.
+defs:
+  - struct: WriteOptions
+    fields:
+      append:
+        type: Boolean
+        docs: Zip.WriteOptions.append
+        text: |-
+          If `true`, appends new entries to the **zip** archive. Otherwise, the archive is re-created if it already exists.
+    docs: Zip.WriteOptions
+    text: |-
+      An optional object passed as the second argument to the `Zip.write` method.
+methods:
+  "[Symbol.iterator]":
+    args:
+      -
+        []
+    docs: Zip.[Symbol.iterator]
+    text: |-
+      Returns an iterator over entries in the *zip* archive.
+
+      Yields array of the form `[name, size]`:
+      - `name` — `String`, entry name
+      - `size` — `Number`, uncompressed size of the entry in bytes
+
+      Throws `ZipException` if **zip** archieve doesn't exist.
+  read:
+    args:
+      -
+        - Tail:
+            - 0
+            - String
+    docs: Zip.read
+    text: |-
+      Reads the **zip** archive.
+
+      If invoked without arguments, reads all entries in the archive.
+      Otherwise, reads only the entries whose names are specified in the argument list.
+
+      Returns `Promise` that resolves to an object mapping entry names to their `Blob` representations. Only entries found in the archive are included in the result.
+      Rejects with `ZipException` if **zip** archieve doesn't exist.
+  remove:
+    args:
+      -
+        - Tail:
+            - 1
+            - String
+    docs: Zip.remove
+    text: |-
+      Removes the specified entries from the **zip** archive.
+
+      Returns `Promise` that resolves to `undefined`.
+      Rejects with `ZipException` if **zip** archieve doesn't exist or read-only.
+  toJSON:
+    args:
+      -
+        []
+    docs: Zip.toJSON
+    text: |-
+      Returns an object where each key is a zip file entry and the value is its uncompressed size.
+
+      Throws `ZipException` if **zip** archieve doesn't exist.
+  write:
+    args:
+      -
+        - Object
+      -
+        - Object
+        - Zip.WriteOptions
+    docs: Zip.write
+    text: |-
+      Writes entries to **zip** archieve.
+
+      `arg0` is an `Object` mapping entry names to entry content, which may be a `String`, `Blob`, or `Path`.
+
+      Returns `Promise` that resolves to undefined if all entries are written successfully.
+      Otherwise, returns an Object mapping entry names to errors that occurred during writing.
+
+      Throws `ZipException` if **zip** rchieve cannot be opened for writting.
+---
+function: zip
+args:
+  -
+    - fs::IPath
+docs: zip
+text: |-
+  Creates a `Zip` instance.
+
+  Returns a `ZIP` instance with `arg0` as the path to the **zip** file.
+
+  ###### Default export

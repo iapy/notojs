@@ -1,0 +1,154 @@
+|-
+  `noto:core` provides **NotoJS** rendering primitives and their factory functions.
+  Although rendering primitives provide constructors, using the factory functions is recommended.
+
+  ###### Exports
+  - `class HTML`
+  - `class Image`
+  - `class Markdown`
+  - `class SVG`
+  - `class XML`
+  - `function html`
+  - `function icon`
+  - `function image`
+  - `function markdown`
+  - `function xml`
+---
+function: html
+args:
+  -
+    - String
+  -
+    - HTML
+text: |-
+  Returns an `HTML` object constructed from a string, or a copy of an existing `HTML` object.
+also:
+  - HTML
+---
+function: icon
+args:
+  -
+    - String
+text: |-
+  Fetches an icon by name.
+
+  Returns a `Promise` that resolves to an `SVG` instance containing the icon from
+  `https://api.iconify.design/{arg0}.svg`. All requests to `api.iconify.design` are
+  cached in the internal HTTP cache.
+also:
+  - HTTPData
+  - topic:ui
+---
+function: image
+args:
+  -
+    - String
+  -
+    - IURL
+  -
+    - SVG
+  -
+    - Image
+  -
+    - IBlob
+text: |-
+  Returns an `Image` object.
+
+  - If `arg0` is a `String` or `URL`, returns an `Image` object with `arg0` as its `data` property.
+  - If `arg0` is an `SVG` or `Image`, returns a copy of `arg0`.
+  - If `arg0` is a `Blob`, returns an `Image` object with a `data:` URL as its `data` property.
+
+  Throws `TypeError` if `arg0` is a `String` but is not a valid `data`, `http://` or `https://` `URL`.
+also:
+  - Image
+  - SVG
+---
+function: markdown
+args:
+  -
+    - String
+docs: markdown
+text: |-
+  Returns a `Markdown` object constructed from a string.
+also:
+  - Markdown
+---
+function: xml
+args:
+  -
+    - String
+  -
+    - XML
+text: |-
+  Returns an `XML` object constructed from a string, or a copy of an existing `XML` object.
+also:
+  - XML
+---
+class: HTML
+text: |-
+  Represents an HTML fragment.
+
+  When printed, inserts its content into the cell output.
+
+  Throws `TypeError` when printed if this `HTML` object was constructed from `<html>`, `<head>`, `<title>`, or `<body>` elements of `HTMLDocument`.
+also:
+  - noto:dom
+ctor:
+  args:
+    -
+      - Object
+  text: |-
+    Creates a new `HTML` object from a configuration object, or creates a copy of an existing `HTML` object.
+    The configuration object must have a `data` property of type `String` containing the HTML fragment.
+---
+class: Image
+text: |-
+  Represents an image.
+
+  When printed, inserts an `<img>` element into the cell output with `src` set to the instance `data`.
+ctor:
+  args:
+    -
+      - Object
+  text: |-
+    Creates a new `Image` object from a configuration object, or creates a copy of an existing `Image` object.
+    The configuration object must have a `data` property of type `String` containing the image URL.
+---
+class: Markdown
+text: |-
+  Represents a Markdown document.
+
+  When printed, inserts a Markdown block containing the instance content into the cell output.
+ctor:
+  args:
+    -
+      - Object
+  text: |-
+    Creates a new `Markdown` object from a configuration object, or creates a copy of an existing `Markdown` object.
+    The configuration object must have a `data` property of type `String` containing the Markdown content.
+---
+class: SVG
+text: |-
+  Represents an SVG document.
+
+  When printed, inserts an `<svg>` element into the cell output.
+ctor:
+  args:
+    -
+      - Object
+  text: |-
+    Creates a new `SVG` object from a configuration object, or creates a copy of an existing `SVG` object.
+    The configuration object must have a `data` property of type `String` containing the SVG content.
+---
+class: XML
+text: |-
+  Represents an XML document.
+
+  When printed, inserts an XML code block into the cell output.
+ctor:
+  args:
+    -
+      - Object
+  text: |-
+    Creates a new `XML` object from a configuration object, or creates a copy of an existing `XML` object.
+    The configuration object must have a `data` property of type `String` containing the XML content.

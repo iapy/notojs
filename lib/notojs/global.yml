@@ -1,0 +1,1245 @@
+|-
+  `noto:global` defines the APIs available on the JavaScript global object. These APIs are available automatically and do not require an import statement.
+---
+class: Blob
+docs: Blob
+text: |-
+  The `Blob` interface represents a blob, which is a file-like object of immutable, raw data; they can be read as text or binary data.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Blob
+impl:
+  - IBlob
+defs:
+  - type: Parts
+    base: Array
+    docs: Blob.Parts
+    text: |-
+      An array of `String` or `ArrayBuffer` elements. If array contains any other type, `TypeError` is thrown.
+  - struct: Options
+    fields:
+      type:
+        type: String
+        docs: Blob.Options.type
+        text: |-
+          The MIME type of the data that will be stored into the blob. The default value is the empty string.
+    docs: Blob.Options
+    text: |-
+      An optional object passed as the second argument to the `Blob` constructor.
+ctor:
+  args:
+    -
+      - Blob.Parts
+    -
+      - Blob.Parts
+      - Blob.Options
+  docs: Blob.constructor
+  text: |-
+    Constructs `Blob` from parts and optional `Blob.Options` object.
+properties:
+  size:
+    getter: true
+    docs: Blob.size
+    text: |-
+      The size, in bytes, of the data contained in the `Blob` object.
+  type:
+    getter: true
+    setter:
+      - String
+    docs: Blob.type
+    text: |-
+      A string indicating the MIME type of the data contained in the `Blob`.
+      Empty string represents unknown `Blob` type.
+methods:
+  arrayBuffer:
+    args:
+      -
+        []
+    docs: Blob.arrayBuffer
+    text: |-
+      Returns a promise that resolves with an `ArrayBuffer` containing the entire contents of the `Blob` as binary data.
+  bytes:
+    args:
+      -
+        []
+    docs: Blob.bytes
+    text: |-
+      Returns a promise that resolves with a `Uint8Array` containing the contents of the `Blob`.
+  slice:
+    args:
+      -
+        []
+      -
+        - Number
+      -
+        - Number
+        - Number
+      -
+        - Number
+        - Number
+        - String
+    docs: Blob.slice
+    text: |-
+      Returns a new `Blob` object containing the data in the specified range of bytes of the blob on which it's called.
+      The returned `Blob` is a view over the original and does not allocate new memory.
+
+      - `arg0` — start index (inclusive), `0` if not present.
+      Negative values are offsets from the end.
+      - `arg1` — end index (exclusive), `Blob.size` if not present.
+      Negative values are offsets from the end.
+      - `arg2` — content type for the new `Blob`, empty string if not present.
+  text:
+    args:
+      -
+        []
+    docs: Blob.text
+    text: |-
+      Returns a promise that resolves with a string containing the entire contents of the `Blob` interpreted as UTF-8 text.
+  toJSON:
+    args:
+      -
+        []
+    docs: Blob.toJSON
+    text: |-
+      Returns object with the following properties:
+      - `size` — `Number`, size of the blob in bytes
+      - `type` — `String`, MIME type of the blob
+---
+class: Headers
+docs: Headers
+text: |-
+  The `Headers` interface of the Fetch API allows you to perform various actions on `Request` and `Response` headers.
+  These actions include retrieving, setting, adding to, and removing headers from the list of the request's headers.
+
+  > Implemented on top of `boost::beast::http::fields`.{.info}
+
+  > Implementation details may differ from browser implementations.{.warning}
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Headers
+ctor:
+  args:
+    -
+      []
+    -
+      - Dict:
+          - String
+  docs: Headers.constructor
+  text: |-
+    Creates a new `Headers` object, optionally initialized with values from `arg0`.
+methods:
+  append:
+    args:
+      -
+        - String
+        - String
+    docs: Headers.append
+    text: |-
+      Appends a new value onto an existing header inside a `Headers` object, or adds the header if it does not already exist.
+
+      - `arg0` — header name
+      - `arg1` — header value
+  delete:
+    args:
+      -
+        - String
+    docs: Headers.delete
+    text: |-
+      Deletes a header from a `Headers` object.
+
+      - `arg0` — header name
+  forEach:
+    args:
+      -
+        - Function
+      -
+        - Function
+        - Any
+    docs: Headers.forEach
+    text: |-
+      Executes a provided function once for each key/value pair in this Headers object.
+
+      - `arg0` — Function to execute for each entry in the map. It takes the following arguments:
+        - `arg0` — value of the currently visited header value.
+        - `arg1` — name of the currently visited header entry.
+        - `arg2` — the object that `forEach` is being applied to
+      - `arg1` — value to use as `this` when executing `arg0`.
+  get:
+    args:
+      -
+        - String
+    docs: Headers.get
+    text: |-
+      Returns a comma-separated `String` of all the values of a header within a `Headers` object with a given name.
+  has:
+    args:
+      -
+        - String
+    docs: Headers.has
+    text: |-
+      Returns a boolean stating whether a `Headers` object contains a certain header.
+  keys:
+    args:
+      -
+        []
+    docs: Headers.keys
+    text: |-
+      Returns an iterator allowing you to go through all keys of the key/value pairs contained in this object.
+  set:
+    args:
+      -
+        - String
+        - String
+    docs: Headers.set
+    text: |-
+      Sets a new value for an existing header inside a Headers object, or adds the header if it does not already exist.
+  toJSON:
+    args:
+      -
+        []
+    docs: Headers.toJSON
+    text: |-
+      Headers.toJSON
+      Returns object mapping header names to values:
+      - `key` — `String`, header name
+      - `value` — `String`, header value
+  values:
+    args:
+      -
+        []
+    docs: Headers.values
+    text: |-
+      Returns an iterator allowing you to go through all values of the key/value pairs contained in this object.
+---
+class: URLSearchParams
+docs: URLSearchParams
+text: |-
+  The `URLSearchParams` interface defines utility methods to work with the query string of a URL.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams
+ctor:
+  args:
+    -
+      []
+  docs: URLSearchParams.constructor
+  text: |-
+    Constructs a new `URLSearchParams` object.
+properties:
+  size:
+    getter: true
+    docs: URLSearchParams.size
+    text: |-
+      Indicates the total number of search parameter entries.
+methods:
+  "[Symbol.toPrimitive]":
+    args:
+      -
+        []
+    docs: URLSearchParams.[Symbol.toPrimitive]
+    text: |-
+      Returns a query string suitable for use in a `URL`.
+  append:
+    args:
+      -
+        - String
+        - String
+    docs: URLSearchParams.append
+    text: |-
+      Appends a specified key/value pair as a new search parameter.
+  delete:
+    args:
+      -
+        - String
+      -
+        - String
+        - String
+    docs: URLSearchParams.delete
+    text: |-
+      Deletes search parameters that match a name (`arg0`), and optional value (`arg1`), from the list of all search parameters.
+  entries:
+    args:
+      -
+        []
+    docs: URLSearchParams.entries
+    text: |-
+      Returns an iterator allowing iteration through all key/value pairs contained in this object in the same order as they appear in the query string.
+  get:
+    args:
+      -
+        - String
+    docs: URLSearchParams.get
+    text: |-
+      Returns the first value associated with the given search parameter.
+  getAll:
+    args:
+      -
+        - String
+    docs: URLSearchParams.getAll
+    text: |-
+      Returns all the values associated with a given search parameter.
+  has:
+    args:
+      -
+        - String
+    docs: URLSearchParams.has
+    text: |-
+      Returns a boolean value indicating if a given parameter, or parameter and value pair, exists.
+  keys:
+    args:
+      -
+        []
+    docs: URLSearchParams.keys
+    text: |-
+      Returns an iterator allowing iteration through all keys of the key/value pairs contained in this object.
+  set:
+    args:
+      -
+        - String
+        - String
+    docs: URLSearchParams.set
+    text: |-
+      Sets the value associated with a given search parameter to the given value. If there are several values, the others are deleted.
+  sort:
+    args:
+      -
+        []
+    docs: URLSearchParams.sort
+    text: |-
+      Sorts all key/value pairs, if any, by their keys.
+  toJSON:
+    args:
+      -
+        []
+    docs: URLSearchParams.toJSON
+    text: |-
+      Returns a query string suitable for use in a `URL`.
+  toString:
+    args:
+      -
+        []
+    docs: URLSearchParams.toString
+    text: |-
+      Returns a query string suitable for use in a `URL`.
+  values:
+    args:
+      -
+        []
+    docs: URLSearchParams.values
+    text: |-
+      Returns an iterator allowing iteration through all values of the key/value pairs contained in this object.
+---
+class: ServerRequest
+docs: ServerRequest
+text: |-
+  The `ServerRequest` represents **NotoJS** HTTP application request and is a base class of `Request`.
+
+  > Implemented on top of `boost::beast::http::request<boost::beast::http::string_body>`.{.info}
+ctor:
+  args:
+    -
+      []
+  docs: ServerRequest.constructor
+  text: |-
+    Constructs empty `ServerRequest`
+properties:
+  headers:
+    getter: true
+    docs: ServerRequest.headers
+    text: |-
+      Contains the associated `Headers` object of the request.
+  method:
+    getter: true
+    docs: ServerRequest.method
+    text: |-
+      Contains the request's method (`GET`, `POST`, etc.)
+  path:
+    getter: true
+    docs: ServerRequest.path
+    text: |-
+      Contains request URL path including query string if present.
+methods:
+  arrayBuffer:
+    args:
+      -
+        []
+    docs: ServerRequest.arrayBuffer
+    text: |-
+      Returns `Promise` that resolves to the request body as `ArrayBuffer`.
+  blob:
+    args:
+      -
+        []
+    docs: ServerRequest.blob
+    text: |-
+      Returns `Promise` that resolves to the request body as `Blob`.
+  bytes:
+    args:
+      -
+        []
+    docs: ServerRequest.bytes
+    text: |-
+      Returns `Promise` that resolves to the request body as `Uint8Array`.
+  formData:
+    args:
+      -
+        []
+    docs: ServerRequest.formData
+    text: |-
+      Returns `Promise` that resolves to the request body as `URLSearchParams`.
+
+      > Multipart bodies aren't supported.{.warning}
+  json:
+    args:
+      -
+        []
+    docs: ServerRequest.json
+    text: |-
+      Returns a `Promise` that resolves to the request body parsed as JSON.
+      Rejects with `SyntaxError` if the body is not valid JSON.
+  text:
+    args:
+      -
+        []
+    docs: ServerRequest.text
+    text: |-
+      Returns `Promise` resolving to `String` representation of request body.
+---
+class: URL
+docs: URL
+text: |-
+  The `URL` interface provides parsing and manipulation of URLs in a structured way.
+
+  > Implemented on top of `boost::urls::url`.{.info}
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/URL
+impl:
+  - IURL
+defs:
+  - type: String
+    base: String
+    docs: URL.String
+    text: |-
+      Must be a valid parseable URL.
+  - type: Protocol
+    base: String
+    docs: URL.Protocol
+    text: |-
+      Must be a string ending with `:` and may contain only letters, digits, `+`, `-`, and `.`.
+ctor:
+  args:
+    -
+      - URL.String
+  docs: URL.constructor
+  text: |-
+    Creates and returns a `URL` object from a URL string.
+properties:
+  host:
+    getter: true
+    setter:
+      - String
+    docs: URL.host
+    text: |-
+      A string containing the domain (hostname) followed by (if a port was specified) a `:` and the port of the `URL`.
+  hostname:
+    getter: true
+    setter:
+      - String
+    docs: URL.hostname
+    text: |-
+      A string containing the domain of the `URL`.
+  href:
+    getter: true
+    setter:
+      - URL.String
+    docs: URL.href
+    text: |-
+      A string containing the whole `URL`.
+  password:
+    getter: true
+    setter:
+      - String
+    docs: URL.password
+    text: |-
+      A string containing the password specified before the domain name.
+  pathname:
+    getter: true
+    setter:
+      - String
+    docs: URL.pathname
+    text: |-
+      A string containing an initial '/' followed by the path of the `URL`, not including the query string or fragment.
+  port:
+    getter: true
+    setter:
+      - String
+    docs: URL.port
+    text: |-
+      A string containing the port number of the `URL`.
+  protocol:
+    getter: true
+    setter:
+      - URL.Protocol
+    docs: URL.protocol
+    text: |-
+      A string containing the protocol scheme of the URL, including the final `:`.
+  search:
+    getter: true
+    setter:
+      - String
+    docs: URL.search
+    text: |-
+      A string indicating the `URL`'s parameter string; if any parameters are provided, this string includes all of them, beginning with the leading `?` character.
+  searchParams:
+    getter: true
+    docs: URL.searchParams
+    text: |-
+      A `URLSearchParams` object which can be used to access the individual query parameters found in search.
+  username:
+    getter: true
+    setter:
+      - String
+    docs: URL.username
+    text: |-
+      A string containing the username specified before the domain name.
+methods:
+  toJSON:
+    args:
+      -
+        []
+    docs: URL.toJSON
+    text: |-
+      Returns a string containing the whole `URL`, i.e. `URL.href`.
+  toString:
+    args:
+      -
+        []
+    docs: URL.toString
+    text: |-
+      Returns a string containing the whole `URL`, i.e. `URL.href`.
+statics:
+  canParse:
+    args:
+      -
+        - String
+    docs: URL.canParse
+    text: |-
+      Returns a boolean indicating whether or not a URL defined from a URL string is parsable and valid.
+  createObjectURL:
+    args:
+      -
+        - Blob
+    docs: URL.createObjectURL
+    text: |-
+      Returns a string containing a blob URL, that is a URL with blob: as its scheme.
+  parse:
+    args:
+      -
+        - String
+    docs: URL.parse
+    text: |-
+      Creates and returns a `URL` object from a URL string, or returns null if the passed parameters define an invalid URL.
+  revokeObjectURL:
+    args:
+      -
+        []
+    docs: URL.revokeObjectURL
+    text: |-
+      Does nothing. For compatibility.
+---
+class: Request
+base: ServerRequest
+docs: Request
+text: |-
+  The `Request` interface of the `fetch` API represents a resource request.
+  Inherits most methods and properties from its base class, `ServerRequest`.
+
+  Defines the `noto:` URL scheme for the local **NotoJS** HTTP endpoint.
+
+  > Implemented on top of `boost::beast::http::request<boost::beast::http::string_body>`.{.info}
+
+  > Implementation details may differ from browser implementations.{.warning}
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Request
+defs:
+  - type: HTTPString
+    base: String
+    docs: Request.HTTPString
+    text: |-
+      Must be a valid `http:`, `https:`, or `noto:` URL string.
+      If a `global.prefix` is configured in the **NotoJS** configuration, relative path may be used.
+      In this case, the `global.prefix` is prepended.
+  - type: HTTPURL
+    base: URL
+    docs: Request.HTTPURL
+    text: |-
+      Must be valid `http:`, `https:` or `noto:` URL.
+  - type: Cache
+    base: String
+    docs: Request.Cache
+    text: |-
+      Cache strategy defined as a combination of flags:
+      - `read` — read from cache
+      - `write` — write response to cache if it has caching headers
+      - `check` — revalidate stale cache (implies `read`)
+      - `force` — write to cache ignoring response headers
+      - `fetch` — always revalidate (implies `read`)
+
+      Named strategies:
+      - `default` = `no-store`
+      - `force-cache` = `force | read`
+      - `no-cache` = `fetch | write`
+      - `no-store` = bypass cache
+      - `reload` = `write`
+
+      Custom combinations:
+      - `read`
+      - `write`
+      - `check`
+      - `force`
+      - `read-write` = `read | write`
+      - `check-write` = `check | write`
+      - `fetch-write` = `fetch | write`
+      - `read-force` = `read | force`
+      - `check-force` = `check | force`
+      - `fetch-force` = `fetch | force`
+
+      HTTP cache is backed by an **LMDB** database `sys:httpdata`, see `doc('topic:lmdb')`.
+  - type: Method
+    base: String
+    docs: Request.Method
+    text: |-
+      Valid uppercase HTTP method.
+  - type: Redirect
+    base: String
+    docs: Request.Redirect
+    text: |-
+      One of the following values:
+      - `follow` — automatically follow redirects.
+      - `error` — reject the promise with a network error when a redirect status is returned.
+      - `manual` — return a redirect response.
+  - struct: Config
+    fields:
+      body:
+        type:
+          Any:
+            - String
+            - ArrayBuffer
+            - Object
+        docs: Request.Config.body
+        text: |-
+          The request body content to send to the server. If `Object`, serialized as JSON and `Content-Type: application/json` header is set.
+      headers:
+        type:
+          Any:
+            - Headers
+            - Dict:
+                - String
+        docs: Request.Config.headers
+        text: |-
+          Any headers you want to add to your request, contained within a `Headers` object or an object literal whose keys are the names of headers and whose values are the header values.
+      timeout:
+        type: Number
+        docs: Request.Config.timeout
+        text: |-
+          Request timeout in milliseconds. Always present; defaults to 10000 (10 seconds).
+      redirect:
+        type: Request.Redirect
+        docs: Request.Config.redirect
+        text: |-
+          Determines the behavior in case the server replies with a redirect status; defaults to `follow`.
+      method:
+        type: Request.Method
+        docs: Request.Config.method
+        text: |-
+          Request method. Defaults to `GET`
+      cache:
+        type: Request.Cache
+        docs: Request.Config.cache
+        text: |-
+          The cache strategy you want to use for the request; defaults to `default` = `no-store`.
+    docs: Request.Config
+    text: |-
+      Set of options that can be used to configure a `Request`.
+ctor:
+  args:
+    -
+      []
+    -
+      - Request.HTTPString
+    -
+      - Request.HTTPURL
+    -
+      - Request.HTTPString
+      - Request.Config
+    -
+      - Request.HTTPURL
+      - Request.Config
+  docs: Request.constructor
+  text: |-
+    Creates a new `Request` object using URL and Config object.
+properties:
+  redirect:
+    getter: true
+    docs: Request.redirect
+    text: |-
+      Contains the mode for how redirects are handled.
+  url:
+    getter: true
+    docs: Request.url
+    text: |-
+      Contains the URL of the request.
+---
+class: ServerResponse
+docs: ServerResponse
+text: |-
+  The `ServerResponse` represents **NotoJS** HTTP application response and is a base class of `Response`.
+
+  > Implemented on top of `boost::beast::http::response<boost::beast::http::string_body>`.{.info}
+ctor:
+  args:
+    -
+      []
+  docs: ServerResponse.constructor
+  text: |-
+    Constructs empty `ServerResponse` object.
+properties:
+  body:
+    getter: false
+    setter:
+      - String
+      - Blob
+      - HTML
+      - SVG
+      - XML
+      - Object
+    docs: ServerResponse.body
+    text: |-
+      Sets the response body and optionally the `Content-Type` header:
+
+      - `String` — `Content-Type` is not set
+      - `Blob` — `Content-Type` is set to the blob’s type
+      - `HTML` — `Content-Type: text/html`
+      - `SVG` — `Content-Type: image/svg+xml`
+      - `XML` — `Content-Type: text/xml`
+      - other objects — serialized as JSON with `Content-Type: application/json`
+  headers:
+    getter: true
+    docs: ServerResponse.headers
+    text: |-
+      Contains the associated `Headers` object of the response.
+  ok:
+    getter: true
+    docs: ServerResponse.ok
+    text: |-
+      Contains `true` if response status code is 2xx and `false` otherwise
+  status:
+    getter: true
+    setter:
+      - Number
+    docs: ServerResponse.status
+    text: |-
+      The status code of the response.
+  status_text:
+    getter: true
+    docs: ServerResponse.status_text
+    text: |-
+      The status message corresponding to the status code. (e.g., `"OK"` for `200`).
+methods:
+  arrayBuffer:
+    args:
+      -
+        []
+    docs: ServerResponse.arrayBuffer
+    text: |-
+      Returns `Promise` that resolves to the response body as `ArrayBuffer`.
+  blob:
+    args:
+      -
+        []
+    docs: ServerResponse.blob
+    text: |-
+      Returns `Promise` that resolves to the response body as `Blob`.
+  bytes:
+    args:
+      -
+        []
+    docs: ServerResponse.bytes
+    text: |-
+      Returns `Promise` that resolves to the response body as `Uint8Array`.
+  json:
+    args:
+      -
+        []
+    docs: ServerResponse.json
+    text: |-
+      Returns a `Promise` that resolves to the response body parsed as JSON.
+      Rejects with `SyntaxError` if the body is not valid JSON.
+  text:
+    args:
+      -
+        []
+    docs: ServerResponse.text
+    text: |-
+      Returns `Promise` resolving to `String` representation of request body.
+  toJSON:
+    args:
+      -
+        []
+    docs: ServerResponse.toJSON
+    text: |-
+      Returns object with the following properties:
+      - `status` — `Number`, response status
+      - `headers` - `Object`, serialized HTTP headers
+---
+class: Response
+base: ServerResponse
+docs: Response
+text: |-
+  The `Response` interface represents the response to a request.
+  Inherits most methods and properties from its base class, `ServerResponse`.
+
+  > Implemented on top of `boost::beast::http::response<boost::beast::http::string_body>`.{.info}
+
+  > Implementation details may differ from browser implementations.{.warning}
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Response
+ctor:
+  args:
+    -
+      []
+  docs: Response.constructor
+  text: |-
+    Constructs empty `Response` object.
+properties:
+  redirected:
+    getter: true
+    docs: Response.redirected
+    text: |-
+      Indicates whether or not the response is the result of a redirect.
+  status:
+    getter: true
+    docs: Response.status
+    text: |-
+      The status code of the response. (This will be 200 for a success).
+  url:
+    getter: true
+    docs: Response.url
+    text: |-
+      The URL of the response.
+---
+class: Storage
+docs: Storage
+text: |-
+  A key–value persistence interface backed by **LMDB**, providing fast, durable storage across executions.
+  Unlike the standard browser implementation, it can store any JSON-serializable values — not just strings.
+
+  `Storage` is accessible using **NotoJS** HTTP API.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Storage
+  - topic:api
+  - topic:lmdb
+  - topic:ui
+defs:
+  - type: Namespace
+    base: String
+    docs: Storage.Namespace
+    text: |-
+      `Storage.Namespace` mimics browser-style `localStorage` domain separation.
+      It must be a non-empty string and cannot contain spaces or forward slashes (/).
+      Each namespace is stored in a separate **LMDB** database (`sys:storage:namespace`).
+  - struct: Config
+    fields:
+      notebook:
+        type: Boolean
+        docs: Storage.Config.notebook
+        text: |-
+          Attach `Storage` instance as `localStorage` to notebook if `true` and to current cell as `false`.
+    docs: Storage.Config
+    text: |-
+      An optional object passed as the second argument to the `Storage.attach` method.
+ctor:
+  args:
+    -
+      - Storage.Namespace
+  docs: Storage.constructor
+  text: |-
+    Constructs `Storage` instance using provided namespace.
+properties:
+  length:
+    getter: true
+    docs: Storage.length
+    text: |-
+      Returns an integer representing the number of data items stored in the `Storage` object.
+methods:
+  attach:
+    args:
+      -
+        []
+      -
+        - Storage.Config
+    docs: Storage.attach
+    text: |-
+      Attaches the Storage instance to the global context as `localStorage`.
+      If `arg0` is present and `arg0.notebook` is true, it is scoped to the notebook; otherwise, it is scoped to the current cell.
+  clear:
+    args:
+      -
+        []
+    docs: Storage.clear
+    text: |-
+      When invoked, will drop underlying **LMDB** database.
+  getItem:
+    args:
+      -
+        - String
+    docs: Storage.getItem
+    text: |-
+      When passed a key name, will return that key's value or `null` if key doesn't exist in the storage.
+  key:
+    args:
+      -
+        - Number
+    docs: Storage.key
+    text: |-
+      When passed a number `n`, this method will return the name of the nth key in the storage.
+      Unlike standard browser implementation, returns nth key with respect to alphabetical order.
+
+      > Complexity: O(n){.warning}
+  removeItem:
+    args:
+      -
+        - String
+    docs: Storage.removeItem
+    text: |-
+      When passed a key name, will remove that key from the storage.
+  setItem:
+    args:
+      -
+        - String
+        - String
+      -
+        - String
+        - Any
+    docs: Storage.setItem
+    text: |-
+      When passed a key name and value, will add that key to the storage, or update that key's value if it already exists.
+---
+function: $
+args:
+  -
+    - Function
+  -
+    - HTML
+    - Object
+  -
+    - String
+    - Object
+  -
+    - Markdown
+    - Object
+text: |-
+  Processes the current notebook input or applies a template, depending on the arguments.
+
+  When passed a function as `arg0`, invokes it with the current `globalThis.input` value and stores the result back in `globalThis.input`.
+  This is a building block for **NotoJS** pipelines.
+
+  Otherwise, applies a **Mustache** template to the given input.
+
+  - `arg0` — template input
+  - `arg1` — values object used for template substitution
+
+  The template is rendered using **Mustache** with `arg0` as the template and `arg1` as the data.
+
+  Returns a value of the same type as `arg0` with the template applied.
+also:
+  - dollar
+  - topic:pipeline
+---
+function: atob
+args:
+  -
+    - String
+text: |-
+  Decodes a string of data which has been encoded using Base64 encoding.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/atob
+---
+function: btoa
+args:
+  -
+    - String
+text: |-
+  Creates a Base64-encoded ASCII string from `arg0`.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/btoa
+---
+function: fetch
+args:
+  -
+    - Request
+  -
+    - Request.HTTPURL
+  -
+    - Request.HTTPString
+  -
+    - Request.HTTPURL
+    - Request.Config
+  -
+    - Request.HTTPString
+    - Request.Config
+text: |-
+  Performs an HTTP request asynchronously.
+
+  - `arg0` — request input (`Request`, `URL`, or URL string)
+  - `arg1` — optional `Request.Config`
+
+  Returns a `Promise` resolving to a `Response` that  contains the fully resolved request, including headers and body.
+
+  The request always respects `Request.Config.timeout` (default: 10 seconds). If the timeout is exceeded, the promise is rejected with `InternalError` (`Request timed out`).
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/fetch
+---
+function: print
+args:
+  -
+    - Tail:
+        - 0
+        - Any
+text: |-
+  Appends values to the current notebook cell output.
+
+  Each call creates one output row. Passing multiple arguments renders those values in the same row, so they can appear inline or side by side depending on their value types and the selected layout.
+
+  ```javascript
+  print('Hello, world!');
+  print('Hello, ', 'world!');
+  print({ score: 42 });
+  ```
+
+  `print` returns `undefined`. Calling it without arguments does nothing.
+
+  ##### Rendered values
+
+  Primitive values are rendered as text.
+
+  Objects of registered types are rendered by notebook output handlers. The built-in handlers include:
+  - `HTML`
+  - `Markdown`
+  - `Image`
+  - `SVG`
+  - `XML`
+
+  Objects of other types are shown as expandable JSON.
+
+  ##### Multiple values
+
+  Multiple arguments are kept together as one output row:
+
+  ```javascript
+  import { html } from 'noto:core';
+  const block = (c, t) => html(`
+    <div style="background-color: ${c}; padding: 3em; text-align: center">${t}</div>
+  `);
+
+  print(
+    block('#9CC6DE', 'left'),
+    block('#B49CDE', 'center'),
+    block('#DEB49C', 'right')
+  );
+  ```
+
+  Adjacent primitive or plain object values may be rendered inline within a text block.
+  Values with dedicated renderers, such as `HTML`, `Markdown`, `Image`, `XML`, or renderering extensions, receive their own output block.
+
+  ##### Layouts
+
+  `print` is also a proxy. Accessing a string property returns a print function configured with a grid layout:
+
+  ```javascript
+  import { html } from 'noto:core';
+  const block = (c, t) => html(`
+    <div style="background-color: ${c}; padding: 3em; margin-bottom: 0.5em; text-align: center">${t}</div>
+  `);
+
+  print['50% 50%'](
+    block('#9CC6DE', '50%'),
+    block('#DEB49C', '50%')
+  );
+  print['50% 25% 25%'](
+    block('#9CC6DE', '50%'),
+    block('#B49CDE', '25%'),
+    block('#DEB49C', '25%')
+  );
+  ```
+
+  A layout is a space-separated list of column widths. Each width must be a percentage, for example `50%` or `33%`.
+
+  A width can include `/N` to make the column consume `N` rendered blocks before moving to the next column:
+
+  ```javascript
+  import { html } from 'noto:core';
+  const block = (c, t) => html(`
+    <div style="background-color: ${c}; padding: 3em; margin-bottom: 0.5em; text-align: center">${t}</div>
+  `);
+
+  print['50%/2'](
+    block('#9CC6DE', '50%'),
+    block('#DEB49C', '50%')
+  );
+  print['50%/2'](
+    block('#9CC6DE', 'top'),
+    block('#B49CDE', 'bottom'),
+    block('#DEB49C', '50%')
+  );
+  ```
+
+  If the layout describes fewer rendered blocks than the call produces, NotoJS adds remaining columns automatically with equal widths based on the unused space.
+
+  ```javascript
+  import { html } from 'noto:core';
+  const block = (c, t) => html(`
+    <div style="background-color: ${c}; padding: 3em; margin-bottom: 0.5em; text-align: center">${t}</div>
+  `);
+
+  print['50%'](
+    block('#9CC6DE', '50%'),
+    block('#DEB49C', '50%')
+  );
+  print['50%'](
+    block('#9CC6DE', '50%'),
+    block('#B49CDE', '25%'),
+    block('#DEB49C', '25%')
+  );
+  ```
+
+  Prefix the first layout token with `:` to wrap the row in a slide container:
+
+  ```javascript
+  import { markdown } from 'noto:core';
+  print[':'](markdown('# Slide 1'));
+  print[':'](markdown('# Slide 2'));
+  ```
+
+  In browsers that support `requestFullscreen`, slides can be presented as a full-screen slideshow.
+
+  Slideshow mode supports the following keyboard shortcuts:
+  - left arrow: move to the previous slide
+  - right arrow: move to the next slide
+  - escape: exit slideshow mode
+  - space: move to the next slide
+  - shift + space: move to the previous slide
+
+  Throw `TypeError` if the layout string is invalid.
+also:
+  - noto:core
+  - topic:markdown
+  - topic:extensions
+---
+function: require
+args:
+  -
+    - String
+text: |-
+  Synchronously loads and executes a legacy **JavaScript** script.
+  Unlike imported modules, scripts may (and often do) export functions, constants, and variables directly to global notebook context.
+
+  `arg0` may be one of the following:
+
+  - one of the predefined legacy scripts:
+    - `dollar`
+    - `console`
+    - `mustache`
+  - a valid `http` or `https` URL — the script is loaded from that URL.
+  - a script configured in `require.config` under the `[scripts]` section — the script is loaded from the configured URL and cached.
+
+  Throws `ReferenceError` if the script cannot be loaded due to a network error, or if it is not found.
+  Rethrows any exception from the script.
+also:
+  - console
+  - dollar
+  - topic:packages
+---
+function: require.config
+args:
+  - []
+  -
+    - String
+text: |-
+  Gets or sets the module and script resolver configuration.
+
+  - Without arguments, returns the current configuration.
+  - With `arg0`, sets the configuration. The value must be a string in INI format.
+
+  Throws `SyntaxError` if the configuration cannot be parsed.
+
+  > The configuration format is a restricted subset of INI as described in `doc('topic:packages')`.{.warning}
+also:
+  - topic:packages
+---
+function: require.script
+args:
+  -
+    - Request
+    - Array
+  -
+    - Request
+    - String
+  -
+    - Request.HTTPURL
+    - Array
+  -
+    - Request.HTTPURL
+    - String
+  -
+    - Request.HTTPString
+    - Array
+  -
+    - Request.HTTPString
+    - String
+  -
+    - Request
+    - Array
+    - Object
+  -
+    - Request
+    - String
+    - Object
+  -
+    - Request.HTTPURL
+    - Array
+    - Object
+  -
+    - Request.HTTPURL
+    - String
+    - Object
+  -
+    - Request.HTTPString
+    - Array
+    - Object
+  -
+    - Request.HTTPString
+    - String
+    - Object
+text: |-
+  Fetches and executes a legacy **JavaScript** script, then returns an object containing selected values from the script context.
+
+  `arg0` specifies the script source. It may be a `Request`, `Request.HTTPURL`, or `Request.HTTPString`.
+  `arg1` specifies which names to capture after the script runs:
+
+  - a string captures one name.
+  - an array captures each string item in the array.
+
+  If `arg2` is provided, it is used as an additional lookup context while the script runs. Name lookup first checks the script context, then `arg2`, then the global object.
+
+  The script is evaluated in a legacy `with`-style context. Assignments made by the script are stored in the returned context object, and the selected names from `arg1` are copied into that object before it is returned.
+
+  ```javascript
+  const { marked } = await require.script(
+    'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
+    'marked'
+  );
+
+  print(marked.parse('# Hello from a legacy script'));
+  ```
+
+  Throws `ReferenceError` if the script cannot be fetched.
+  Throws an internal error if the HTTP response status is not `200 OK`.
+  Rethrows any exception from the script.

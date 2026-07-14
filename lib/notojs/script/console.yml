@@ -1,0 +1,30 @@
+|-
+  *Global Object Extender* that defines the `console` object.
+
+  ```js!noplay
+  require('console');
+  ```
+---
+function: console.log
+args:
+  -
+    - Tail:
+      - 0
+      - Any
+text: |-
+  Alias for `print`.
+also:
+  - print
+---
+function: console.clog
+args:
+  -
+    - String
+    - Tail:
+      - 0
+      - Any
+text: |-
+  Appends a log entry to the **NotoJS** server log.
+
+  - `arg0` — log message  
+  - `arg1` — optional values, serialized as a JSON array

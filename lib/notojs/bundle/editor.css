@@ -1,0 +1,104 @@
+:root {
+    --nj-min-editor-width: 250px;
+    --nj-max-editor-width: 950px;
+}
+nj-cell > div {
+    margin: auto;
+    max-width: var(--nj-max-editor-width);
+}
+
+nj-cell > div > div:nth-child(1) {
+    border: 1px solid #ddd;
+    overflow: hidden;
+    border-radius: 0.5em;
+}
+
+nj-cell > div > div:nth-child(2) {
+    color: darkgrey;
+    justify-content: space-between;
+    align-items: stretch;
+    padding-top: 5px;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    display: flex;
+    width: 100%;
+}
+nj-cell > div > div:nth-child(2) div {
+    align-self: center;
+    margin: 0 5px 0 5px;
+    display: flex;
+    gap: 5px;
+}
+nj-cell > div > div:nth-child(2) span:not(.material-symbols-outlined) {
+    font-family: var(--nj-monospaced);
+    padding-right: 1ch;
+    padding-left: 1ch;
+    align-self: center;
+    font-size: 12px;
+    display: inline-block;
+}
+nj-cell > div > div:nth-child(2) span.material-symbols-outlined {
+    cursor: default;
+    z-index: 3;
+}
+nj-cell > div > div:nth-child(2) span.disabled {
+    color: #efefef;
+}
+nj-cell > div > div:nth-child(3) {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+nj-cell > div > div.preview:not(.nj-output) {
+    display: none;
+}
+nj-cell > div > div.preview.nj-output {
+    margin-top: 0px !important;
+    margin-bottom: 0px !important;
+}
+nj-cell > div > div.preview div.nj-block pre + div.nj-run-code {
+    display: none;
+}
+nj-cell > div > div.preview div.nj-block li.nj-see-also::after {
+    display: none;
+}
+.CodeMirror {
+    height: auto;
+    font-family: var(--nj-monospaced);
+    font-size: 14px;
+    line-height: 1.5;
+    font-weight: 400;
+}
+.CodeMirror-gutters {
+    background: #fff !important;
+    border-right: none !important;
+    padding-right: 0.5em !important;
+}
+.CodeMirror-linewidget div.jump-to-output {
+    cursor: pointer;
+    padding: 0 4px;
+    opacity: 0.25;
+}
+.cm-gutter-error {
+    padding-right: 3px;
+    text-align: right;
+    color: red;
+}
+.cm-readonly-line .CodeMirror-linenumber {
+    visibility: hidden;
+}
+.cm-readonly-line .CodeMirror-line {
+    opacity: 0.5;
+}
+span.cm-task {
+    color: #57606a;
+}
+span.cm-task.cm-task-checked {
+    color: #1a7f37;
+}
+.CodeMirror textarea {
+  caret-color: transparent;
+}
+nj-cell[nj-inactive] .CodeMirror {
+   opacity: 0.5;
+}

@@ -1,0 +1,21 @@
+[submodule "lib/quickjs"]
+	path = lib/quickjs
+	url = https://github.com/bellard/quickjs.git
+[submodule "lib/rapidjson"]
+	path = lib/rapidjson
+	url = https://github.com/Tencent/rapidjson.git
+[submodule "lib/pugixml"]
+	path = lib/pugixml
+	url = https://github.com/zeux/pugixml.git
+[submodule "lib/lmdb"]
+	path = lib/lmdb
+	url = https://github.com/LMDB/lmdb.git
+[submodule "lib/lmdbxx"]
+	path = lib/lmdbxx
+	url = https://github.com/drycpp/lmdbxx.git
+[submodule "lib/yaml"]
+	path = lib/yaml
+	url = https://github.com/jbeder/yaml-cpp.git
+[submodule "lib/lexbor"]
+	path = lib/lexbor
+	url = https://github.com/lexbor/lexbor.git

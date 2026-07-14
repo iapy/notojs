@@ -1,0 +1,393 @@
+text: |-
+  `noto:db` provides access to an embedded **LMDB**.
+
+  ###### Exports:
+  - `function backup`
+  - `function info`
+  - `function open`
+  - `function stat`
+also:
+  - topic:lmdb
+---
+exception: DBException
+docs: DBException
+text: |-
+  `DBException` is thrown by functions in the `noto:db` library on failure.
+
+  Defines the following properties:
+  - `code` — error code (`std::error_code`)
+  - `message` — explanatory string
+---
+class: Handle
+docs: Handle
+text: |-
+  `Handle` is a database handle inside a transaction.
+properties:
+  stat:
+    getter: true
+    docs: Handle.stat
+    text: |-
+      Obtain statistics about current database:
+
+      - `branch_pages` — Number of internal (non-leaf) pages
+      - `depth` — Depth (height) of the B-tree
+      - `entries` — Number of key/value pairs saved in database
+      - `leaf_pages` — Number of leaf pages
+      - `overflow_pages` — Number of overflow pages
+      - `psize` — Size of a database page. This is the same for all databases.
+methods:
+  del:
+    args:
+      -
+        - Number
+      -
+        - String
+    docs: Handle.del
+    text: |-
+      Removes the key/value pair associated with the given key `arg0` from the current database.
+
+      Returns `true` if the entry was removed, or `false` if no entry existed.
+      Throws `DBException` if invoked within a read-only transaction.
+  each:
+    args:
+      -
+        - Function
+      -
+        - Array
+        - Function
+    docs: Handle.each
+    text: |-
+      Iterates over entries in the current database in binary key order.
+
+      The callback is invoked for each entry.
+
+      - In the first form:
+        - `arg0` — callback function
+
+      - In the second form:
+        - `arg0` — key bounds
+        - `arg1` — callback function
+
+      The callback function is invoked with two arguments: the key and the value of the current entry.
+      Key bounds are defined as:
+      - `[min]` — start from `min` key (no upper bound)
+      - `[min, max]` — range from `min` to `max`
+      - `[null, max]` — up to `max` key (no lower bound)
+
+      Returns `undefined`.
+  get:
+    args:
+      -
+        - Number
+      -
+        - String
+    docs: Handle.get
+    text: |-
+      Gets the value associated with given key `arg0` or `null` if key doesn't exist.
+  has:
+    args:
+      -
+        - Number
+      -
+        - String
+    docs: Handle.has
+    text: |-
+      Checks if key `arg0` exists in current database.
+  map:
+    args:
+      -
+        - Function
+      -
+        - Array
+        - Function
+    docs: Handle.map
+    text: |-
+      Maps values in the current database.
+
+      In the first form:
+        - `arg0` — mapping function
+
+      In the second form:
+        - `arg0` — key bounds
+        - `arg1` — mapping function
+
+      The mapper function is invoked with two arguments: the key and the value of the current entry.
+      Key bounds are defined as:
+      - `[min]` — start from `min` key (no upper bound)
+      - `[min, max]` — range from `min` to `max`
+      - `[null, max]` — up to `max` key (no lower bound)
+
+      Returns an array of mapped values.
+  reduce:
+    args:
+      -
+        - Function
+        - Any
+      -
+        - Array
+        - Function
+        - Any
+    docs: Handle.reduce
+    text: |-
+      Reduces values in the current database.
+
+      The reduction function is invoked for each entry and receives the accumulator and current value.
+
+      In the first form:
+        - `arg0` — reducer function
+        - `arg1` — initial accumulator value
+
+      In the second form:
+        - `arg0` — key bounds
+        - `arg1` — reducer function
+        - `arg2` — initial accumulator value
+
+      The reduction function is invoked with three arguments: current value of an accumulator, the key and the value of the current entry.
+      Key bounds are defined as:
+      - `[min]` — start from `min` key (no upper bound)
+      - `[min, max]` — range from `min` to `max`
+      - `[null, max]` — up to `max` key (no lower bound)
+
+      Returns the final accumulated result and rethrows any exception thrown by reducer function.
+  set:
+    args:
+      -
+        - String
+        - String
+      -
+        - Number
+        - String
+      -
+        - String
+        - Any
+      -
+        - Number
+        - Any
+    docs: Handle.set
+    text: |-
+      Stores a key/value pair in the current database, replacing existing key.
+
+      Accepts a key (`arg0`) and a value (`arg1`):
+
+      - `arg0` — `String` or `Integer`, the key
+      - `arg1` — `String` or `Any`, the value. Non-string values are stored as serialized JSON.
+
+      Throws `DBException` if invoked within a read-only transaction.
+---
+class: Database
+docs: Database
+text: |-
+  `Database` is an interface to a generic database.
+defs:
+  - type: Name
+    base: String
+    docs: Database.Name
+    text: |-
+      Valid database name. Must contain only English letters or `:`, and must not start with `:` or contain `::`.
+properties:
+  length:
+    getter: true
+    docs: Database.length
+    text: |-
+      Contains number of databases associated with this object.
+methods:
+  drop:
+    args:
+      -
+        []
+    docs: Database.drop
+    text: |-
+      Drops all databases associated with this object.
+
+      > This operation is irreversible. Use with caution.{.warning}
+  ro:
+    args:
+      -
+        - Function
+    docs: Database.ro
+    text: |-
+      Executes a read-only transaction across all databases associated with this object.
+
+      `arg0` is invoked with one argument per database specified when this object was created via `open`.
+      Each argument is a `Handle`, and the order matches the order of the database names.
+
+      Returns the result of `arg0` invocation and rethrows any exception thrown by `arg0`.
+  rw:
+    args:
+      -
+        - Function
+    docs: Database.rw
+    text: |-
+      Executes a read-write transaction across all databases associated with this object and commits it.
+
+      `arg0` is invoked with one argument per database specified when this object was created via `open`.
+      Each argument is a `Handle`, and the order matches the order of the database names.
+
+      Returns the result of `arg0`. If `arg0` throws, the transaction is rolled back and the exception is rethrown.
+---
+class: System
+docs: System
+text: |-
+  `System` provides access to databases in the `sys:` and `var:` namespaces.
+
+  It has limited functionality compared to `Database`, supporting only database removal and retrieval of statistics.
+defs:
+  - type: Name
+    base: String
+    docs: System.Name
+    text: |-
+      Used internally, not documented.
+properties:
+  stat:
+    getter: true
+    docs: System.stat
+    text: |-
+      Obtain statistics about current database:
+
+      - `branch_pages` — Number of internal (non-leaf) pages
+      - `depth` — Depth (height) of the B-tree
+      - `entries` — Number of key/value pairs saved in database
+      - `leaf_pages` — Number of leaf pages
+      - `overflow_pages` — Number of overflow pages
+      - `psize` — Size of a database page. This is the same for all databases.
+methods:
+  drop:
+    args:
+      -
+        []
+    docs: System.drop
+    text: |-
+      Drops the database.
+
+      > This operation is irreversible. Use with caution.{.warning}
+---
+class: ErrorLog
+base: System
+docs: ErrorLog
+text: |-
+  `ErrorLog` provides access to `sys:errorlog` database.
+
+  The `sys:errorlog` database stores information about errors that occur during automatic execution of notebooks.
+properties:
+  data:
+    getter: true
+    docs: ErrorLog.data
+    text: |-
+      Contains data stored in the database.
+
+      The data is an array of objects with the following fields:
+      - `time` — timestamp of when the error occurred
+      - `type` — error type (e.g. `ReferenceError`)
+      - `where` — name of the notebook that caused the error
+      - `stack` — stack trace
+      - `data` — additional error object fields (if any)
+methods:
+  drop:
+    args:
+      -
+        []
+      -
+        - Number
+    docs: ErrorLog.drop
+    text: |-
+      Drops data from the database.
+
+      - If invoked without arguments, drops all data.
+      - If invoked with `arg0`, drops data with `time` less or equal than `arg0`.
+---
+class: HTTPData
+base: System
+docs: HTTPData
+text: |-
+  `HTTPData` provides access to `sys:httpdata` database.
+properties:
+  data:
+    getter: true
+    docs: HTTPData.data
+    text: |-
+      Contains data stored in the database.
+
+      The data is an array of objects with the following fields:
+      - `base` — host name of the cached data, including protocol (e.g. `https://cdnjs.cloudflare.com`)
+      - `type` — one of:
+        - `system` — internal system cache (primarily cached modules)
+        - `internal` — internal non-system cache (e.g. icons)
+        - `fetch` — responses cached via `fetch`
+      - `path` — an object where each key is the **MD5** hash of a URL path and the value is the size of the cached response
+methods:
+  drop:
+    args:
+      -
+        []
+      -
+        - String
+      -
+        - String
+        - String
+    docs: HTTPData.drop
+    text: |-
+      Drops data from the database.
+
+      - If invoked without arguments, drops all data.
+      - If invoked with one argument `arg0`, drops all data for the specified cache type (`system`, `internal`, or `fetch`).
+      - If invoked with two arguments, drops all data for the specified cache type (`arg0`) with base `arg1`.
+---
+function: backup
+args:
+  -
+    - fs::IPath
+docs: backup
+text: |-
+  Backs up the **LMDB** environment.
+
+  `arg0` must be a `Path` pointing to a non-existent or empty directory.
+  Throws `DBException` on error or if `arg0` path is read-only.
+---
+function: info
+args:
+  -
+    []
+docs: info
+text: |-
+  Returns information about the **LMDB** environment.
+
+  The returned `Object` has the following fields:
+  - `last_pgno` — ID of the last used page
+  - `last_txnid` — ID of the last committed transaction
+  - `mapsize` — size of the data memory map
+  - `maxreaders` — maximum number of reader slots
+  - `numreaders` — number of reader slots currently in use
+---
+function: stat
+args:
+  -
+    []
+docs: stat
+text: |-
+  Return statistics about the **LMDB** environment.
+
+  The returned `Object` has the following fields:
+  - `branch_pages` — Number of internal (non-leaf) pages
+  - `depth` — Depth (height) of the B-tree
+  - `entries` — Number of databases in the environment
+  - `leaf_pages` — Number of leaf pages
+  - `overflow_pages` — Number of overflow pages
+  - `psize` — Size of a database page. This is the same for all databases.
+---
+function: open
+args:
+  -
+    - Tail:
+        - 1
+        - String
+text: |-
+  Creates a `Database` instance.
+
+  Accepts a variable number of arguments, each a string representing a database name.
+
+  - If the first argument starts with `sys:` or `var:`, it must be the only argument. In this case, `open` returns:
+    - `ErrorLog` for `sys:errorlog`
+    - `HTTPData` for `sys:httpdata`
+    - `System` for any other value
+  - Otherwise, all arguments are treated as database names in the `usr:` namespace, validated against `Database.Name`,
+  and `open` returns a `Database` instance.

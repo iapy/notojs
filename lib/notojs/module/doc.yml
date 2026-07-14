@@ -1,0 +1,41 @@
+|-
+  `noto:doc` provides access to **NotoJS** documentation.
+
+  ###### Exports
+  - `function doc`
+  - `function suite`
+---
+function: doc
+args:
+  -
+    []
+  -
+    - String
+docs: doc
+text: |-
+  Returns a `Markdown` object containing documentation for the topic `arg0` if specified or the top-level documentation otherwise.
+
+  The topic may be one of the following:
+
+  - `noto:{name}` — documentation for module `noto:{name}`
+  - `topic:{name}` — documentation on topic `{name}`
+  - otherwise, documentation is searched for a class, method, or function across all modules, for example:
+    - `Path`
+    - `Path.write`
+    - `fetch`
+
+  ###### Default export
+---
+function: suite
+args:
+  -
+    []
+docs: suite
+text: |-
+  Returns a `String` containing the configured documentation suite or `null` if suite is not configured.
+
+  The suite is defined in the main configuration file:
+  ```
+  [module:doc]
+  suite = /path/to/libdoc.so
+  ```

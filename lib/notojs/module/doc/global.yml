@@ -1,0 +1,152 @@
+text: |-
+  `global.hpp` provides C++ interfaces for selected APIs available on JavaScript global object.
+also:
+  - noto:global
+---
+interface: noto::Blob
+docs: noto::Blob
+text: |-
+  Represents a *pointer* to JavaScript `Blob` object owned by the host runtime.
+
+  ```c++
+  JSValue copy(JSContext *ctx, noto::Blob blob) {
+    auto [data, size] = blob->data();
+    return noto::Blob::make(ctx, data, size, blob->type());
+  }
+  ```
+also:
+  - Blob
+methods:
+  copy:
+    sign:
+      - type: std::shared_ptr<std::vector<std::uint8_t>>
+        args:
+          []
+    docs: noto::Blob.copy
+    text: |-
+      Returns the copy of `Blob` bytes.
+  data:
+    sign:
+      - type: std::pair<const std::uint8_t *, std::size_t>
+        args:
+          []
+    docs: noto::Blob.data
+    text: |-
+      Returns the `std::pair` containing the pointer to `Blob` data and its size.
+  type:
+    sign:
+      - type: std::string
+        args:
+          []
+    docs: noto::Blob.type
+    text: |-
+      Returns the `Blob` MIME type.
+statics:
+  make:
+    sign:
+      - type: JSValue
+        args:
+          - JSContext *
+          - "std::vector<std::uint8_t> &&"
+          - "const std::string &"
+      - type: JSValue
+        args:
+          - JSContext *
+          - const std::uint8_t *
+          - std::size_t
+          - "const std::string &"
+    docs: noto::Blob.make
+    text: |-
+      Creates and returns `JSValue` representing a `Blob`.
+---
+interface: noto::URL
+docs: noto::URL
+text: |-
+  Represents a *pointer* to JavaScript `URL` object owned by the host runtime.
+
+  ```c++
+  JSValue copy(JSContext *ctx, noto::URL url) {
+    if(auto u = noto::URL::parse(url->href()); u)
+        return noto::URL::make(ctx, std::move(*u));
+    return JS_NULL;
+  }
+  ```
+also:
+  - URL
+methods:
+  href:
+    sign:
+      - type: std::string
+        args:
+          []
+    docs: noto::URL.href
+    text: |-
+      Returns string representation the `URL`.
+statics:
+  make:
+    sign:
+      - type: JSValue
+        args:
+          - JSContext *
+          - "boost::urls::url &&"
+    docs: noto::URL.make
+    text: |-
+      Creates and returns `JSValue` representing an `URL`.
+  parse:
+    sign:
+      - type: std::optional<boost::urls::url>
+        args:
+          - const char *
+    docs: noto::URL.parse
+    text: |-
+      Parses an url and returns `std::optional<boost::urls::url>` which is not `std::nullopt` if parsing succeeds.
+      Supports relative URLs when `[global].prefix` is configured.
+---
+function: noto::clog
+sign:
+  - type: JSValue
+    args:
+      - JSContext *
+      - int
+      - JSValue *
+docs: noto::clog
+text: |-
+  Writes one or more JavaScript values to the **NotoJS** server log. The first argument must be a string.
+  Returns `undefined`, or thrown a JavaScript exception if the arguments are invalid.
+also:
+  - console.clog
+---
+function: noto::fetch
+sign:
+  - type: JSValue
+    args:
+      - JSContext *
+      - "boost::beast::http::request<boost::beast::http::string_body> &&"
+      - "boost::urls::url &&"
+      - "JSValue (*)(JSContext *, JSValue, const boost::beast::http::response<boost::beast::http::string_body> &)"
+docs: noto::fetch
+text: |-
+  Sends a constructed `boost::beast::http::request` to the requested URL and returns a JavaScript `Promise`.
+  The callback is invoked for a successful response with the:
+
+  - `JSContext`
+  - `JSValue` referencing the JavaScript `Response`
+  - reference to the C++ response object
+
+  Callback should return the value promise resolves to.
+also:
+  - fetch
+---
+function: noto::print
+sign:
+  - type: JSValue
+    args:
+      - JSContext *
+      - int
+      - JSValue *
+docs: noto::print
+text: |-
+  Prints its JavaScript arguments to cell output using host `print` implementation.
+  Returns `undefined`.
+also:
+  - print

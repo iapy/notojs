@@ -1,0 +1,51 @@
+text: |-
+  *Global Object Extender* that defines the `$.ajax` function for limited compatibility with **jQuery**-based `fetch` API.
+
+  ```js!noplay
+  require('dollar');
+  ```
+
+  > This is a legacy API and is not recommended for use unless
+  compatibility with existing **jQuery**-based scripts is required.{.warning}
+also:
+  - '$'
+---
+struct: Config
+fields:
+  contentType:
+    type: String
+    text: |-
+      Value of the `Content-Type` header.
+  dataType:
+    type: String
+    text: |-
+      If `json`, the response body is returned as JSON; otherwise, it is returned as text.
+  data:
+    type: String
+    text: |-
+      The request body.
+  headers:
+    type: Dict[String]
+    text: |-
+      Request headers.
+  method:
+    type: String
+    text: |-
+      HTTP method. Defaults to `GET`.
+  url:
+    type: Request.HTTPString
+    text: |-
+      URL. Required.
+text: |-
+  Set of options that can be used to configure a `Request`.
+---
+function: $.ajax
+args:
+  -
+    - Config
+text: |-
+  Performs an HTTP request asynchronously.
+
+  Constructs `Request` from `arg0`, invokes `fetch` and returns a `Promise` resolving to the response body:
+  - JSON if `dataType` is `json`
+  - text otherwise

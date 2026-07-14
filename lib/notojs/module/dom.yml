@@ -1,0 +1,2582 @@
+text: |-
+  `noto:dom` provides a subset of the DOM API for server-side use in **NotoJS**.
+
+  It is intended for compatibility with libraries such as *svg.js* and *D3*, is not necessarily
+  standards-compliant and supports parsing and manipulation of HTML and XML documents.
+
+  The implementation of `HTMLDocument` is backed by [lexbor](https://lexbor.com).
+  The implementation of `XMLDocument` is backed by [pugixml](https://pugixml.org).
+
+  ###### Exports
+  - `class Document`
+  - `class DOMParser`
+  - `const window = new Window()`
+also:
+  - https://developer.mozilla.org/en-US/docs/Glossary/DOM
+  - topic:dom
+---
+exception: DOMException
+docs: DOMException
+text: |-
+  DOMException represents an abnormal event that occurs as a result of calling a method or accessing a property of a DOM API.
+
+  Defines the following properties:
+  - `code` one of the legacy error code constants
+  - `name` string that contains error name
+  - `message` string representing a message or description associated with the given error
+
+  `NotoJS` implementation supports the following exception types:
+  - `HierarchyRequestError`, `code=3`
+  - `WrongDocumentError`, `code=4`
+  - `NotFoundError`, `code=8`
+  - `SyntaxError`, `code=12`
+  - `NamespaceError`, `code=14`
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/DOMException
+---
+class: Event
+docs: Event
+text: |-
+  Stub class for compatibility with some libraries
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Event
+ctor:
+  args:
+    -
+      []
+  docs: Event.constructor
+  text: |-
+    Creates a new `Event` object.
+---
+class: CustomEvent
+base: Event
+docs: CustomEvent
+text: |-
+  Stub class for compatibility with some libraries
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent
+ctor:
+  args:
+    -
+      - String
+    -
+      - String
+      - Object
+  docs: CustomEvent.constructor
+  text: |-
+    Creates a new `CustomEvent` object.
+---
+class: NodeList
+docs: NodeList
+text: |-
+  `NodeList` is live (its contents update as the DOM changes) collection of nodes,
+  returned by properties such as `Node.childNodes` and methods such as `Document.querySelectorAll`.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/NodeList
+properties:
+  length:
+    getter: true
+    docs: NodeList.length
+    text: |-
+      The number of nodes in the `NodeList`.
+methods:
+  "[Symbol.iterator]":
+    args:
+      -
+        []
+    docs: NodeList.[Symbol.iterator]
+    text: |-
+      Returns an iterator allowing code to go through all values (nodes) of the key/value pairs contained in the `NodeList`.
+      Equivalent to `NodeList.values`.
+  entries:
+    args:
+      -
+        []
+    docs: NodeList.entries
+    text: |-
+      Returns an iterator, allowing code to go through all key/value pairs contained in the `NodeList`.
+      The keys are integers starting from 0 and the values are nodes.
+  forEach:
+    args:
+      -
+        - Function
+      -
+        - Function
+        - Any
+    docs: NodeList.forEach
+    text: |-
+      Executes a provided callback `arg0` once for each `NodeList` element.
+
+      - `arg0` — function to execute for each element, eventually taking three arguments:
+        - `arg0` — the current element being processed in the `NodeList`.
+        - `arg1` — the index of the current element being processed in the `NodeList`.
+        - `arg2` — the object that `forEach` is being applied to
+      - `arg1` — the value of `this` when executing callback
+  item:
+    args:
+      -
+        - Number
+    docs: NodeList.item
+    text: |-
+      Returns an item in the `NodeList` by its index `arg0`, or `null` if the index is out-of-bounds.
+  keys:
+    args:
+      -
+        []
+    docs: NodeList.keys
+    text: |-
+      Returns an iterator, allowing code to go through all the keys of the key/value pairs contained in the `NodeList`.
+      The keys are integers starting from 0.
+  values:
+    args:
+      -
+        []
+    docs: NodeList.values
+    text: |-
+      Returns an iterator allowing code to go through all values (nodes) of the key/value pairs contained in the `NodeList`.
+      Equivalent to `NodeList.[Symbol.iterator]`.
+---
+class: Node
+docs: Node
+text: |-
+  The `Node` interface represents any node in a `Document`.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Node
+properties:
+  _document:
+    getter: true
+    docs: Node._document
+    text: |-
+      Contains the Document associated with `this` `Node`. Unlike `ownerDocument`, this property may be `null` if the `Document` has been garbage collected.
+  baseURI:
+    getter: true
+    docs: Node.baseURI
+    text: |-
+      Contains `String` `about:blank`.
+  childNodes:
+    getter: true
+    docs: Node.childNodes
+    text: |-
+      Contains a `NodeList` containing all the children of this `Node`.
+  firstChild:
+    getter: true
+    docs: Node.firstChild
+    text: |-
+      Contains a `Node` representing the first direct child node of this `Node`, or `null` if this `Node` has no children.
+  isConnected:
+    getter: true
+    docs: Node.isConnected
+    text: |-
+      Contains `true` if this `Node` is connected to its `Document` (i.e. not removed), and `false` otherwise.
+  lastChild:
+    getter: true
+    docs: Node.lastChild
+    text: |-
+      Contains a `Node` representing the last direct child node of this `Node`, or `null` if this `Node` has no children.
+  namespaceURI:
+    getter: true
+    docs: Node.namespaceURI
+    text: |-
+      Contains the namespace URI of this `Node`, or `null` if this `Node` belongs to an `XMLDocument`.
+  nextSibling:
+    getter: true
+    docs: Node.nextSibling
+    text: |-
+      Contains a `Node` representing the next node in the tree, or `null` if there isn't such node.
+  nodeName:
+    getter: true
+    docs: Node.nodeName
+    text: |-
+      Contains the name of the `Node`:
+
+      - `'#cdata-section'` for CDATA nodes
+      - `'#comment'` for comment nodes
+      - `'#document'` for `Document`
+      - `'#text'` for `Text`
+      - `Element.tagName` for `Element`
+  nodeType:
+    getter: true
+    docs: Node.nodeType
+    text: |-
+      Contains a `Number` representing the type of this `Node`:
+
+      - `1` — `Element`
+      - `2` — `Attr`
+      - `3` — `Text`
+      - `4` — CDATA
+      - `7` — processing instruction
+      - `8` — comment node
+      - `9` — `Document`
+      - `10` — `<!DOCTYPE>`
+  nodeValue:
+    getter: true
+    setter:
+      - String
+    docs: Node.nodeValue
+    text: |-
+      Gets or sets the value of this `Node`.
+  ownerDocument:
+    getter: true
+    docs: Node.ownerDocument
+    text: |-
+      Contains `Document` this `Node` belongs to.
+  parentElement:
+    getter: true
+    docs: Node.parentElement
+    text: |-
+      Contains an `Element` that is the parent of this `Node`, or `null` if there isn't such `Element`.
+  parentNode:
+    getter: true
+    docs: Node.parentNode
+    text: |-
+      Contains a `Node` that is the parent of this `Node`, or `null` if there isn't such node.
+  previousSibling:
+    getter: true
+    docs: Node.previousSibling
+    text: |-
+      Contains a `Node` representing the previous node in the tree, or `null` if there isn't such node.
+  textContent:
+    getter: true
+    setter:
+      - "Null"
+      - Any
+    docs: Node.textContent
+    text: |-
+      Gets or sets the textual content of this `Node`.
+
+      - When accessed, returns textual content of this `Node`.
+      - When set, replaces this `Node`’s content with a single `Text` node created from the provided value.
+methods:
+  appendChild:
+    args:
+      -
+        - Node
+    docs: Node.appendChild
+    text: |-
+      Adds `arg0` to the end of the list of children of this `Node`.
+
+      Throws `DOMException (HierarchyRequestError)` if `arg0` is ancestor of this `Node`.
+      Throws `DOMException (WrongDocumentError)` if `arg0` and this `Node` belong to different documents.
+  cloneNode:
+    args:
+      -
+        []
+      -
+        - Boolean
+    docs: Node.cloneNode
+    text: |-
+      Returns a clone of this node. If `arg0` is `true`, the clone includes all of its content.
+  compareDocumentPosition:
+    args:
+      -
+        - Attr
+      -
+        - Node
+    docs: Node.compareDocumentPosition
+    text: |-
+      Compares the position of this node with `arg0` and returns a bitmask describing their relationship in the document tree.
+
+      If `arg0` is `Node`, the returned value is a combination of zero or more of the following flags:
+
+      | Value | Constant | Description |
+      |---------|----------|-------------|
+      | 0x01 | DOCUMENT_POSITION_DISCONNECTED | The nodes belong to different trees or documents. |
+      | 0x02 | DOCUMENT_POSITION_PRECEDING | `arg0` precedes this node in document order. |
+      | 0x04 | DOCUMENT_POSITION_FOLLOWING | `arg0` follows this node in document order. |
+      | 0x08 | DOCUMENT_POSITION_CONTAINS | `arg0` is an ancestor of this node. |
+      | 0x10 | DOCUMENT_POSITION_CONTAINED_BY | `arg0` is a descendant of this node. |
+      | 0x20 | DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC | The relative order is implementation-specific. |
+
+      If `arg0` is `Attr`, the returned value is a combination of zero or more of the following flags:
+
+      | Value | Constant | Description |
+      |---------|----------|-------------|
+      | 0x01 | DOCUMENT_POSITION_DISCONNECTED | `this` attribute and `arg0` do not belong to the same document tree. |
+      | 0x02 | DOCUMENT_POSITION_PRECEDING | `arg0` precedes `this` attribute in implementation-defined order. |
+      | 0x04 | DOCUMENT_POSITION_FOLLOWING | `arg0` follows `this` attribute in implementation-defined order. |
+      | 0x08 | DOCUMENT_POSITION_CONTAINS | `arg0` is an attribute of `this`. |
+
+      Returns 0 if `arg0` is this node.
+  contains:
+    args:
+      -
+        - "Null"
+      -
+        - Attr
+      -
+        - Node
+    docs: Node.contains
+    text: |-
+      Returns `true` if `arg0` is descendant of this `Node` and `false` otherwise.
+      Returns `false` if `arg0` is `null`.
+  dispatchEvent:
+    args:
+      -
+        - Event
+    docs: Node.dispatchEvent
+    text: |-
+      Noop. For compatibility.
+  getRootNode:
+    args:
+      -
+        []
+    docs: Node.getRootNode
+    text: |-
+      Returns the topmost ancestor of this node.
+  hasChildNodes:
+    args:
+      -
+        []
+    docs: Node.hasChildNodes
+    text: |-
+      Returns `true` if this `Node` has any children and `false` otherwise.
+  insertBefore:
+    args:
+      -
+        - Node
+        - "Null"
+      -
+        - Node
+        - Node
+    docs: Node.insertBefore
+    text: |-
+      Inserts `arg0` as a child of this node before `arg1`. If `arg1` is `null`, `arg0` is appended by calling `appendChild(arg0)`.
+
+      Returns `arg0`.
+
+      Throws
+      - `DOMException (HierarchyRequestError)` if `arg0` is ancestor of this `Node`.
+      - `DOMException (NotFoundError)` if `arg1` is not `null` and isn't child of this `Node`.
+      - `DOMException (WrongDocumentError)` if `arg0` and this `Node` belong to different documents.
+  isDefaultNamespace:
+    args:
+      -
+        - String
+    docs: Node.isDefaultNamespace
+    text: |-
+      Returns `true` if this `Node` belongs to an `HTMLDocument` and `arg0` is `http://www.w3.org/1999/xhtml`.
+  isEqualNode:
+    args:
+      -
+        - "Null"
+      -
+        - Attr
+      -
+        - Node
+    docs: Node.isEqualNode
+    text: |-
+      Returns `true` if `arg0` is equal to this `Node`.
+
+      Two nodes are considered equal if they have the same type, name, namespace, value, attributes, and equivalent child nodes.
+      The nodes do not need to be the same object.
+
+      Returns `false` if `arg0` is null or differs from this `Node` in any of the above properties.
+  isSameNode:
+    args:
+      -
+        - "Null"
+      -
+        - Attr
+      -
+        - Node
+    docs: Node.isSameNode
+    text: |-
+      Returns `this === arg0`.
+  lookupNamespaceURI:
+    args:
+      -
+        - String
+    docs: Node.lookupNamespaceURI
+    text: |-
+      Returns `null`.
+  lookupPrefix:
+    args:
+      -
+        - String
+    docs: Node.lookupPrefix
+    text: |-
+      Returns `null`.
+  normalize:
+    args:
+      -
+        []
+    docs: Node.normalize
+    text: |-
+      Removes empty text nodes and merges adjacent text nodes into a single text node.
+      After normalization, no two text nodes are adjacent within the subtree rooted at this node.
+  removeChild:
+    args:
+      -
+        - Node
+    docs: Node.removeChild
+    text: |-
+      Removes child node `arg0` from the DOM and returns the removed `Node`.
+
+      Throws
+      - `DOMException (NotFoundError)` if `arg0` is not child of this `Node`.
+      - `DOMException (WrongDocumentError)` if `arg0` and this `Node` belong to different documents.
+  replaceChild:
+    args:
+      -
+        - Node
+        - Node
+    docs: Node.replaceChild
+    text: |-
+      Replaces child `arg1` of `this` Node with `arg0` and returns `arg1`.
+
+      Throws
+      - `DOMException (NotFoundError)` if `arg1` is not child of this `Node`.
+      - `DOMException (HierarchyRequestError)` if `arg0` is ancestor of this `Node`.
+      - `DOMException (WrongDocumentError)` if `arg0` and this `Node` belong to different documents.
+---
+class: Attr
+base: Node
+docs: Attr
+text: |-
+  The interface representing one of attribute of an `Element`'s as an object.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Attr
+properties:
+  _document:
+    getter: true
+    docs: Attr._document
+    text: |-
+      Contains the Document associated with `this` `Node`. Unlike `ownerDocument`, this property may be `null` if the `Document` has been garbage collected.
+  childNodes:
+    getter: true
+    docs: Attr.childNodes
+    text: |-
+      Contains an empty `NodeList`.
+  firstChild:
+    getter: true
+    docs: Attr.firstChild
+    text: |-
+      Contains `null`.
+  isConnected:
+    getter: true
+    docs: Attr.isConnected
+    text: |-
+      A boolean indicating whether or not the `Attr` is connected to the `Element` object.
+  lastChild:
+    getter: true
+    docs: Attr.lastChild
+    text: |-
+      Contains `null`.
+  namespaceURI:
+    getter: true
+    docs: Attr.namespaceURI
+    text: |-
+      Contains the namespace URI of this `Attr`, or `null` if this `Attr` belongs to an `XMLDocument`.
+  nextSibling:
+    getter: true
+    docs: Attr.nextSibling
+    text: |-
+      Contains `null`.
+  nodeName:
+    getter: true
+    docs: Attr.nodeName
+    text: |-
+      Contains the name of this `Attr`.
+  nodeType:
+    getter: true
+    docs: Attr.nodeType
+    text: |-
+      Contains `2`.
+  nodeValue:
+    getter: true
+    setter:
+      - String
+    docs: Attr.nodeValue
+    text: |-
+      Gets or sets the value of this `Attr`.
+  ownerDocument:
+    getter: true
+    docs: Attr.ownerDocument
+    text: |-
+      Returns the `Document` that this `Attr` belongs to.
+  ownerElement:
+    getter: true
+    docs: Attr.ownerElement
+    text: |-
+      Returns the `Element` that this `Attr` belongs to or `null` if this `Attr` is not connected.
+  parentElement:
+    getter: true
+    docs: Attr.parentElement
+    text: |-
+      Contains `null`.
+  parentNode:
+    getter: true
+    docs: Attr.parentNode
+    text: |-
+      Contains `null`.
+  previousSibling:
+    getter: true
+    docs: Attr.previousSibling
+    text: |-
+      Contains `null`.
+  textContent:
+    getter: true
+    setter:
+      - String
+    docs: Attr.textContent
+    text: |-
+      Gets or sets the value of this `Attr`.
+  value:
+    getter: true
+    setter:
+      - String
+    docs: Attr.value
+    text: |-
+      Gets or sets the value of this `Attr`.
+methods:
+  appendChild:
+    args:
+      -
+        []
+    docs: Attr.appendChild
+    text: |-
+      Throws `DOMException (HierarchyRequestError)`.
+  cloneNode:
+    args:
+      -
+        []
+    docs: Attr.cloneNode
+    text: |-
+      Creates and returns a copy of this attribute.
+
+      The returned attribute is disconnected, has the same namespace, qualified name, and value as `this` attribute.
+  compareDocumentPosition:
+    args:
+      -
+        - Attr
+      -
+        - Node
+    docs: Attr.compareDocumentPosition
+    text: |-
+      Compares the position of this node with `arg0` and returns a bitmask describing their relationship in the document tree.
+
+      If `arg0` is `Attr`, the returned value is a combination of zero or more of the following flags:
+
+      | Value | Constant | Description |
+      |---------|----------|-------------|
+      | 0x01 | DOCUMENT_POSITION_DISCONNECTED | `this` attribute and `arg0` do not belong to the same document tree. |
+      | 0x02 | DOCUMENT_POSITION_PRECEDING | `arg0` precedes `this` attribute in implementation-defined order. |
+      | 0x04 | DOCUMENT_POSITION_FOLLOWING | `arg0` follows `this` attribute in implementation-defined order. |
+      | 0x10 | DOCUMENT_POSITION_CONTAINED_BY | if `arg0` is an `Element` and `this` is an attribute of `arg0`. |
+
+      If `arg0` is `Node`, the returned value is a result of `this.ownerElement.compareDocumentPosition(this)`.
+
+      Returns 0 if `arg0` is `this` `Attr`.
+  contains:
+    args:
+      -
+        - "Null"
+      -
+        - Node
+      -
+        - Attr
+    docs: Attr.contains
+    text: |-
+      Returns `false`.
+  dispatchEvent:
+    args:
+      -
+        - Event
+    docs: Attr.dispatchEvent
+    text: |-
+      Noop. For compatibility.
+  getRootNode:
+    args:
+      -
+        []
+    docs: Attr.getRootNode
+    text: |-
+      Returns `null` if `this` is disconnected and `Element.getRootNode` of `ownerElement` otherwise.
+  hasChildNodes:
+    args:
+      -
+        []
+    docs: Attr.hasChildNodes
+    text: |-
+      Returns `false`.
+  insertBefore:
+    args:
+      -
+        []
+    docs: Attr.insertBefore
+    text: |-
+      Throws `DOMException (HierarchyRequestError)`.
+  isDefaultNamespace:
+    args:
+      -
+        - String
+    docs: Attr.isDefaultNamespace
+    text: |-
+      Returns `true` if this `Attr` belongs to an `HTMLDocument` and `arg0` is `http://www.w3.org/1999/xhtml`.
+  isEqualNode:
+    args:
+      -
+        - "Null"
+      -
+        - Attr
+      -
+        - Node
+    docs: Attr.isEqualNode
+    text: |-
+      Returns `true` if `arg0` is an `Attr` with the same namespace, qualified name, and value as `this` attribute.
+  isSameNode:
+    args:
+      -
+        - "Null"
+      -
+        - Attr
+      -
+        - Node
+    docs: Attr.isSameNode
+    text: |-
+      Returns `this === arg0`.
+  lookupNamespaceURI:
+    args:
+      -
+        - String
+    docs: Attr.lookupNamespaceURI
+    text: |-
+      Returns `null`.
+  lookupPrefix:
+    args:
+      -
+        - String
+    docs: Attr.lookupPrefix
+    text: |-
+      Returns `null`.
+  normalize:
+    args:
+      -
+        []
+    docs: Attr.normalize
+    text: |-
+      Noop.
+  removeChild:
+    args:
+      -
+        []
+    docs: Attr.removeChild
+    text: |-
+      Throws `DOMException` (`HierarchyRequestError`).
+  replaceChild:
+    args:
+      -
+        []
+    docs: Attr.replaceChild
+    text: |-
+      Throws `DOMException` (`HierarchyRequestError`).
+---
+class: DOMRect
+docs: DOMRect
+text: |-
+  Represents a rectangle defined by its position and dimensions. Aliased `window.SVGRect`.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/DOMRect
+properties:
+  height:
+    getter: true
+    docs: DOMRect.height
+    text: |-
+      Contains the height of the rectangle. If `height` is `0` or not defined, contains `1` for compatibility with some libraries.
+  width:
+    getter: true
+    docs: DOMRect.width
+    text: |-
+      Contains the width of the rectangle. If `width` is `0` or not defined, contains `1` for compatibility with some libraries.
+  x:
+    getter: true
+    docs: DOMRect.x
+    text: |-
+      Contains the x-coordinate of the rectangle’s origin. Contains `0` if undefined.
+  y:
+    getter: true
+    docs: DOMRect.y
+    text: |-
+      Contains the y-coordinate of the rectangle’s origin. Contains `0` if undefined.
+---
+class: NamedNodeMap
+docs: NamedNodeMap
+text: |-
+  Represents a collection of attribute nodes associated with an `Element`.
+
+  Unlike ordinary JavaScript arrays, `NamedNodeMap` items can be accessed by name and are not guaranteed to be ordered in any particular way.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/NamedNodeMap
+properties:
+  length:
+    getter: true
+    docs: NamedNodeMap.length
+    text: |-
+      Contains the number of `Attr` nodes in `this` `NamedNodeMap`.
+methods:
+  "[Symbol.iterator]":
+    args:
+      -
+        []
+    docs: NamedNodeMap.[Symbol.iterator]
+    text: |-
+      Returns an iterator over the `Attr` nodes contained in `this` `NamedNodeMap`.
+  getNamedItem:
+    args:
+      -
+        - String
+    docs: NamedNodeMap.getNamedItem
+    text: |-
+      Returns the `Attr` node whose name matches `arg0` or `null` if no such node exists.
+  item:
+    args:
+      -
+        - Number
+    docs: NamedNodeMap.item
+    text: |-
+      Returns the `Attr` node at the specified index or `null` if `arg0` is out of range.
+  removeNamedItem:
+    args:
+      -
+        - String
+    docs: NamedNodeMap.removeNamedItem
+    text: |-
+      Removes and returns the `Attr` node whose name matches `arg0`.
+
+      Throws `DOMException (NotFoundError)` if no such node exists.
+  setNamedItem:
+    args:
+      -
+        - Object
+    docs: NamedNodeMap.setNamedItem
+    text: |-
+      Adds the specified node to the map or replaces an existing node with the same name.
+
+      Returns the node that was replaced, or null if no existing node was replaced.
+
+      Throws
+      - `TypeError` if `arg0` is not an `Attr`.
+      - `DOMException (WrongDocumentError)` if `arg0` and this `NamedNodeMap` belong to different documents.
+---
+class: HTMLNamedNodeMap
+base: NamedNodeMap
+docs: HTMLNamedNodeMap
+text: |-
+  Represents a collection of attribute nodes associated with an `HTMLelement`.
+
+  This class extends the functionality of `NamedNodeMap` with namespace-aware attribute operations.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/NamedNodeMap
+properties:
+  length:
+    getter: true
+    docs: HTMLNamedNodeMap.length
+    text: |-
+      Contains the number of `Attr` nodes in `this` `HTMLNamedNodeMap`.
+methods:
+  "[Symbol.iterator]":
+    args:
+      -
+        []
+    docs: HTMLNamedNodeMap.[Symbol.iterator]
+    text: |-
+      Returns an iterator over the `Attr` nodes contained in `this` `HTMLNamedNodeMap`.
+  getNamedItem:
+    args:
+      -
+        - String
+    docs: HTMLNamedNodeMap.getNamedItem
+    text: |-
+      Returns the `Attr` node whose name matches `arg0` or `null` if no such node exists.
+  getNamedItemNS:
+    args:
+      -
+        - String
+        - String
+    docs: HTMLNamedNodeMap.getNamedItemNS
+    text: |-
+      Returns the `Attr` node whose namespace is `arg0` and local name is `arg1` or `null` if no such node exists.
+
+      Throws `DOMException (NamespaceError)` if `arg0` is unsupported namespace.
+  item:
+    args:
+      -
+        - Number
+    docs: HTMLNamedNodeMap.item
+    text: |-
+      Returns the `Attr` node at the specified index or `null` if `arg0` is out of range.
+  removeNamedItem:
+    args:
+      -
+        - String
+    docs: HTMLNamedNodeMap.removeNamedItem
+    text: |-
+      Removes and returns the `Attr` node whose name matches `arg0`.
+
+      Throws `DOMException (NotFoundError)` if no such node exists.
+  removeNamedItemNS:
+    args:
+      -
+        - String
+        - String
+    docs: HTMLNamedNodeMap.removeNamedItemNS
+    text: |-
+      Removes and returns the `Attr` node whose namespace is `arg0` and local name is `arg1`.
+
+      Throws
+      - `DOMException (NotFoundError)` if no such node exists.
+      - `DOMException (NamespaceError)` if `arg0` is unsupported namespace.
+  setNamedItem:
+    args:
+      -
+        - Object
+    docs: HTMLNamedNodeMap.setNamedItem
+    text: |-
+      Adds the specified `Attr` node to the map or replaces an existing node with the same name.
+
+      Returns the `Attr` node that was replaced, or null if no existing node was replaced.
+
+      Throws
+      - `TypeError` if `arg0` is not an `Attr`.
+      - `DOMException (WrongDocumentError)` if `arg0` and this `NamedNodeMap` belong to different documents.
+  setNamedItemNS:
+    args:
+      -
+        - Object
+    docs: HTMLNamedNodeMap.setNamedItemNS
+    text: |-
+      An alias for `HTMLNamedNodeMap.setNamedItem`.
+---
+class: Text
+base: Node
+docs: Text
+text: |-
+  Represents text `Node`.
+
+  > Unlike the standard DOM API, `Text` objects cannot be instantiated directly. New text nodes must be created using `Document.createTextNode()`.
+  {.warning}
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Text
+---
+class: HTMLCollection
+docs: HTMLCollection
+text: |-
+  Represents a *live* or *static* collection of `Element` objects.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/HTMLCollection
+properties:
+  length:
+    getter: true
+    docs: HTMLCollection.length
+    text: |-
+      Contains the number of elements in `this` `HTMLCollection`.
+methods:
+  "[Symbol.iterator]":
+    args:
+      -
+        []
+    docs: HTMLCollection.[Symbol.iterator]
+    text: |-
+      Returns an iterator over the elements in `this` `HTMLCollection`.
+  entries:
+    args:
+      -
+        []
+    docs: HTMLCollection.entries
+    text: |-
+      Returns an iterator over `[index, element]` pairs.
+  forEach:
+    args:
+      -
+        - Function
+      -
+        - Function
+        - Any
+    docs: HTMLCollection.forEach
+    text: |-
+      Invokes `arg0` once for each `Element` in `this` `HTMLCollection`.
+
+      If arg1 is provided, it is used as the callback’s this value.
+  item:
+    args:
+      -
+        - Number
+    docs: HTMLCollection.item
+    text: |-
+      Returns the `Element` at the specified index `arg0`.
+
+      Returns `null` if `arg0` is out of range.
+  keys:
+    args:
+      -
+        []
+    docs: HTMLCollection.keys
+    text: |-
+      Returns an iterator over `this` `HTMLCollection` indices.
+  namedItem:
+    args:
+      -
+        - String
+    docs: HTMLCollection.namedItem
+    text: |-
+      Returns the first `Element` whose `id` or `name` attribute matches `arg0`.
+
+      Returns `null` if no matching `Element` is found.
+  values:
+    args:
+      -
+        []
+    docs: HTMLCollection.values
+    text: |-
+      Returns an iterator over the elements in `this` `HTMLCollection`.
+---
+class: Element
+base: Node
+docs: Element
+text: |-
+  Represents an element node in a document tree.
+
+  `Element` serves as the base class for HTML, SVG, and XML elements.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Element
+impl:
+  - XML::Interface
+defs:
+  - type: Position
+    base: String
+    docs: Element.Position
+    text: |-
+      Represents a position relative to an element.
+
+      Values of this type are accepted by methods such as `Element.insertAdjacentElement()` and `Element.insertAdjacentText()` to specify where content should be inserted.
+
+      The following values are supported:
+
+      | Value | Description |
+      |---------|-------------|
+      | `"beforebegin"` | Before the element itself. |
+      | `"afterbegin"` | Inside the element, before its first child. |
+      | `"beforeend"` | Inside the element, after its last child. |
+      | `"afterend"` | After the element itself. |
+properties:
+  attributes:
+    getter: true
+    docs: Element.attributes
+    text: |-
+      Contains attribute collection as an `NamedNodeMap`.
+  childElementCount:
+    getter: true
+    docs: Element.childElementCount
+    text: |-
+      Contains the number of child nodes that are elements.
+  children:
+    getter: true
+    docs: Element.children
+    text: |-
+      Contains a live `HTMLCollection` containing `this` element’s child elements.
+  firstElementChild:
+    getter: true
+    docs: Element.firstElementChild
+    text: |-
+      Contains the first child `Element`, or `null` if `this` `Element` has no child elements.
+  innerText:
+    getter: true
+    setter:
+      - "Null"
+      - Any
+    docs: Element.innerText
+    text: |-
+      Gets or sets the textual content of `this` `Element`. Assigning `null` clears `this` `Element`’s contents.
+  lastElementChild:
+    getter: true
+    docs: Element.lastElementChild
+    text: |-
+      Contains the last child `Element`, or `null` if `this` `Element` has no child elements.
+  nextElementSibling:
+    getter: true
+    docs: Element.nextElementSibling
+    text: |-
+      Contains the next sibling that is an `Element`, or `null` if none exists.
+  previousElementSibling:
+    getter: true
+    docs: Element.previousElementSibling
+    text: |-
+      Contains the previous sibling that is an `Element`, or `null` if none exists.
+  tagName:
+    getter: true
+    docs: Element.tagName
+    text: |-
+      Contains `this` `Element`'s tag name.
+methods:
+  after:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: Element.after
+    text: |-
+      Inserts the specified nodes or strings immediately after `this` `Element`.
+  append:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: Element.append
+    text: |-
+      Appends the specified nodes or strings to `this` `Element`.
+  before:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: Element.before
+    text: |-
+      Inserts the specified nodes or strings immediately before `this` `Element`.
+  getAttribute:
+    args:
+      -
+        - String
+    docs: Element.getAttribute
+    text: |-
+      Returns the value of the specified attribute or `null` if the attribute does not exist.
+  getAttributeNode:
+    args:
+      -
+        - String
+    docs: Element.getAttributeNode
+    text: |-
+      Returns the specified attribute of `this` `Element`, as an `Attr` node or null if attribute does not exist.
+  getElementsByTagName:
+    args:
+      -
+        - String
+    docs: Element.getElementsByTagName
+    text: |-
+      Returns a *static* `NodeList` containing all descendant elements whose tag name matches `arg0`.
+
+      If `arg0` is `"*"`, a *static* `NodeList` all descendant elements is returned.
+  hasAttribute:
+    args:
+      -
+        - String
+    docs: Element.hasAttribute
+    text: |-
+      Returns `true` if `this` `Element` has an attribute `arg0` or `false` otherwise.
+  insertAdjacentElement:
+    args:
+      -
+        - Element.Position
+        - Element
+    docs: Element.insertAdjacentElement
+    text: |-
+      Inserts `arg1` at the position specified by `arg0`.
+
+      Returns `arg1`.
+
+      Throws
+      - `TypeError` if `arg0` is not supported `Position`.
+      - `DOMException (HierarchyRequestError)` if `arg1` is ancestor of this `Element`.
+      - `DOMException (WrongDocumentError)` if `arg0` and this `Element` belong to different documents.
+  insertAdjacentText:
+    args:
+      -
+        - Element.Position
+        - String
+    docs: Element.insertAdjacentText
+    text: |-
+      Inserts a text node containing `arg1` at the position specified by `arg0`.
+
+      Throws `TypeError` if `arg0` is not supported `Position`.
+  moveBefore:
+    args:
+      -
+        - Node
+        - "Null"
+      -
+        - Node
+        - Node
+    docs: Element.moveBefore
+    text: |-
+      Moves `arg0` to become a child of this `Element` before `arg1` or to the end of the child list if `arg0` is `null`.
+  prepend:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: Element.prepend
+    text: |-
+      Prepends the specified nodes or strings to `this` `Element`.
+  querySelector:
+    args:
+      -
+        - String
+    docs: Element.querySelector
+    text: |-
+      Returns the first descendant `Element` matching the CSS selector `arg0` or `null` if no matching `Element` is found.
+
+      > When used with XML documents, only a subset of CSS selectors is supported. Selectors that rely on HTML-specific semantics or browser features may not be available.{.warning}
+    also:
+      - topic:selectors
+  querySelectorAll:
+    args:
+      -
+        - String
+    docs: Element.querySelectorAll
+    text: |-
+      Returns a static `NodeList` containing all descendant `Elements` that match the CSS selector `arg0`.
+
+      > When used with XML documents, only a subset of CSS selectors is supported. Selectors that rely on HTML-specific semantics or browser features may not be available.{.warning}
+    also:
+      - topic:selectors
+  remove:
+    args:
+      -
+        []
+    docs: Element.remove
+    text: |-
+      Removes `this` `Element` from its parent.
+  removeAttribute:
+    args:
+      -
+        - String
+    docs: Element.removeAttribute
+    text: |-
+      Removes the attribute named `arg0`.
+  removeAttributeNode:
+    args:
+      -
+        - Attr
+    docs: Element.removeAttributeNode
+    text: |-
+      Removes the specified `Attr` node and returns it.
+
+      Throws `DOMException (NotFoundError)` if `arg0` isn't an attribute of `this` `Element`.
+  replaceChildren:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: Element.replaceChildren
+    text: |-
+      Replaces the children of `this` `Element` with the specified nodes or strings.
+  setAttribute:
+    args:
+      -
+        - String
+        - Any
+    docs: Element.setAttribute
+    text: |-
+      Creates or updates the specified attribute `arg0` with value `arg1`.
+  setAttributeNode:
+    args:
+      -
+        - Object
+    docs: Element.setAttributeNode
+    text: |-
+      Associates the specified `Attr` node with `this` `Element`.
+      Returns the `Attr` node that was replaced, or `null` if no attribute was replaced.
+
+      Throws
+      - `TypeError` if `arg0` is not an `Attr`.
+      - `DOMException (WrongDocumentError)` if `arg0` and this `Element` belong to different documents.
+  toJSON:
+    args:
+      -
+        []
+    docs: Element.toJSON
+    text: |-
+      Returns a printable `XML` object associated with `this` `Element`. Overriden in `HTMLElement`.
+  toString:
+    args:
+      -
+        []
+    docs: Element.toString
+    text: |-
+      Returns the serialized representation of `this` `Element`.
+  toggleAttribute:
+    args:
+      -
+        - String
+      -
+        - String
+        - Boolean
+    docs: Element.toggleAttribute
+    text: |-
+      Adds or removes the specified attribute.
+
+      - if `arg1` is omitted, the attribute is toggled.
+      - if `arg1` is provided, the attribute is added when `true` and removed when `false`.
+
+      Returns `true` if the attribute is present after the operation; otherwise returns `false`.
+---
+class: Document
+base: Node
+docs: Document
+text: |-
+  Represents a parsed document tree.
+
+  `Document` is the common base class for `HTMLDocument` and `XMLDocument`.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement
+methods:
+  querySelector:
+    args:
+      -
+        - String
+    docs: Document.querySelector
+    text: |-
+      Returns the first element within `this` `Document` that matches the CSS selector `arg0` or `null` if no matching `Element` is found.
+
+      > When used with XML documents, only a subset of CSS selectors is supported. Selectors that rely on HTML-specific semantics or browser features may not be available.{.warning}
+    also:
+      - topic:selectors
+  querySelectorAll:
+    args:
+      -
+        - String
+    docs: Document.querySelectorAll
+    text: |-
+      Returns a static `NodeList` containing all `Elements` within `this` `Document` that match the CSS selector `arg0`.
+
+      > When used with XML documents, only a subset of CSS selectors is supported. Selectors that rely on HTML-specific semantics or browser features may not be available.{.warning}
+    also:
+      - topic:selectors
+statics:
+  html:
+    args:
+      -
+        []
+      -
+        - String
+    docs: Document.html
+    text: |-
+      Creates and returns a new `HTMLDocument`.
+
+      If `arg0` is provided, it is parsed as HTML and used to populate the `HTMLDocument`.
+
+      Throws `DOMException (SyntaxError)` if parsing fails (very unlikely).
+  xml:
+    args:
+      -
+        - String
+    docs: Document.xml
+    text: |-
+      Creates and returns a new `XMLDocument` by parsing arg0 as XML.
+
+      Throws `DOMException (SyntaxError)` if parsing fails.
+---
+class: XMLDocument
+base: Document
+docs: XMLDocument
+text: |-
+  Represents an XML document.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/XMLDocument
+impl:
+  - XML::Interface
+properties:
+  documentElement:
+    getter: true
+    docs: XMLDocument.documentElement
+    text: |-
+      Returns the root `Element` of `this` `XMLdocument`.
+methods:
+  createElement:
+    args:
+      -
+        - String
+    docs: XMLDocument.createElement
+    text: |-
+      Creates and returns a new `Element` with the specified tag name.
+
+      The returned `Element` is not automatically inserted into `this` `XMLDocument`.
+  createTextNode:
+    args:
+      -
+        - String
+    docs: XMLDocument.createTextNode
+    text: |-
+      Creates and returns a new `Text` node containing the specified text.
+
+      The returned `Text` node is not automatically inserted into `this` `XMLDocument`.
+  getElementsByTagName:
+    args:
+      -
+        - String
+    docs: XMLDocument.getElementsByTagName
+    text: |-
+      Returns a *static* `HTMLCollection` containing all elements whose tag name matches `arg0`.
+
+      If `arg0` is `"*"`, a *static* `HTMLCollection` containing all descendant elements is returned.
+  toJSON:
+    args:
+      -
+        []
+    docs: XMLDocument.toJSON
+    text: |-
+      Returns a printable `XML` object associated with `this` `XMLDocument`.
+  toString:
+    args:
+      -
+        []
+    docs: XMLDocument.toString
+    text: |-
+      Returns the serialized representation of `this` `XMLDocument`.
+---
+class: DOMStringMap
+docs: DOMStringMap
+text: |-
+  Represents the collection of custom data attributes associated with an `HTMLElement`.
+
+  Instances of this class are typically accessed through the `dataset` property of an `HTMLElement`.
+
+  `DOMStringMap` does not define any explicit properties or methods. Instead, property access is mapped dynamically to the `data-*` attributes:
+
+  * Reading a property returns the value of the corresponding `data-*` attribute.
+  * Assigning to a property creates or updates the corresponding `data-*` attribute.
+  * Deleting a property removes the corresponding `data-*` attribute.
+
+  For example, `element.dataset.userName` corresponds to the `data-user-name` attribute.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/DOMStringMap
+---
+class: DOMTokenList
+docs: DOMTokenList
+text: |-
+  Represents an ordered set of space-separated tokens.
+
+  `DOMTokenList` is commonly used by attributes such as `class`, where each token represents an individual value.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/DOMTokenList
+properties:
+  length:
+    getter: true
+    docs: DOMTokenList.length
+    text: |-
+      Contains the number of tokens in `this` `DOMTokenList`.
+  value:
+    getter: true
+    setter:
+      - Any
+    docs: DOMTokenList.value
+    text: |-
+      Gets or sets the serialized representation of `this` `DOMTokenList`.
+methods:
+  add:
+    args:
+      -
+        - Tail:
+            - 1
+            - Any
+    docs: DOMTokenList.add
+    text: |-
+      Adds one or more tokens to `this` `DOMTokenList`. Tokens that already exist are ignored.
+  contains:
+    args:
+      -
+        - Any
+    docs: DOMTokenList.contains
+    text: |-
+      Returns `true` if the specified token exists in the list; otherwise returns `false`.
+  entries:
+    args:
+      -
+        []
+    docs: DOMTokenList.entries
+    text: |-
+      Returns an iterator over `[index, token]` pairs.
+  forEach:
+    args:
+      -
+        - Function
+      -
+        - Function
+        - Any
+    docs: DOMTokenList.forEach
+    text: |-
+      Invokes `arg0` once for each token in the list.
+      If `arg1` is provided, it is used as the callback’s `this` value.
+  item:
+    args:
+      -
+        - Number
+    docs: DOMTokenList.item
+    text: |-
+      Returns the token at index `arg0`.
+
+      Returns `null` if `arg0` is out of range.
+  keys:
+    args:
+      -
+        []
+    docs: DOMTokenList.keys
+    text: |-
+      Returns an iterator over the token indices.
+  remove:
+    args:
+      -
+        - Tail:
+            - 1
+            - Any
+    docs: DOMTokenList.remove
+    text: |-
+      Removes one or more tokens from `this` `DOMTokenList`. Tokens that do not exist are ignored.
+  replace:
+    args:
+      -
+        - Any
+        - Any
+    docs: DOMTokenList.replace
+    text: |-
+      Replaces token `arg0` with token `arg1`.
+
+      Returns `true` if the replacement was performed; otherwise returns `false`.
+  toString:
+    args:
+      -
+        []
+    docs: DOMTokenList.toString
+    text: |-
+      Returns the serialized representation of `this` `DOMTokenList`. Equivalent to reading the `value` property.
+  toggle:
+    args:
+      -
+        - Any
+      -
+        - Any
+        - Boolean
+    docs: DOMTokenList.toggle
+    text: |-
+      Adds or removes a token from `this` `DOMTokenList`.
+
+      If `arg1` is omitted, the token is added if absent and removed if present.
+
+      If `arg1` is provided, the token is added when `arg1` is `true` and removed when `arg1` is `false`.
+
+      Returns `true` if the token is present after the operation; otherwise returns `false`.
+  values:
+    args:
+      -
+        []
+    docs: DOMTokenList.values
+    text: |-
+      Returns an iterator over the tokens in `this` `DOMTokenList`.
+---
+class: CSSRule
+docs: CSSRule
+text: |-
+  Represents a single CSS rule within a stylesheet.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/CSSRule
+properties:
+  cssText:
+    getter: true
+    docs: CSSRule.cssText
+    text: |-
+      Contains the textual representation of this rule.
+
+      > This property is read-only. Unlike the standard DOM API, assigning a new value to `cssText` is not supported.
+      {.warning}
+  type:
+    getter: true
+    docs: CSSRule.type
+    text: |-
+      Returns the type of this rule as a numeric constant. The value identifies the kind of rule represented by this object, such as a style rule, import rule, or media rule.
+---
+class: CSSRuleList
+docs: CSSRuleList
+text: |-
+  Represents an ordered collection of `CSSRule` objects.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/CSSRuleList
+properties:
+  length:
+    getter: true
+    docs: CSSRuleList.length
+    text: |-
+      Contains the number of rules in the `CSSRuleList`.
+methods:
+  item:
+    args:
+      -
+        - Number
+    docs: CSSRuleList.item
+    text: |-
+      Returns the `CSSRule` at the specified index `arg0`.
+---
+class: CSSStyleDeclaration
+docs: CSSStyleDeclaration
+text: |-
+  Base class for CSS declaration objects.
+
+  This class is provided for compatibility with the standard DOM inheritance hierarchy. It does not define any properties or methods of its own.
+
+  All functionality is implemented by `CSSStyleProperties`, which inherits from `CSSStyleDeclaration`.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/CSSStyleDeclaration
+---
+class: CSSStyleProperties
+base: CSSStyleDeclaration
+docs: CSSStyleProperties
+text: |-
+  Represents inline or computed styles available on an `HTMLElement`.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/CSSStyleProperties
+properties:
+  cssText:
+    getter: true
+    setter:
+      - String
+    docs: CSSStyleProperties.cssText
+    text: |-
+      Gets or sets the serialized CSS declaration block represented by `this` `CSSStyleProperties`.
+
+      For inline styles, assigning to this property replaces all existing declarations with those parsed from the provided string.
+
+      For computed styles, this property is read-only and assigning a value has no effect.
+  length:
+    getter: true
+    docs: CSSStyleProperties.length
+    text: |-
+      Contains the number of CSS properties currently defined in this declaration block.
+methods:
+  "[Symbol.iterator]":
+    args:
+      -
+        []
+    docs: CSSStyleProperties.[Symbol.iterator]
+    text: |-
+      Returns an iterator over the names of all defined CSS properties.
+  getPropertyPriority:
+    args:
+      -
+        - String
+    docs: CSSStyleProperties.getPropertyPriority
+    text: |-
+      Returns `"important"` if the property is marked with `!important`; otherwise returns an empty string.
+  getPropertyValue:
+    args:
+      -
+        - String
+    docs: CSSStyleProperties.getPropertyValue
+    text: |-
+      Returns the value of the specified property or an empty string if the property is not defined.
+  item:
+    args:
+      -
+        - Number
+    docs: CSSStyleProperties.item
+    text: |-
+      Returns the name of the property at the specified index. If `arg0` is out of range, returns an empty string.
+  removeProperty:
+    args:
+      -
+        - String
+    docs: CSSStyleProperties.removeProperty
+    text: |-
+      Removes the specified property from the declaration block. Returns the property’s previous value, or an empty string if the property was not defined.
+
+      For computed styles, this method has no effect.
+  setProperty:
+    args:
+      -
+        - String
+        - String
+      -
+        - String
+        - String
+        - String
+    docs: CSSStyleProperties.setProperty
+    text: |-
+      Sets the value of the specified property.
+
+      If `arg2` is `"important"`, the property is marked with `!important`. Any other value is ignored.
+
+      For computed styles, this method has no effect.
+---
+class: CSSStyleSheet
+docs: CSSStyleSheet
+text: |-
+  Represents a CSS stylesheet and provides access to the rules it contains.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/CSSStyleSheet
+properties:
+  cssRules:
+    getter: true
+    docs: CSSStyleSheet.cssRules
+    text: |-
+      Contains a live `CSSRuleList` containing all rules in the stylesheet.
+  ownerRule:
+    getter: true
+    docs: CSSStyleSheet.ownerRule
+    text: |-
+      Contains `null`.
+methods:
+  deleteRule:
+    args:
+      -
+        - Number
+    docs: CSSStyleSheet.deleteRule
+    text: |-
+      Removes the rule at the specified index.
+  insertRule:
+    args:
+      -
+        - String
+      -
+        - String
+        - Number
+    docs: CSSStyleSheet.insertRule
+    text: |-
+      Parses and inserts the rule specified by `arg0`.
+
+      If `arg1` is provided, the rule is inserted at that index. Otherwise, the rule is appended to the end of the stylesheet.
+
+      Returns the index of the inserted rule.
+  replace:
+    args:
+      -
+        - String
+    docs: CSSStyleSheet.replace
+    text: |-
+      Replaces the contents of the stylesheet with the rules parsed from `arg0`.
+
+      Returns a `Promise` that resolves to `this`.
+  replaceSync:
+    args:
+      -
+        - String
+    docs: CSSStyleSheet.replaceSync
+    text: |-
+      Replaces the contents of the stylesheet with the rules parsed from `arg0`.
+---
+class: HTMLElement
+base: Element
+docs: HTMLElement
+text: |-
+  Represents an element in an `HTMLDocument`.
+
+  `HTMLElement` extends `Element` and provides HTML-specific functionality, including namespace-aware attribute access, HTML parsing and serialization, CSS styles, classes, and custom data attributes.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement
+impl:
+  - HTML::Interface
+properties:
+  attributes:
+    getter: true
+    docs: HTMLElement.attributes
+    text: |-
+      Contains attribute collection as an `HTMLNamedNodeMap`.
+  classList:
+    getter: true
+    docs: HTMLElement.classList
+    text: |-
+      Contains a `DOMTokenList` representing the tokens in `class` attribute.
+  className:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLElement.className
+    text: |-
+      Gets or sets the value of the `class` attribute.
+  dataset:
+    getter: true
+    docs: HTMLElement.dataset
+    text: |-
+      Contains a `DOMStringMap` providing access to `data-*` attributes.
+  id:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLElement.id
+    text: |-
+      Gets or sets the value of `id` attribute.
+  innerHTML:
+    getter: true
+    setter:
+      - HTML
+      - Any
+    docs: HTMLElement.innerHTML
+    text: |-
+      Gets or sets the serialized HTML content of `this` `Element`.
+  innerText:
+    getter: true
+    setter:
+      - "Null"
+      - Any
+    docs: HTMLElement.innerText
+    text: |-
+      Gets or sets the textual content of `this` `HTMLElement`. Assigning `null` clears `this` `HTMLElement`’s contents.
+  outerHTML:
+    getter: true
+    setter:
+      - HTML
+      - Any
+    docs: HTMLElement.outerHTML
+    text: |-
+      Gets or sets the serialized HTML representation of `this` `HTMLElement`, including the element itself.
+  outerText:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLElement.outerText
+    text: |-
+      Gets or sets the text representation of `this` `HTMLElement`, including the element itself.
+  style:
+    getter: true
+    docs: HTMLElement.style
+    text: |-
+      Contains a `CSSStyleProperties` object representing the inline styles of `this` `HTMLElement`.
+methods:
+  after:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLElement.after
+    text: |-
+      Inserts the specified nodes, HTML fragments, images, SVG documents, or strings immediately after `this` `HTMLElement`.
+
+      String arguments are converted to text nodes. Arguments are inserted in the order they are provided.
+  append:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLElement.append
+    text: |-
+      Appends the specified nodes, HTML fragments, images, SVG documents, or strings as children of `this` `HTMLElement`.
+
+      String arguments are converted to text nodes. Arguments are appended in the order they are provided.
+  appendChild:
+    args:
+      -
+        - Node
+      -
+        - Image
+      -
+        - SVG
+    docs: HTMLElement.appendChild
+    text: |-
+      Appends `arg0` as the last child of `this` `HTMLElement`.
+
+      If `arg0` already belongs to a document tree, it is removed from its current parent before being appended.
+
+      Returns the appended node. When `arg0` is an `Image` or `SVG`, the return value is the `Node` created from that object.
+  before:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLElement.before
+    text: |-
+      Inserts the specified nodes, HTML fragments, images, SVG documents, or strings immediately before `this` `HTMLElement`.
+
+      String arguments are converted to text nodes. Arguments are inserted in the order they are provided.
+  closest:
+    args:
+      -
+        - String
+    docs: HTMLElement.closest
+    text: |-
+      Returns the nearest ancestor `this` `HTMLElement` (or the `HTMLElement` itself) matching the specified CSS selector or `null` if no matching `HTMLElement` is found.
+  getAttributeNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: HTMLElement.getAttributeNS
+    text: |-
+      Returns the value of the attribute identified by the specified namespace `arg0` and local name `arg1` or `null` if the attribute does not exist.
+  getAttributeNode:
+    args:
+      -
+        - String
+    docs: HTMLElement.getAttributeNode
+    text: |-
+      Returns the specified attribute of `this` `HTMLElement`, as an `Attr` node or `null` if the attribute does not exist.
+  getAttributeNodeNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: HTMLElement.getAttributeNodeNS
+    text: |-
+      Returns the `Attr` identified by the specified namespace `arg0` and local name `arg1` or `null` if the attribute does not exist.
+
+      Throws `DOMException (NamespaceError)` if `arg0` is unsupported namespace.
+  getElementsByClassName:
+    args:
+      -
+        - String
+    docs: HTMLElement.getElementsByClassName
+    text: |-
+      Returns a live `HTMLCollection` containing all descendant elements that have the specified class name `arg0`.
+  getElementsByTagName:
+    args:
+      -
+        - String
+    docs: HTMLElement.getElementsByTagName
+    text: |-
+      Returns a *live* `HTMLCollection` containing all descendant elements whose tag name matches `arg0`.
+
+      If `arg0` is `"*"`, a *live* `HTMLCollection` containing all descendant elements is returned.
+  getElementsByTagNameNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: HTMLElement.getElementsByTagNameNS
+    text: |-
+      Returns a *live* `HTMLCollection` containing all descendant elements whose namespace and local name match the specified values `arg0` and `arg1` respectively.
+
+      Throws `DOMException (NamespaceError)` if `arg0` is unsupported namespace.
+  getHTML:
+    args:
+      -
+        []
+    docs: HTMLElement.getHTML
+    text: |-
+      Returns the serialized HTML content of `this` `Element`.
+
+      Equivalent to reading `innerHTML`.
+  hasAttributeNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: HTMLElement.hasAttributeNS
+    text: |-
+      Returns true if the specified namespaced (`arg0`) attribute (`arg1`) exists.
+
+      Throws `DOMException (NamespaceError)` if `arg0` is unsupported namespace.
+  insertAdjacentElement:
+    args:
+      -
+        - Element.Position
+        - Element
+      -
+        - Element.Position
+        - Image
+      -
+        - Element.Position
+        - SVG
+    docs: HTMLElement.insertAdjacentElement
+    text: |-
+      Inserts `arg1` at the position specified by `arg0`.
+
+      Returns the inserted node. When `arg0` is an `Image` or `SVG`, the return value is the `Node` created from that object.
+
+      Throws
+      - `TypeError` if `arg0` is not supported `Position`.
+      - `DOMException (HierarchyRequestError)` if `arg1` is ancestor of this `Element`.
+      - `DOMException (WrongDocumentError)` if `arg0` and this `Element` belong to different documents.
+  insertAdjacentHTML:
+    args:
+      -
+        - Element.Position
+        - String
+      -
+        - Element.Position
+        - HTML
+    docs: HTMLElement.insertAdjacentHTML
+    text: |-
+      Parses and inserts HTML at the position specified by `arg0`.
+
+      Throws `TypeError` if `arg0` is unsupported `Position`.
+  insertBefore:
+    args:
+      -
+        - Node
+        - "Null"
+      -
+        - Node
+        - Node
+      -
+        - Image
+        - Node
+      -
+        - SVG
+        - Node
+      -
+        - Image
+        - "Null"
+      -
+        - SVG
+        - "Null"
+    docs: HTMLElement.insertBefore
+    text: |-
+      Inserts `arg0` as a child of this node before `arg1`. If `arg1` is `null`, `arg0` is appended by calling `appendChild(arg0)`.
+
+      Returns the inserted node. When `arg0` is an `Image` or `SVG`, the return value is the `Node` created from that object.
+
+      Throws
+      - `DOMException (HierarchyRequestError)` if `arg0` is ancestor of this `Node`.
+      - `DOMException (NotFoundError)` if `arg1` is not `null` and isn't child of this `Node`.
+      - `DOMException (WrongDocumentError)` if `arg0` and this `Node` belong to different documents.
+  matches:
+    args:
+      -
+        - String
+    docs: HTMLElement.matches
+    text: |-
+      Returns `true` if `this` `Element` matches the specified CSS selector `arg0`, otherwise returns `false`.
+  moveBefore:
+    args:
+      -
+        - Node
+        - "Null"
+      -
+        - Node
+        - Node
+      -
+        - Image
+        - Node
+      -
+        - SVG
+        - Node
+      -
+        - Image
+        - "Null"
+      -
+        - SVG
+        - "Null"
+    docs: HTMLElement.moveBefore
+    text: |-
+      HTMLElement.moveBefore
+  prepend:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLElement.prepend
+    text: |-
+      Prepends the specified nodes, HTML fragments, images, SVG documents, or strings as children of `this` `HTMLElement`.
+
+      String arguments are converted to text nodes. Arguments are prepended in the order they are provided.
+  removeAttributeNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: HTMLElement.removeAttributeNS
+    text: |-
+      Removes the specified namespaced attribute.
+
+      Throws `DOMException (NamespaceError)` if `arg0` is unsupported namespace.
+  removeAttributeNode:
+    args:
+      -
+        - Attr
+    docs: HTMLElement.removeAttributeNode
+    text: |-
+      Removes the specified `Attr` node and returns it.
+
+      Throws `DOMException (NotFoundError)` if `arg0` isn't an attribute of `this` `HTMLElement`.
+  replaceChild:
+    args:
+      -
+        - Node
+        - Node
+      -
+        - HTML
+        - Node
+      -
+        - Image
+        - Node
+      -
+        - SVG
+        - Node
+    docs: HTMLElement.replaceChild
+    text: |-
+      Replaces child `arg1` of `this` `HTMLElement` with `arg0` and returns `arg1`.
+
+      When `arg0` is an `Image` or `SVG`, `arg1` is replace with `HTMLElement` instances created from that object.
+
+      Throws
+      - `DOMException (NotFoundError)` if `arg1` is not child of `this` `Node`.
+      - `DOMException (HierarchyRequestError)` if `arg0` is `Node` and is ancestor of `this` `Node`.
+      - `DOMException (WrongDocumentError)` if `arg1` and this `Node` belong to different documents.
+      - `DOMException (WrongDocumentError)` if `arg0` is `Node` and belong to different document than `this` `Node`.
+  replaceChildren:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLElement.replaceChildren
+    text: |-
+      Replaces the children of `this` `Element` with the specified nodes, HTML fragments, images, SVG documents, or strings.
+  setAttributeNS:
+    args:
+      -
+        - "Null"
+        - String
+        - Any
+      -
+        - String
+        - String
+        - Any
+    docs: HTMLElement.setAttributeNS
+    text: |-
+      Creates or updates an attribute identified by the specified namespace `arg0` and qualified name `arg1`.
+
+      If `arg0` is null, the attribute is created in no namespace.
+
+      The value of the attribute is set to the string representation of `arg2`. If an attribute with the same namespace and local name already exists, its value is replaced.
+  setAttributeNode:
+    args:
+      -
+        - Object
+    docs: HTMLElement.setAttributeNode
+    text: |-
+      Associates the specified `Attr` node with `this` `HTMLElement`.
+      Returns the `Attr` node that was replaced, or `null` if no attribute was replaced.
+
+      Throws
+      - `TypeError` if `arg0` is not an `Attr`.
+      - `DOMException (WrongDocumentError)` if `arg0` and this `HTMLElement` belong to different documents.
+  setAttributeNodeNS:
+    args:
+      -
+        - Object
+    docs: HTMLElement.setAttributeNodeNS
+    text: |-
+      An alias for `HTMLElement.setAttributeNode`.
+  toJSON:
+    args:
+      -
+        []
+    docs: HTMLElement.toJSON
+    text: |-
+      Returns an `HTML` object with outerHTML of `this` `HTMLElement`.
+
+      Throws `TypeError` if `this` `HTMLElement` is one of the following:
+      - `<html>`
+      - `<head>`
+      - `<body>`
+      - `<title>`
+  toString:
+    args:
+      -
+        []
+    docs: HTMLElement.toString
+    text: |-
+      Returns the serialized representation of `this` `HTMLElement`. Equivalent to reading the `outerHTML` property.
+---
+class: HTMLAnchorElement
+base: HTMLElement
+docs: HTMLAnchorElement
+text: |-
+  Represents an HTML `<a>` element.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/HTMLAnchorElement
+properties:
+  href:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLAnchorElement.href
+    text: |-
+      Gets or sets the value of the `href` attribute.
+  hreflang:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLAnchorElement.hreflang
+    text: |-
+      Gets or sets the value of the `hreflang` attribute.
+  rel:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLAnchorElement.rel
+    text: |-
+      Gets or sets the value of the `rel` attribute.
+  relList:
+    getter: true
+    docs: HTMLAnchorElement.relList
+    text: |-
+      Returns a `DOMTokenList` representing the tokens in the `rel` attribute.
+  target:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLAnchorElement.target
+    text: |-
+      Gets or sets the value of the `target` attribute.
+---
+class: HTMLImageElement
+base: HTMLElement
+docs: HTMLImageElement
+text: |-
+  Represents an HTML `<img>` element.
+
+  Instances of this class can be converted to an `Image` object using `image` function from `noto:core`.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement
+  - Image
+  - image
+impl:
+  - Image::Interface
+properties:
+  alt:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLImageElement.alt
+    text: |-
+      Gets or sets the value of the `alt` attribute.
+  src:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLImageElement.src
+    text: |-
+      Gets or sets the value of the `src` attribute.
+---
+class: HTMLLinkElement
+base: HTMLElement
+docs: HTMLLinkElement
+text: |-
+  Represents an HTML `<link>` element.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/HTMLLinkElement
+properties:
+  href:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLLinkElement.href
+    text: |-
+      Gets or sets the value of the `href` attribute.
+  hreflang:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLLinkElement.hreflang
+    text: |-
+      Gets or sets the value of the `hreflang` attribute.
+  rel:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLLinkElement.rel
+    text: |-
+      Gets or sets the value of the `rel` attribute.
+  relList:
+    getter: true
+    docs: HTMLLinkElement.relList
+    text: |-
+      Returns a `DOMTokenList` representing the tokens in the `rel` attribute.
+---
+class: HTMLStyleElement
+base: HTMLElement
+docs: HTMLStyleElement
+text: |-
+  Represents an HTML `<style>` element.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/HTMLStyleElement
+properties:
+  sheet:
+    getter: true
+    docs: HTMLStyleElement.sheet
+    text: |-
+      Contains the `CSSStyleSheet` associated with `this` `<style>` element.
+---
+class: SVGElement
+base: HTMLElement
+docs: SVGElement
+text: |-
+  Base class for all HTML elements in the SVG namespace.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SVGElement
+---
+class: SVGSVGElement
+base: SVGElement
+docs: SVGSVGElement
+text: |-
+  Represents an SVG `<svg>` element.
+
+  Instances of this class can be converted to an `SVG` object using `image` function from `noto:core`.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SVGSVGElement
+  - SVG
+  - image
+impl:
+  - SVG::Interface
+---
+class: SVGGraphicsElement
+base: SVGElement
+docs: SVGGraphicsElement
+text: |-
+  Base class for SVG elements that participate in rendering and have graphical geometry.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SVGGraphicsElement
+methods:
+  getBBox:
+    args:
+      -
+        []
+    docs: SVGGraphicsElement.getBBox
+    text: |-
+      Returns a `DOMRect` representing the bounding box of this element.
+---
+class: SVGRectElement
+base: SVGGraphicsElement
+docs: SVGRectElement
+text: |-
+  Represents an SVG <rect> element.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SVGRectElement
+properties:
+  height:
+    getter: true
+    setter:
+      - Any
+    docs: SVGRectElement.height
+    text: |-
+      Gets or sets the value of the `height` attribute.
+  rx:
+    getter: true
+    setter:
+      - Any
+    docs: SVGRectElement.rx
+    text: |-
+      Gets or sets the value of the `rx` attribute.
+  ry:
+    getter: true
+    setter:
+      - Any
+    docs: SVGRectElement.ry
+    text: |-
+      Gets or sets the value of the `ry` attribute.
+  width:
+    getter: true
+    setter:
+      - Any
+    docs: SVGRectElement.width
+    text: |-
+      Gets or sets the value of the `width` attribute.
+  x:
+    getter: true
+    setter:
+      - Any
+    docs: SVGRectElement.x
+    text: |-
+      Gets or sets the value of the `x` attribute.
+  y:
+    getter: true
+    setter:
+      - Any
+    docs: SVGRectElement.y
+    text: |-
+      Gets or sets the value of the `y` attribute.
+---
+class: SVGTextElement
+base: SVGGraphicsElement
+docs: SVGTextElement
+text: |-
+  Represents an SVG <text> element.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SVGTextElement
+properties:
+  dx:
+    getter: true
+    setter:
+      - Any
+    docs: SVGTextElement.dx
+    text: |-
+      Gets or sets the value of the `dx` attribute.
+  dy:
+    getter: true
+    setter:
+      - Any
+    docs: SVGTextElement.dy
+    text: |-
+      Gets or sets the value of the `dy` attribute.
+  rotate:
+    getter: true
+    setter:
+      - Any
+    docs: SVGTextElement.rotate
+    text: |-
+      Gets or sets the value of the `rotate` attribute.
+  x:
+    getter: true
+    setter:
+      - Any
+    docs: SVGTextElement.x
+    text: |-
+      Gets or sets the value of the `x` attribute.
+  y:
+    getter: true
+    setter:
+      - Any
+    docs: SVGTextElement.y
+    text: |-
+      Gets or sets the value of the `y` attribute.
+---
+class: HTMLDocument
+base: Document
+docs: HTMLDocument
+text: |-
+  Represents an HTML document.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/HTMLDocument
+impl:
+  - HTML::Interface
+properties:
+  _live:
+    getter: true
+    docs: HTMLDocument._live
+    text: |-
+      Contains the number of live `HTMLCollection` objects associated with this `HTMLDocument`.
+  body:
+    getter: true
+    docs: HTMLDocument.body
+    text: |-
+      Contains the document’s `<body>` element.
+  documentElement:
+    getter: true
+    docs: HTMLDocument.documentElement
+    text: |-
+      Returns the root `HTMLElement` of `this` `HTMLdocument`.
+  head:
+    getter: true
+    docs: HTMLDocument.head
+    text: |-
+      Contains the document’s `<head>` element.
+  title:
+    getter: true
+    setter:
+      - "Null"
+      - String
+    docs: HTMLDocument.title
+    text: |-
+      Gets or sets `this` `HTMLDocument` title.
+
+      The title is stored in the document’s `<title>` element. Assigning `null` clears the title.
+methods:
+  createElement:
+    args:
+      -
+        - String
+    docs: HTMLDocument.createElement
+    text: |-
+      Creates and returns a new `HTMLElement` with tag name `arg0`.
+
+      The returned element is not automatically inserted into the document.
+  createElementNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: HTMLDocument.createElementNS
+    text: |-
+      Creates and returns a new `HTMLElement` with tag name `arg1` in namespace `arg0`.
+
+      The returned element is not automatically inserted into the document.
+
+      Throws `DOMException (NamespaceError)` if `arg0` is unsupported namespace.
+  createTextNode:
+    args:
+      -
+        - String
+    docs: HTMLDocument.createTextNode
+    text: |-
+      Creates and returns a new `Text` node containing the specified text.
+
+      The returned node is not automatically inserted into the document.
+  getElementById:
+    args:
+      -
+        - String
+    docs: HTMLDocument.getElementById
+    text: |-
+      Returns the first `HTMLElement` whose `id` attribute matches `arg0`.
+
+      Returns `null` if no matching element is found.
+  getElementsByClassName:
+    args:
+      -
+        - String
+    docs: HTMLDocument.getElementsByClassName
+    text: |-
+      Returns a *live* `HTMLCollection` containing all elements that have the specified class name `arg0`.
+  getElementsByTagName:
+    args:
+      -
+        - String
+    docs: HTMLDocument.getElementsByTagName
+    text: |-
+      Returns a *live* `HTMLCollection` containing all elements whose tag name matches `arg0`.
+      If arg0 is `"*"`, a *live* `HTMLCollection` containing all elements are returned.
+  getElementsByTagNameNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: HTMLDocument.getElementsByTagNameNS
+    text: |-
+      Returns a *live* `HTMLCollection` containing all descendant elements whose namespace and local name match the specified values `arg0` and `arg1` respectively.
+
+      Throws `DOMException (NamespaceError)` if `arg0` is unsupported namespace.
+  toJSON:
+    args:
+      -
+        []
+    docs: HTMLDocument.toJSON
+    text: |-
+      Throws `TypeError` `"HTMLDocument cannot be serialized"`.
+  toString:
+    args:
+      -
+        []
+    docs: HTMLDocument.toString
+    text: |-
+      Returns the serialized representation of `this` `HTMLDocument`.
+---
+class: Window
+docs: Window
+text: |-
+  Represents a rendering environment associated with a document.
+
+  > Unlike a browser Window, this implementation provides only a limited subset of the standard API required for DOM, SVG, and styling operations.
+  {.warning}
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Window
+defs:
+  - struct: Config
+    fields:
+      notebook:
+        type: Boolean
+        docs: Window.Config.notebook
+        text: |-
+          If `true`, the window and document are attached at notebook scope.
+    docs: Window.Config
+    text: |-
+      Configuration object used when attaching a window.
+ctor:
+  args:
+    -
+      []
+  docs: Window.constructor
+  text: |-
+    Creates a new `Window` instance.
+methods:
+  attach:
+    args:
+      -
+        []
+      -
+        - Window.Config
+    docs: Window.attach
+    text: |-
+      Attaches this window to the current execution environment and exposes it as `globalThis.window`.
+
+      As part of the attachment process, a new `HTMLDocument` is created and exposed as `globalThis.document`.
+
+      If `arg0` is omitted, the window and document are attached to the current cell.
+
+      If `arg0.notebook` is `true`, the window and document are attached at notebook scope and become available to all cells in the notebook. Otherwise, they are available only within the current cell.
+
+      Returns `globalThis.document`.
+  getComputedStyle:
+    args:
+      -
+        - HTMLElement
+    docs: Window.getComputedStyle
+    text: |-
+      Returns a `CSSStyleProperties` object representing the computed style of `arg0`.
+
+      The returned object is read-only and reflects the styles currently applied to the element.
+---
+class: DOMParser
+docs: DOMParser
+text: |-
+  The `DOMParser` provides the ability to parse XML or HTML source code from a string into a `Document`.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/DOMParser
+ctor:
+  args:
+    -
+      []
+  docs: DOMParser.constructor
+  text: |-
+    Creates a `DOMParser`.
+methods:
+  parseFromString:
+    args:
+      -
+        - String
+        - String
+    docs: DOMParser.parseFromString
+    text: |-
+      Parses `arg0` as HTML or XML.
+
+      - `arg0` — HTML or XML string
+      - `arg1` — MIME type specifying the parser to use. Supported values:
+        - `text/html`, `application/xhtml+xml` — parse as HTML
+        - `text/xml`, `application/xml` — parse as XML
+
+      Returns `HTMLDocument` if parsed as HTML, or `XMLDocument` if parsed as XML.
+
+      Throws
+      - `TypeError` if `arg1` is not a supported MIME type.
+      - `DOMException (SyntaxError)` if parsing fails.

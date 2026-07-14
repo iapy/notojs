@@ -1,0 +1,273 @@
+text: |-
+  `noto:fs` provides sandboxed access to the filesystem.
+
+  ###### Exports
+  - `function mounts`
+  - `function path`
+also:
+  - topic:fs
+---
+exception: FileSystemException
+docs: FileSystemException
+text: |-
+  `FileSystemException` is thrown by functions in the `noto:fs` library on failure.
+
+  Defines the following properties:
+  - `code` — error code (`std::error_code`)
+  - `message` — explanatory string (`std::filesystem::filesystem_error::what()`)
+---
+class: Path
+docs: Path
+text: |-
+  `Path` represents path in virtual filesystem.
+
+  The virtual filesystem is defined in the main configuration file as a set of path mappings.
+  Each entry maps a virtual path to a real filesystem path with access mode:
+  - `ro` — read-only (default)
+  - `rw` — read-write
+
+  Example:
+  ```
+  [module:fs]
+  /     = /root/path
+  /tmp  = /some/real/path,rw
+  ```
+impl:
+  - fs::IPath
+defs:
+  - type: Absolute
+    base: String
+    docs: Path.Absolute
+    text: |-
+      Absolute virtual path
+  - struct: CopyOptions
+    fields:
+      overwrite:
+        type: Boolean
+        docs: Path.CopyOptions.overwrite
+        text: |-
+          If `true`, overwrites the target file; otherwise throws `FileSystemException` if it exists.
+    docs: Path.CopyOptions
+    text: |-
+      An optional object passed as the second argument to the `Path.copy` method.
+  - struct: DirectoryOptions
+    fields:
+      recursive:
+        type: Boolean
+        docs: Path.DirectoryOptions.recursive
+        text: |-
+          If `true`, makes or removes directories recursively.
+    docs: Path.DirectoryOptions
+    text: |-
+      An optional object passed as the second argument to the `Path.mkdir` and `Path.remove` methods.
+  - struct: WriteOptions
+    fields:
+      append:
+        type: Boolean
+        docs: Path.WriteOptions.append
+        text: |-
+          If `true`, opens file in `std::ios_base::app` mode.
+    docs: Path.WriteOptions
+    text: |-
+      An optional object passed as the second argument to the `Path.write` method.
+properties:
+  exists:
+    getter: true
+    docs: Path.exists
+    text: |-
+      Contains `true` if the given `Path` corresponds to an existing file or directory.
+  extension:
+    getter: true
+    docs: Path.extension
+    text: |-
+      Contains the extension of the file.
+  filename:
+    getter: true
+    docs: Path.filename
+    text: |-
+      Contains the filename identified by the path.
+  is_directory:
+    getter: true
+    docs: Path.is_directory
+    text: |-
+      Contains `true` if `Path` corresponds to a directory.
+  is_fifo:
+    getter: true
+    docs: Path.is_fifo
+    text: |-
+      Contains `true` if `Path` corresponds to a `FIFO` or pipe file as if determined by `POSIX` `S_ISFIFO`.
+  is_regular_file:
+    getter: true
+    docs: Path.is_regular_file
+    text: |-
+      Contains `true` if `Path` refers to a regular file.
+  is_socket:
+    getter: true
+    docs: Path.is_socket
+    text: |-
+      Contains `true` if `Path` refers to a `UNIX` socket file.
+  is_symlink:
+    getter: true
+    docs: Path.is_symlink
+    text: |-
+      Contains `true` if `Path` refers to a symlink.
+  native:
+    getter: true
+    docs: Path.native
+    text: |-
+      Contains actual filesystem path.
+  parent:
+    getter: true
+    docs: Path.parent
+    text: |-
+      Contains parent `Path`.
+  size:
+    getter: true
+    docs: Path.size
+    text: |-
+      Contains size of the file in bytes of `Path` refers to a regular file.
+
+      Throws `FileSystemException` on error or if `this` `Path` doesn't refer to a regular file.
+methods:
+  "[Symbol.iterator]":
+    args:
+      -
+        []
+    docs: Path.[Symbol.iterator]
+    text: |-
+      Returns iterator over directory.
+
+      Throws `FileSystemException` if `this` `Path` doesn't refer to directory.
+  append:
+    args:
+      -
+        - String
+    docs: Path.append
+    text: |-
+      Constructs new `Path` by appending `arg0` to the current instance.
+  blob:
+    args:
+      -
+        []
+      -
+        - String
+    docs: Path.blob
+    text: |-
+      Returns a `Promise` resolving to a `Blob` with data set to file contents if the path refers to a regular file and type to `arg0` if `arg0` is specified.
+
+      Throws `FileSystemException` on error or if `this` `Path` doesn't refer to a regular file.
+  copy:
+    args:
+      -
+        - Path
+      -
+        - Path
+        - Path.CopyOptions
+    docs: Path.copy
+    text: |-
+      Copies `Path`. If target exists and `arg0.overwrite` is `false`, throws `FileSystemException`.
+
+      Throws `FileSystemException` on error or if target path is read-only.
+  json:
+    args:
+      -
+        []
+    docs: Path.json
+    text: |-
+      Returns a `Promise` resolving to file contents parsed as JSON if the path refers to a regular file; otherwise throws `FileSystemException`.
+      Rejects with `SyntaxError` if file content is not valid JSON.
+  mkdir:
+    args:
+      -
+        []
+      -
+        - Path.DirectoryOptions
+    docs: Path.mkdir
+    text: |-
+      Creates a directory at the `Path`. If `arg0.recursive` is `true`, parent directories are created as needed.
+
+      Throws `FileSystemException` on error or if source or target paths is read-only.
+  move:
+    args:
+      -
+        - Path
+    docs: Path.move
+    text: |-
+      Moves or renames the `Path`.
+
+      Throws `FileSystemException` on error or if source or target paths is read-only.
+  relative:
+    args:
+      -
+        - Path
+    docs: Path.relative
+    text: |-
+      Returns a `String` representing the current `Path` relative to `arg0`.
+  remove:
+    args:
+      -
+        []
+      -
+        - Path.DirectoryOptions
+    docs: Path.remove
+    text: |-
+      Removes file or directory at `Path`. If `Path` is directory and `arg0.recursive` is `false`, throws `FileSystemException`.
+
+      Throws `FileSystemException` on error or if `Path` is read-only.
+  text:
+    args:
+      -
+        []
+    docs: Path.text
+    text: |-
+      Returns a `Promise` resolving to a `String` representatioin of file contents if the path refers to a regular file.
+
+      Throws `FileSystemException` on error or if `this` `Path` doesn't refer to a regular file.
+  toJSON:
+    args:
+      -
+        []
+    docs: Path.toJSON
+    text: |-
+      Returns a `String` representing the virtual path (i.e. the value originally passed to the `Path` constructor).
+  write:
+    args:
+      -
+        - String
+      -
+        - IBlob
+      -
+        - String
+        - Path.WriteOptions
+      -
+        - IBlob
+        - Path.WriteOptions
+    docs: Path.write
+    text: |-
+      Writes `Blob` or `String` to a file.
+
+      Returns a `Promise` resolving to a number of bytes written.
+
+      Throws `FileSystemException` if `Path` is read-only, refers to an existing non-regular file or any error occurs.
+---
+function: mounts
+args:
+  -
+    []
+docs: mounts
+text: |-
+  Returns an `Array` of mount points.
+
+  Each entry is
+  - `flag` — `ro` or `rw`
+  - `path` — virtual mount point
+---
+function: path
+args:
+  -
+    - Path.Absolute
+docs: path
+text: |-
+  Constructs a `Path`.
+
+  Throws `TypeError` if `arg0` is not absolute or no mount point exists for it.
