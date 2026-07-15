@@ -536,7 +536,7 @@ struct ErrorLog : bridge::Interface<ErrorLog, std::pair<DB::Namespace, std::stri
             lmdb::val k, v;
             bridge::Strong<bridge::Array> arr{ctx, bridge::Array{ctx}};
 
-            auto [tx, db] = DB(ctx).open(DB::RT, ref().first, ref().second);
+            auto [tx, db] = DB(ctx).open(DB::RO, ref().first, ref().second);
             auto cr = lmdb::cursor::open(tx, db);
             if(cr.get(k, v, MDB_FIRST)) do {
                 auto const j = std::strlen(v.data());
@@ -621,7 +621,7 @@ struct HTTPData : bridge::Interface<HTTPData, std::pair<DB::Namespace, std::stri
             bridge::Strong<bridge::Array> arr{ctx, bridge::Array{ctx}};
             std::array<std::unordered_map<std::string, std::uint64_t>, static_cast<std::size_t>(CacheType::_count)> paths;
 
-            auto [tx, db] = DB(ctx).open(DB::RT, ref().first, ref().second);
+            auto [tx, db] = DB(ctx).open(DB::RO, ref().first, ref().second);
             auto cr = lmdb::cursor::open(tx, db);
             if(cr.get(k, v, MDB_FIRST)) do {
                 CacheType ctp;
