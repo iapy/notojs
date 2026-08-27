@@ -29,25 +29,22 @@
 
 namespace notojs {
 
-extern const std::string_view CLIENT_JS;
-extern const std::string_view CTYPES_JS;
-
-extern const std::string_view EDITOR_CSS;
-extern const std::string_view EDITOR_JS;
-
 extern const std::string_view ANDROID_CHROME_192X192_PNG;
 extern const std::string_view ANDROID_CHROME_512X512_PNG;
 extern const std::string_view APPLE_TOUCH_ICON_PNG;
+extern const std::string_view CLIENT_JS;
+extern const std::string_view EDITOR_CSS;
+extern const std::string_view EDITOR_JS;
 extern const std::string_view FAVICON_ICO;
 extern const std::string_view FAVICON_16X16_PNG;
 extern const std::string_view FAVICON_32X32_PNG;
 extern const std::string_view KEYMAP_INI;
 extern const std::string_view LOGO_PNG;
+extern const std::string_view NOTOCM_JS;
 extern const std::string_view NOTOJS_CSS;
 extern const std::string_view NOTOJS_JS;
 extern const std::string_view NOTOUI_JS;
 extern const std::string_view SITE_WEBMANIFEST;
-
 extern const std::string_view WINDOW_CSS;
 extern const std::string_view WINDOW_JS;
 
@@ -55,7 +52,11 @@ extern const std::string_view CODEMIRROR_CSS;
 extern const std::string_view CODEMIRROR_JS;
 extern const std::string_view ICONS_CSS;
 extern const std::string_view ICONS_TTF;
+extern const std::string_view CSS_JS;
 extern const std::string_view JAVASCRIPT_JS;
+extern const std::string_view HTMLMIXED_JS;
+extern const std::string_view XML_JS;
+extern const std::string_view MATCHBRACKETS_JS;
 extern const std::string_view MARKDOWN_JS;
 
 extern const std::string_view ETAG;
@@ -93,9 +94,9 @@ BOOST_FORCEINLINE std::array<std::string, 2> parse_kv(std::string const &tail)
 
 constexpr auto router = detail::router(
     detail::route("/client.js"),
-    detail::route("/ctypes.js"),
     detail::route("/editor.js"),
     detail::route("/editor.css"),
+    detail::route("/notocm.js"),
     detail::route("/notojs.js"),
     detail::route("/notojs.css"),
     detail::route("/notoui.js"),
@@ -107,15 +108,19 @@ constexpr auto router = detail::router(
     detail::route("/apple-touch-icon.png"),
     detail::route("/codemirror.css"),
     detail::route("/codemirror.js"),
+    detail::route("/css.js"),
     detail::route("/favicon-16x16.png"),
     detail::route("/favicon-32x32.png"),
     detail::route("/favicon.ico"),
+    detail::route("/htmlmixed.js"),
     detail::route("/icons.css"),
     detail::route("/icons.ttf"),
     detail::route("/javascript.js"),
     detail::route("/logo.png"),
     detail::route("/markdown.js"),
+    detail::route("/matchbrackets.js"),
     detail::route("/site.webmanifest"),
+    detail::route("/xml.js"),
 
     detail::route("/"),
     detail::route("/api/v1/app/"),
@@ -142,9 +147,9 @@ constexpr auto router = detail::router(
 using Static = std::tuple<std::string_view const *, std::string_view>;
 constexpr std::array<Static, router["/"]> static_{{
     {&CLIENT_JS,       "application/javascript"},
-    {&CTYPES_JS,       "application/javascript"},
     {&EDITOR_JS,       "application/javascript"},
     {&EDITOR_CSS,      "text/css"},
+    {&NOTOCM_JS,       "application/javascript"},
     {&NOTOJS_JS,       "application/javascript"},
     {&NOTOJS_CSS,      "text/css"},
     {&NOTOUI_JS,       "application/javascript"},
@@ -156,15 +161,19 @@ constexpr std::array<Static, router["/"]> static_{{
     {&APPLE_TOUCH_ICON_PNG, "image/png"},
     {&CODEMIRROR_CSS,       "text/css"},
     {&CODEMIRROR_JS,        "application/javascript"},
+    {&CSS_JS,               "application/javascript"},
     {&FAVICON_ICO,          "image/x-icon"},
     {&FAVICON_16X16_PNG,    "image/png"},
     {&FAVICON_32X32_PNG,    "image/png"},
+    {&HTMLMIXED_JS,         "application/javascript"},
     {&ICONS_CSS,            "text/css"},
     {&ICONS_TTF,            "font/ttf"},
     {&JAVASCRIPT_JS,        "application/javascript"},
     {&LOGO_PNG,             "image/png"},
     {&MARKDOWN_JS,          "application/javascript"},
-    {&SITE_WEBMANIFEST,     "application/manifest+json"}
+    {&MATCHBRACKETS_JS,     "application/javascript"},
+    {&SITE_WEBMANIFEST,     "application/manifest+json"},
+    {&XML_JS,               "application/javascript"}
 }};
 
 thread_local Cacher::Cached applications;

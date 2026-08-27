@@ -1,5 +1,5 @@
 #include <notojs/module/dom/html_collection.hpp>
-#include <utility>
+#include <algorithm>
 
 namespace notojs::dom {
 

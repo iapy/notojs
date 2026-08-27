@@ -1,0 +1,16 @@
+text: |-
+  `globalThis` extender that defines `localStorage` as a namespaced `Storage` instance.
+
+  ```js!noplay
+  require('storage', {ns: 'example'});
+  ```
+
+  The `ns` option is required and must be a valid `Storage.Namespace`: a non-empty
+  string that contains neither spaces nor forward slashes.
+
+  Unlike browser `localStorage`, the **NotoJS** implementation can store any
+  JSON-serializable value, not only strings.
+also:
+  - Storage
+  - Storage.Namespace
+  - https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage

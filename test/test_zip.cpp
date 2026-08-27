@@ -8,7 +8,16 @@ BOOST_AUTO_TEST_CASE(Zip)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 import * as fs from 'noto:fs';
-import { zip } from 'noto:zip';
+import { zip, ZipError } from 'zip.so';
+
+let error;
+try {
+    zip(fs.path('/ro/archive.zip')).write({});
+} catch(e) {
+    error = e;
+}
+assert(() => error instanceof ZipError);
+assert(() => error instanceof Error);
 
 assert(() => throws(() => zip(fs.path('/ro/archive.zip')).write({}), 'Read-only file system'));
 assert(() => throws(() => zip(fs.path('/ro/archive.zip')).read(), 'No such file or directory'));
@@ -27,12 +36,18 @@ assert(() => fs.path('/rw/archive.zip').exists);
 
 const a = await zip(fs.path('/rw/archive.zip')).read('foo.txt');
 assert(() => 1 == Object.keys(a).length);
+assert(() => a['foo.txt'] instanceof File);
+assert(() => a['foo.txt'] instanceof Blob);
+assert(() => 'foo.txt' == a['foo.txt'].name);
+assert(() => 0 == a['foo.txt'].lastModified);
 
 let t = await a['foo.txt'].text();
 assert(() => 'This is foo.txt' == t);
 
 const b = await zip(fs.path('/rw/archive.zip')).read();
 assert(() => 3 == Object.keys(b).length);
+assert(() => Object.values(b).every(file => file instanceof File));
+assert(() => Object.entries(b).every(([name, file]) => name == file.name));
 
 t = await b['bar.txt'].text();
 assert(() => 'This is bar.txt' == t);

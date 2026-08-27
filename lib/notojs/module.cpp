@@ -18,20 +18,13 @@
 #include <notojs/module/doc.hpp>
 #include <notojs/module/dom.hpp>
 #include <notojs/module/fs.hpp>
-#ifdef WITH_LIBZIP
-#include <notojs/module/zip.hpp>
-#endif
-#ifdef WITH_ZLIB
-#include <notojs/module/gzip.hpp>
-#endif
+#include <notojs/module/noto.hpp>
 
 #include <lmdbxx/lmdb++.h>
 #include <notodb.hpp>
 
 #include <future>
 #include <fstream>
-#include <iostream>
-#include <shared_mutex>
 
 namespace notojs  {
 namespace {
@@ -142,7 +135,7 @@ template<typename F>
 auto http_request(JSContext *ctx, const char * name, boost::urls::url &&url, Server &server, bool cache, F &&callback)
 -> decltype(callback(std::declval<boost::urls::url &&>(), std::declval<std::string &&>()))
 {
-    auto scheme = url.scheme_id(); 
+    auto scheme = url.scheme_id();
     if(boost::urls::scheme::https == scheme)
     {
         if(cache) try
@@ -230,22 +223,17 @@ Module::Module()
     MODULE(db),
     MODULE(doc),
     MODULE(dom),
-    MODULE(fs)
-#ifdef WITH_ZLIB
-    , MODULE(gzip)
-#endif
-#ifdef WITH_LIBZIP
-    , MODULE(zip)
-#endif
+    MODULE(fs),
+    MODULE(noto)
 #undef MODULE
 }
 {
     for(auto const &[_, m] : modules) m.init0();
 }
 
-void Module::configure(boost::property_tree::ptree const &cfg)
+void Module::configure(detail::Config const &pt)
 {
-    for(auto const &[_, m] : modules) m.init2(cfg);
+    for(auto const &[_, m] : modules) m.init2(pt);
 }
 
 void Module::init(JSRuntime *rt) const

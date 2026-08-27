@@ -161,4 +161,13 @@ import 'http:// ';
     BOOST_TEST(get_error() != std::nullopt);
 }
 
+BOOST_AUTO_TEST_CASE(FailedImport)
+{
+    eval(R"JS(
+import { foo } from 'noto:dom';
+    )JS");
+
+    BOOST_TEST(get_error() == "Could not find export 'foo' in module 'noto:dom'");
+}
+
 BOOST_AUTO_TEST_SUITE_END()

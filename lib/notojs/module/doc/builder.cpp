@@ -393,7 +393,7 @@ void parse_file(std::ostream &ofs, T &mod, std::filesystem::path const &name, st
                         write_docs(9, f.doc) << ",\n";
                         ofs << pad(9) << ".type = \"" << f.type << "\"\n";
                         ofs << pad(8) << "}}";
-                        if(++m.back() != c.types.size()) ofs << ","; ofs << "\n";
+                        if(++m.back() != std::get<1>(d.data).size()) ofs << ","; ofs << "\n";
                     }
                     ofs << pad(6) << "}\n";
                     m.pop_back();
@@ -723,18 +723,25 @@ int main(int argc, char **argv)
     std::vector<std::size_t> m;
     for(auto it = std::begin(input); it != std::end(input);)
     {
-        if(it->extension() != ".yml" || (it->parent_path().filename() != "module" && it->parent_path().filename() != "notojs"))
+        auto const parent = it->parent_path();
+        auto const standard = parent.parent_path().filename() == "std";
+        if(it->extension() != ".yml" ||
+           (!standard && parent.filename() != "module" && parent.filename() != "notojs"))
         {
             ++it;
             continue;
         }
-        std::cout << "doc:module noto:" << it->stem().string() << '\n';
+
+        auto const name = standard
+            ? std::filesystem::path{parent.filename().string() + ".so"}
+            : it->stem();
+        std::cout << "doc:module " << (standard ? "" : "noto:") << name.string() << '\n';
 
         if(!std::exchange(first, false)) ofs << ",";
         ofs << "\n";
 
         notojs::doc::Module mod;
-        parse_file(ofs, mod, it->stem(), YAML::LoadAllFromFile(*it), m);
+        parse_file(ofs, mod, name, YAML::LoadAllFromFile(*it), m);
         it = input.erase(it);
     }
     ofs << "\n" << pad(1) << "},\n";

@@ -1,7 +1,6 @@
 #pragma once
 #include <notojs/module/dom/backend.hpp>
 #include <notojs/module/dom/node.hpp>
-#include <iostream>
 
 namespace notojs::dom {
 
@@ -33,6 +32,12 @@ struct HTMLCollection : Node
     {
         if(!sel.empty()) update();
         return doc->collection_item(out, i, def);
+    }
+
+    BOOST_FORCEINLINE JSValue at(std::string_view const &name, JSValue def) const
+    {
+        if(!sel.empty()) update();
+        return doc->collection_item(out, name, def);
     }
 
     BOOST_FORCEINLINE operator JSValue() const

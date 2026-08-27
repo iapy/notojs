@@ -9,7 +9,7 @@ void Node::register_upcast()
 JSValue Node::compareDocumentPosition_0(JSContext *ctx, Attr a) const
 {
     if(!ref().node || !a.ref().node) return bridge::Number{ctx, 1};
-    if(ref().node == a.ref().node) return bridge::Number{ctx, 8 | 2}; // CONTAINS
+    if(ref().node == a.ref().node) return bridge::Number{ctx, 16 | 4}; // CONTAINED_BY | FOLLOWING
     return ref().doc->compareDocumentPosition(ref(), a.ref());
 }
 
@@ -43,13 +43,16 @@ JSValue Attr::cloneNode(JSContext *ctx) const
     return v ? Attr::from(ctx, dom::Attr{ref().doc->shared_from_this(), ref().name, std::move(*v)}) : JS_NULL;
 }
 
-JSValue Attr::isConnected(JSContext *ctx) const
+JSValue Attr::isConnected(JSContext *) const
 {
-    return ref().node ? JS_TRUE : JS_FALSE;
+    if(!ref().node) return JS_FALSE;
+    return ref().doc->isConnected(ref());
 }
 
 JSValue Attr::isEqualNode_1(JSContext *, Attr a) const
 {
+    if(ref().name != a.ref().name) return JS_FALSE;
+
     std::optional<std::string> v1, v2;
     if(ref().value) v1 = ref().value;
     else if(auto it = ref().doc->attributes.find(ref().node); it != std::end(ref().doc->attributes))

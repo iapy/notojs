@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 add_executable(builder ${CMAKE_CURRENT_SOURCE_DIR}/builder.cpp)
 target_link_libraries(builder PRIVATE Boost::program_options yaml-cpp::yaml-cpp)
@@ -11,8 +11,13 @@ set(DOCS
     ${PROJECT_SOURCE_DIR}/lib/notojs/module/doc.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/module/dom.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/module/fs.yml
+    ${PROJECT_SOURCE_DIR}/lib/notojs/module/noto.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/script/console.yml
+    ${PROJECT_SOURCE_DIR}/lib/notojs/script/crypto.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/script/dollar.yml
+    ${PROJECT_SOURCE_DIR}/lib/notojs/script/dom.yml
+    ${PROJECT_SOURCE_DIR}/lib/notojs/script/storage.yml
+    ${PROJECT_SOURCE_DIR}/std/crypto/crypto.yml
     ${CMAKE_CURRENT_SOURCE_DIR}/global.yml
     ${CMAKE_CURRENT_SOURCE_DIR}/module.yml
     ${CMAKE_CURRENT_SOURCE_DIR}/api.md
@@ -24,7 +29,7 @@ set(DOCS
     ${CMAKE_CURRENT_SOURCE_DIR}/dom.md
     ${CMAKE_CURRENT_SOURCE_DIR}/extensions.md
     ${CMAKE_CURRENT_SOURCE_DIR}/fs.md
-    ${CMAKE_CURRENT_SOURCE_DIR}/gzip.md
+    ${CMAKE_CURRENT_SOURCE_DIR}/kernels.md
     ${CMAKE_CURRENT_SOURCE_DIR}/lmdb.md
     ${CMAKE_CURRENT_SOURCE_DIR}/markdown.md
     ${CMAKE_CURRENT_SOURCE_DIR}/notojs.md
@@ -33,15 +38,16 @@ set(DOCS
     ${CMAKE_CURRENT_SOURCE_DIR}/selectors.md
     ${CMAKE_CURRENT_SOURCE_DIR}/timers.md
     ${CMAKE_CURRENT_SOURCE_DIR}/ui.md
-    ${CMAKE_CURRENT_SOURCE_DIR}/zip.md
 )
 
-if(libzip_FOUND)
-list(APPEND DOCS ${PROJECT_SOURCE_DIR}/lib/notojs/module/zip.yml)
+if(ZLIB_FOUND)
+list(APPEND DOCS ${PROJECT_SOURCE_DIR}/std/gzip/gzip.yml)
+list(APPEND DOCS ${CMAKE_CURRENT_SOURCE_DIR}/gzip.md)
 endif()
 
-if(ZLIB_FOUND)
-list(APPEND DOCS ${PROJECT_SOURCE_DIR}/lib/notojs/module/gzip.yml)
+if(libzip_FOUND)
+list(APPEND DOCS ${PROJECT_SOURCE_DIR}/std/zip/zip.yml)
+list(APPEND DOCS ${CMAKE_CURRENT_SOURCE_DIR}/zip.md)
 endif()
 
 add_custom_command(
@@ -51,3 +57,6 @@ add_custom_command(
     VERBATIM)
 
 add_library(doc SHARED ${CMAKE_CURRENT_BINARY_DIR}/libdoc.cpp)
+set_target_properties(doc PROPERTIES SUFFIX ".so")
+
+install(TARGETS doc DESTINATION lib/notojs)

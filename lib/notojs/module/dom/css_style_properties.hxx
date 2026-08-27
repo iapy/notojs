@@ -17,7 +17,7 @@ struct CSSStyleProperties : bridge::Interface<CSSStyleProperties, dom::CSSStyleP
     JSValue getPropertyPriority(JSContext *ctx, bridge::String name)
     {
         if(!ref().impl.index()) return bridge::String{ctx, std::get<0>(ref().impl).getPropertyPriority(ref(), name)};
-        return bridge::String{ctx, std::string_view{}};
+        return bridge::String{ctx};
     }
 
     template<typename T, typename F>

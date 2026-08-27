@@ -3,95 +3,12 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
     HTMLElement(JSContext *ctx, JSValue self) : Base{ctx, self} {}
     HTMLElement(std::reference_wrapper<dom::HTMLElement> &&rw) : Base(std::move(rw)) {}
 
-    template<typename T>
-    JSValue appendChild_t(JSContext *ctx, T object)
-    {
-        std::optional<std::string> error;
-        if(auto *node = ref().appendChild(object, error); node)
-            return dynamic_cast<dom::HTMLBackend *>(ref().doc.get())->make(node);
-        return DOMException::throwSyntaxError(ctx, std::move(error));
-    }
-
     using appendChild = bridge::Function
     <
         &Node::appendChild,
-        &HTMLElement::appendChild_t<Image>,
-        &HTMLElement::appendChild_t<SVG>
+        &HTMLNodeMixin::appendChild_t<Image>,
+        &HTMLNodeMixin::appendChild_t<SVG>
     >;
-
-    template<typename T>
-    JSValue insertBefore_t0(JSContext *ctx, T object, Node r)
-    {
-        if(ref().doc != r.ref().doc) return DOMException::throwWrongDocumentError(ctx);
-        if(!ref().doc->isChild(ref(), r.ref())) return DOMException::throwNotFoundError(ctx);
-
-        std::optional<std::string> error;
-        if(auto *node = ref().insertBefore(object, r.ref(), error); node)
-            return dynamic_cast<dom::HTMLBackend *>(ref().doc.get())->make(node);
-        return DOMException::throwSyntaxError(ctx, std::move(error));
-    }
-
-    template<typename T>
-    JSValue insertBefore_t1(JSContext *ctx, T object, bridge::Null)
-    {
-        return appendChild_t<T>(ctx, object);
-    }
-
-    using insertBefore = bridge::Function
-    <
-        &Node::insertBefore_0,
-        &Node::insertBefore_1,
-        &HTMLElement::insertBefore_t0<Image>,
-        &HTMLElement::insertBefore_t0<SVG>,
-        &HTMLElement::insertBefore_t1<Image>,
-        &HTMLElement::insertBefore_t1<SVG>
-    >;
-
-    using Tail = bridge::Tail<1, Node, bridge::String, HTML, Image, SVG>;
-
-    static std::optional<JSValue> after_f(JSContext *ctx, Tail &nodes, std::size_t j, dom::Node const &self,
-        dom::Node const &parent, std::optional<dom::Node> const &next)
-    {
-        std::optional<std::string> error;
-        if(auto h = nodes.template get<HTML>(j); h)
-        {
-            if(next) (void)dom::HTMLElement{parent}.insertBefore(*h, *next, error);
-            else (void)dom::HTMLElement{parent}.appendChild(*h, error);
-        }
-        else if(auto i = nodes.template get<Image>(j); i)
-        {
-            if(next) (void)dom::HTMLElement{parent}.insertBefore(*i, *next, error);
-            else (void)dom::HTMLElement{parent}.appendChild(*i, error);
-        }
-        else if(auto s = nodes.template get<SVG>(j); s)
-        {
-            if(next) (void)dom::HTMLElement{parent}.insertBefore(*s, *next, error);
-            else (void)dom::HTMLElement{parent}.appendChild(*s, error);
-        }
-        if(error) DOMException::throwSyntaxError(ctx, std::move(*error));
-        return std::nullopt;
-    }
-    using after = bridge::Function<&Element::after_t<HTMLElement, Node, bridge::String, HTML, Image, SVG>>;
-
-    static std::optional<JSValue> append_f(JSContext *ctx, Tail &nodes, std::size_t j, dom::Node const &self)
-    {
-        std::optional<std::string> error;
-        if(auto h = nodes.template get<HTML>(j); h)
-        {
-            (void)dom::HTMLElement{self}.appendChild(*h, error);
-        }
-        else if(auto i = nodes.template get<Image>(j); i)
-        {
-            (void)dom::HTMLElement{self}.appendChild(*i, error);
-        }
-        else if(auto s = nodes.template get<SVG>(j); s)
-        {
-            (void)dom::HTMLElement{self}.appendChild(*s, error);
-        }
-        if(error) DOMException::throwSyntaxError(ctx, std::move(*error));
-        return std::nullopt;
-    }
-    using append = bridge::Function<&Element::append_t<HTMLElement, Node, bridge::String, HTML, Image, SVG>>;
 
     JSValue attributes_(JSContext *ctx)
     {
@@ -104,27 +21,6 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
     {
         return attributes_(ctx);
     }
-
-    static std::optional<JSValue> before_f(JSContext *ctx, Tail &nodes, std::size_t j, dom::Node const &self,
-        dom::Node const &parent)
-    {
-        std::optional<std::string> error;
-        if(auto h = nodes.template get<HTML>(j); h)
-        {
-            (void)dom::HTMLElement{parent}.insertBefore(*h, self, error);
-        }
-        else if(auto i = nodes.template get<Image>(j); i)
-        {
-            (void)dom::HTMLElement{parent}.insertBefore(*i, self, error);
-        }
-        else if(auto s = nodes.template get<SVG>(j); s)
-        {
-            (void)dom::HTMLElement{parent}.insertBefore(*s, self, error);
-        }
-        if(error) DOMException::throwSyntaxError(ctx, std::move(*error));
-        return std::nullopt;
-    }
-    using before = bridge::Function<&Element::before_t<HTMLElement, Node, bridge::String, HTML, Image, SVG>>;
 
     JSValue className(JSContext *ctx) const
     {
@@ -148,14 +44,6 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
         ref().setAttribute({"class"}, value.toString());
     }
 
-    JSValue closest(JSContext *ctx, bridge::String query)
-    {
-        std::optional<std::string> error;
-        if(auto *node = ref().closest(query, error); node)
-            return dynamic_cast<dom::HTMLBackend *>(ref().doc.get())->make(node);
-        return error ? DOMException::throwSyntaxError(ctx, std::move(error)) : JS_NULL;
-    }
-
     JSValue dataset(JSContext *ctx) const
     {
         auto doc = dynamic_cast<dom::HTMLBackend *>(ref().doc.get());
@@ -166,7 +54,7 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
         return doc->datasets[ptr] = DOMStringMap::from(ctx, dom::DOMStringMap(ref()));
     }
 
-    JSValue getAttributeNode(JSContext *ctx, bridge::String name)
+    JSValue getAttributeNode(JSContext *ctx, Attr::Name name)
     {
         bridge::Strong<NamedNodeMap> a{ctx, attributes_(ctx)};
         return (-a).getNamedItem(a, ctx, name);
@@ -175,7 +63,7 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
     JSValue getAttributeNodeNS_0(JSContext *ctx, bridge::Null, bridge::String name)
     {
         bridge::Strong<NamedNodeMap> a{ctx, attributes_(ctx)};
-        return (-a).getNamedItem(a, ctx, name);
+        return (-a).getNamedItemExact(a, ctx, name);
     }
 
     JSValue getAttributeNodeNS_1(JSContext *ctx, bridge::String ns, bridge::String name)
@@ -280,7 +168,128 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
         });
     }
 
-    ELEMENT_ATTRIBUTE_PROPERTY(id)
+    JSValue form(JSContext *ctx) const
+    {
+        auto *doc = dynamic_cast<dom::HTMLBackend *>(ref().doc.get());
+        if(auto id = ref().getAttribute({"form"}))
+        {
+            auto *el = lxb_dom_element_by_id(lxb_dom_interface_element(doc->doc.get()), reinterpret_cast<lxb_char_t const *>(id->data()), id->size());
+            if(el && LXB_TAG_FORM == lxb_dom_node_tag_id(lxb_dom_interface_node(el)))
+                return doc->make(lxb_dom_interface_node(el));
+            return JS_NULL;
+        }
+
+        if(auto *node = ref().closest(LXB_TAG_FORM); node)
+            return doc->make(node);
+        return JS_NULL;
+    }
+
+    struct attributes
+    {
+        static constexpr char abbr[] = "abbr";
+        static constexpr char action[] = "action";
+        static constexpr char alt[] = "alt";
+        static constexpr char amplitude[] = "amplitude";
+        static constexpr char attributeName[] = "attributeName";
+        static constexpr char autocomplete[] = "autocomplete";
+        static constexpr char azimuth[] = "azimuth";
+        static constexpr char baseFrequency[] = "baseFrequency";
+        static constexpr char begin[] = "begin";
+        static constexpr char bias[] = "bias";
+        static constexpr char by[] = "by";
+        static constexpr char clipPathUnits[] = "clipPathUnits";
+        static constexpr char command[] = "command";
+        static constexpr char content[] = "content";
+        static constexpr char diffuseConstant[] = "diffuseConstant";
+        static constexpr char divisor[] = "divisor";
+        static constexpr char dur[] = "dur";
+        static constexpr char edgeMode[] = "edgeMode";
+        static constexpr char elevation[] = "elevation";
+        static constexpr char end[] = "end";
+        static constexpr char enctype[] = "enctype";
+        static constexpr char exponent[] = "exponent";
+        static constexpr char fill[] = "fill";
+        static constexpr char filterUnits[] = "filterUnits";
+        static constexpr char from[] = "from";
+        static constexpr char gradientUnits[] = "gradientUnits";
+        static constexpr char headers[] = "headers";
+        static constexpr char href[] = "href";
+        static constexpr char hreflang[] = "hreflang";
+        static constexpr char id[] = "id";
+        static constexpr char in2[] = "in2";
+        static constexpr char intercept[] = "intercept";
+        static constexpr char k1[] = "k1";
+        static constexpr char k2[] = "k2";
+        static constexpr char k3[] = "k3";
+        static constexpr char k4[] = "k4";
+        static constexpr char kernelMatrix[] = "kernelMatrix";
+        static constexpr char kernelUnitLength[] = "kernelUnitLength";
+        static constexpr char label[] = "label";
+        static constexpr char limitingConeAngle[] = "limitingConeAngle";
+        static constexpr char markerUnits[] = "markerUnits";
+        static constexpr char maskContentUnits[] = "maskContentUnits";
+        static constexpr char maskUnits[] = "maskUnits";
+        static constexpr char media[] = "media";
+        static constexpr char method[] = "method";
+        static constexpr char mode[] = "mode";
+        static constexpr char name[] = "name";
+        static constexpr char numOctaves[] = "numOctaves";
+        static constexpr char offset[] = "offset";
+        static constexpr char order[] = "order";
+        static constexpr char orient[] = "orient";
+        static constexpr char patternContentUnits[] = "patternContentUnits";
+        static constexpr char patternUnits[] = "patternUnits";
+        static constexpr char points[] = "points";
+        static constexpr char pointsAtX[] = "pointsAtX";
+        static constexpr char pointsAtY[] = "pointsAtY";
+        static constexpr char pointsAtZ[] = "pointsAtZ";
+        static constexpr char preserveAlpha[] = "preserveAlpha";
+        static constexpr char preserveAspectRatio[] = "preserveAspectRatio";
+        static constexpr char primitiveUnits[] = "primitiveUnits";
+        static constexpr char radius[] = "radius";
+        static constexpr char rel[] = "rel";
+        static constexpr char repeatCount[] = "repeatCount";
+        static constexpr char result[] = "result";
+        static constexpr char scale[] = "scale";
+        static constexpr char scope[] = "scope";
+        static constexpr char seed[] = "seed";
+        static constexpr char slope[] = "slope";
+        static constexpr char spacing[] = "spacing";
+        static constexpr char specularConstant[] = "specularConstant";
+        static constexpr char specularExponent[] = "specularExponent";
+        static constexpr char spreadMethod[] = "spreadMethod";
+        static constexpr char src[] = "src";
+        static constexpr char stdDeviation[] = "stdDeviation";
+        static constexpr char stitchTiles[] = "stitchTiles";
+        static constexpr char surfaceScale[] = "surfaceScale";
+        static constexpr char tableValues[] = "tableValues";
+        static constexpr char target[] = "target";
+        static constexpr char targetX[] = "targetX";
+        static constexpr char targetY[] = "targetY";
+        static constexpr char to[] = "to";
+        static constexpr char type[] = "type";
+        static constexpr char value[] = "value";
+        static constexpr char values[] = "values";
+        static constexpr char x[] = "x";
+        static constexpr char xChannelSelector[] = "xChannelSelector";
+        static constexpr char y[] = "y";
+        static constexpr char yChannelSelector[] = "yChannelSelector";
+        static constexpr char z[] = "z";
+    };
+
+    template<char const *Name>
+    JSValue attribute(JSContext *ctx) const
+    {
+        if(auto value = ref().getAttribute({Name}))
+            return bridge::String{ctx, *value};
+        return bridge::String{ctx};
+    }
+
+    template<char const *Name>
+    void set_attribute(JSContext *, bridge::Value value)
+    {
+        ref().setAttribute({Name}, value.toString());
+    }
 
     JSValue innerHTML(JSContext *ctx) const
     {
@@ -336,12 +345,12 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
             auto first = ref().doc->first(ref());
             if(first)
             {
-                if(auto *node = ref().insertBefore(object, *first, error); node)
+                if(auto *node = dom::lexbor::insertBefore(ref(), object, static_cast<lxb_dom_node_t *>(first->node), error))
                     return dynamic_cast<dom::HTMLBackend *>(ref().doc.get())->make(node);
                 return DOMException::throwSyntaxError(ctx, std::move(error));
             }
 
-            if(auto *node = ref().appendChild(object, error); node)
+            if(auto *node = dom::lexbor::appendChild(ref(), object, error))
                 return dynamic_cast<dom::HTMLBackend *>(ref().doc.get())->make(node);
             return DOMException::throwSyntaxError(ctx, std::move(error));
         }
@@ -355,11 +364,11 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
 
             if(auto next = ref().doc->next(ref()))
             {
-                if(auto *node = dom::HTMLElement{*parent}.insertBefore(object, *next, error); node)
+                if(auto *node = dom::lexbor::insertBefore(static_cast<lxb_dom_node_t *>(parent->node), object, static_cast<lxb_dom_node_t *>(next->node), error))
                     return dynamic_cast<dom::HTMLBackend *>(ref().doc.get())->make(node);
                 return DOMException::throwSyntaxError(ctx, std::move(error));
             }
-            if(auto *node = dom::HTMLElement{*parent}.appendChild(object, error); node)
+            if(auto *node = dom::lexbor::appendChild(static_cast<lxb_dom_node_t *>(parent->node), object, error))
                 return dynamic_cast<dom::HTMLBackend *>(ref().doc.get())->make(node);
             return DOMException::throwSyntaxError(ctx, std::move(error));
         }
@@ -371,14 +380,14 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
             if(!parent)
                 return DOMException::throwHierarchyRequestError(ctx);
 
-            if(auto *node = dom::HTMLElement{*parent}.insertBefore(object, ref(), error); node)
+            if(auto *node = dom::lexbor::insertBefore(static_cast<lxb_dom_node_t *>(parent->node), object, ref(), error))
                 return dynamic_cast<dom::HTMLBackend *>(ref().doc.get())->make(node);
             return DOMException::throwSyntaxError(ctx, std::move(error));
         }
         else if constexpr (Element::Position::Value::beforeend == pos)
         {
             std::optional<std::string> error;
-            if(auto *node = ref().appendChild(object, error); node)
+            if(auto *node = dom::lexbor::appendChild(ref(), object, error))
                 return dynamic_cast<dom::HTMLBackend *>(ref().doc.get())->make(node);
             return DOMException::throwSyntaxError(ctx, std::move(error));
         }
@@ -418,12 +427,12 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
         case Element::Position::Value::afterbegin:
             if(auto first = ref().doc->first(ref()))
             {
-                if(auto *node = ref().insertBefore(text, *first, error))
+                if(auto *node = dom::lexbor::insertBefore(ref(), text, static_cast<lxb_dom_node_t *>(first->node), error))
                     return JS_UNDEFINED;
             }
             else
             {
-                if(auto *node = ref().appendChild(text, error))
+                if(auto *node = dom::lexbor::appendChild(ref(), text, error))
                     return JS_UNDEFINED;
             }
             return DOMException::throwSyntaxError(ctx, std::move(error));
@@ -432,22 +441,22 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
                 return DOMException::throwHierarchyRequestError(ctx);
             else if(auto next = ref().doc->next(ref()))
             {
-                if(auto *node = dom::HTMLElement{*parent}.insertBefore(text, *next, error))
+                if(auto *node = dom::lexbor::insertBefore(static_cast<lxb_dom_node_t *>(parent->node), text, static_cast<lxb_dom_node_t *>(next->node), error))
                     return JS_UNDEFINED;
             }
             else
             {
-                if(auto *node = dom::HTMLElement{*parent}.appendChild(text, error))
+                if(auto *node = dom::lexbor::appendChild(static_cast<lxb_dom_node_t *>(parent->node), text, error))
                     return JS_UNDEFINED;
             }
             return DOMException::throwSyntaxError(ctx, std::move(error));
         case Element::Position::Value::beforebegin:
             if(auto parent = ref().doc->parent(ref()); !parent) return DOMException::throwHierarchyRequestError(ctx);
-            else if(auto *node = dom::HTMLElement{*parent}.insertBefore(text, ref(), error))
+            else if(auto *node = dom::lexbor::insertBefore(static_cast<lxb_dom_node_t *>(parent->node), text, ref(), error))
                 return JS_UNDEFINED;
             return DOMException::throwSyntaxError(ctx, std::move(error));
         case Element::Position::Value::beforeend:
-            if(auto *node = ref().appendChild(text, error); node)
+            if(auto *node = dom::lexbor::appendChild(ref(), text, error))
                 return JS_UNDEFINED;
             return DOMException::throwSyntaxError(ctx, std::move(error));
         default:
@@ -463,12 +472,12 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
         case Element::Position::Value::afterbegin:
             if(auto first = ref().doc->first(ref()))
             {
-                if(auto *node = ref().insertBefore(object, *first, error))
+                if(auto *node = dom::lexbor::insertBefore(ref(), object, static_cast<lxb_dom_node_t *>(first->node), error))
                     return JS_UNDEFINED;
             }
             else
             {
-                if(auto *node = ref().appendChild(object, error))
+                if(auto *node = dom::lexbor::appendChild(ref(), object, error))
                     return JS_UNDEFINED;
             }
             return DOMException::throwSyntaxError(ctx, std::move(error));
@@ -477,22 +486,22 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
                 return DOMException::throwHierarchyRequestError(ctx);
             else if(auto next = ref().doc->next(ref()))
             {
-                if(auto *node = dom::HTMLElement{*parent}.insertBefore(object, *next, error))
+                if(auto *node = dom::lexbor::insertBefore(static_cast<lxb_dom_node_t *>(parent->node), object, static_cast<lxb_dom_node_t *>(next->node), error))
                     return JS_UNDEFINED;
             }
             else
             {
-                if(auto *node = dom::HTMLElement{*parent}.appendChild(object, error))
+                if(auto *node = dom::lexbor::appendChild(static_cast<lxb_dom_node_t *>(parent->node), object, error))
                     return JS_UNDEFINED;
             }
             return DOMException::throwSyntaxError(ctx, std::move(error));
         case Element::Position::Value::beforebegin:
             if(auto parent = ref().doc->parent(ref()); !parent) return DOMException::throwHierarchyRequestError(ctx);
-            else if(auto *node = dom::HTMLElement{*parent}.insertBefore(object, ref(), error))
+            else if(auto *node = dom::lexbor::insertBefore(static_cast<lxb_dom_node_t *>(parent->node), object, ref(), error))
                 return JS_UNDEFINED;
             return DOMException::throwSyntaxError(ctx, std::move(error));
         case Element::Position::Value::beforeend:
-            if(auto *node = ref().appendChild(object, error); node)
+            if(auto *node = dom::lexbor::appendChild(ref(), object, error))
                 return JS_UNDEFINED;
             return DOMException::throwSyntaxError(ctx, std::move(error));
         default:
@@ -506,25 +515,37 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
         &HTMLElement::insertAdjacentHTML_2
     >;
 
-    JSValue matches(JSContext *ctx, bridge::String query)
-    {
-        std::optional<std::string> error;
-        if(auto const result = ref().matches(query, error); error)
-            return DOMException::throwSyntaxError(ctx, std::move(error));
-        else return result ? JS_TRUE : JS_FALSE;
-    }
+    using insertBefore = bridge::Function
+    <
+        &Node::insertBefore_0,
+        &Node::insertBefore_1,
+        &HTMLNodeMixin::insertBefore_t0<Image>,
+        &HTMLNodeMixin::insertBefore_t0<SVG>,
+        &HTMLNodeMixin::insertBefore_t1<Image>,
+        &HTMLNodeMixin::insertBefore_t1<SVG>
+    >;
 
-    void set_outerHTML_0(JSContext *ctx, HTML value)
+    JSValue set_outerHTML_0(JSContext *ctx, HTML value)
     {
         if(lxb_dom_node_t *node = ref(); node->parent)
+        {
+            if(LXB_DOM_NODE_TYPE_DOCUMENT == node->parent->type)
+                return DOMException::throwNoModificationAllowedError(ctx);
             ref().outerHTML(value);
+        }
+        return JS_UNDEFINED;
     }
 
-    void set_outerHTML_1(JSContext *ctx, bridge::Value value)
+    JSValue set_outerHTML_1(JSContext *ctx, bridge::Value value)
     {
-        auto str = value.toString();
         if(lxb_dom_node_t *node = ref(); node->parent)
+        {
+            if(LXB_DOM_NODE_TYPE_DOCUMENT == node->parent->type)
+                return DOMException::throwNoModificationAllowedError(ctx);
+            auto str = value.toString();
             ref().outerHTML(static_cast<std::string_view const &>(str));
+        }
+        return JS_UNDEFINED;
     }
 
     using set_outerHTML = bridge::Setters
@@ -533,10 +554,16 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
         &HTMLElement::set_outerHTML_1
     >;
 
-    void set_outerText(JSContext *ctx, bridge::Value value)
+    JSValue set_outerText(JSContext *ctx, bridge::Value value)
     {
+        lxb_dom_node_t *node = ref();
+        if(!node->parent) return DOMException::throwNoModificationAllowedError(ctx);
+        if(LXB_DOM_NODE_TYPE_DOCUMENT == node->parent->type)
+            return DOMException::throwHierarchyRequestError(ctx);
+
         auto str = value.toString();
         ref().outerText(static_cast<std::string_view const &>(str));
+        return JS_UNDEFINED;
     }
 
     JSValue relList(JSContext *ctx) const
@@ -549,29 +576,30 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
         return doc->rels[ptr] = DOMTokenList::from(ctx, dom::DOMTokenList{ref(), dom::Attr::Name{"rel"}});
     }
 
-    using prepend = bridge::Function<&Element::prepend_t<HTMLElement, Node, bridge::String, HTML, Image, SVG>>;
-
     JSValue removeAttributeNode(JSContext *ctx, Attr attr)
     {
         if(ref().node != attr.ref().node) return DOMException::throwNotFoundError(ctx);
 
         bridge::Strong<NamedNodeMap> m{ctx, attributes_(ctx)};
-        bridge::Strong<bridge::String> n{ctx, attr.nodeName(ctx)};
+        bridge::Strong<Attr::Name> n{ctx, attr.nodeName(ctx)};
         return (-m).removeNamedItem(m, ctx, n);
     }
 
     JSValue removeAttributeNS_0(JSContext *ctx, bridge::Null, bridge::String name)
     {
-        return ref().removeAttribute({name}), JS_UNDEFINED;
+        auto const key = dom::Attr::Name{name};
+        if(auto it = ref().doc->attributes.find(ref().node); it != std::end(ref().doc->attributes))
+            NamedNodeMap::remove(it->second, key);
+        return ref().removeAttribute(key), JS_UNDEFINED;
     }
 
-    JSValue removeAttributeNS_1(JSContext *ctx, bridge::String ns, bridge::String name)
+    JSValue removeAttributeNS_1(JSContext *ctx, bridge::String ns, Attr::Name name)
     {
         auto doc = dynamic_cast<dom::HTMLBackend *>(ref().doc.get());
         auto const &nsv = static_cast<std::string_view const &>(ns);
         if(auto nsid = doc->lookupNS(nsv); LXB_NS__UNDEF != nsid)
         {
-            auto key = dom::Attr::Name{name, nsid};
+            auto key = dom::Attr::Name{name.get(ref()), nsid};
             if(auto it = ref().doc->attributes.find(ref().node); it != std::end(ref().doc->attributes))
                 NamedNodeMap::remove(it->second, key);
             return ref().removeAttribute(key), JS_UNDEFINED;
@@ -585,27 +613,13 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
         &HTMLElement::removeAttributeNS_1
     >;
 
-    template<typename T>
-    JSValue replaceChild_t(JSContext *ctx, T object, Node o)
-    {
-        if(ref().doc != o.ref().doc) return DOMException::throwWrongDocumentError(ctx);
-        if(!ref().doc->isChild(ref(), o.ref())) return DOMException::throwNotFoundError(ctx);
-
-        std::optional<std::string> error;
-        if(auto *node = ref().insertBefore(object, o.ref(), error); node)
-            return ref().doc->remove(o.ref());
-        return DOMException::throwSyntaxError(ctx, std::move(error));
-    }
-
     using replaceChild = bridge::Function
     <
         &Node::replaceChild,
-        &HTMLElement::replaceChild_t<HTML>,
-        &HTMLElement::replaceChild_t<Image>,
-        &HTMLElement::replaceChild_t<SVG>
+        &HTMLNodeMixin::replaceChild_t<HTML>,
+        &HTMLNodeMixin::replaceChild_t<Image>,
+        &HTMLNodeMixin::replaceChild_t<SVG>
     >;
-
-    using replaceChildren = bridge::Function<&Element::replaceChildren_t<HTMLElement, Node, bridge::String, HTML, Image, SVG>>;
 
     JSValue setAttributeNode(JSContext *ctx, bridge::Object attr)
     {
@@ -683,26 +697,27 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
     using impl = bridge::Implements<I>;
     using ctor = bridge::Unconstructable<HTMLElement>;
     friend class Window;
+    friend class HTMLSelectElement;
     static JSCFunctionListEntry const funcs[];
 };
 
 JSCFunctionListEntry const HTMLElement::funcs[] = {
+    REFLECTING_ATTRIBUTE(id),
+
     JS_CGETSET_DEF("attributes", &bridge::Getter<&HTMLElement::attributes>, NULL),
     JS_CGETSET_DEF("classList", &bridge::Getter<&HTMLElement::classList>, NULL),
     JS_CGETSET_DEF("className", &bridge::Getter<&HTMLElement::className>, &bridge::Setter<&HTMLElement::set_className>),
     JS_CGETSET_DEF("dataset", &bridge::Getter<&HTMLElement::dataset>, NULL),
-    JS_CGETSET_DEF("id", &bridge::Getter<&HTMLElement::id>, &bridge::Setter<&HTMLElement::set_id>),
     JS_CGETSET_DEF("innerHTML", &bridge::Getter<&HTMLElement::innerHTML>, &HTMLElement::set_innerHTML::invoke),
     JS_CGETSET_DEF("innerText", &bridge::Getter<&HTMLElement::innerText>, &HTMLElement::set_innerText::invoke),
     JS_CGETSET_DEF("outerHTML", &bridge::Getter<&HTMLElement::toString>, &HTMLElement::set_outerHTML::invoke),
     JS_CGETSET_DEF("outerText", &bridge::Getter<&HTMLElement::innerText>, &bridge::Setter<&HTMLElement::set_outerText>),
     JS_CGETSET_DEF("style", &bridge::Getter<&HTMLElement::style>, NULL),
 
-    JS_CFUNC_DEF("after", 1, &HTMLElement::after::invoke),
-    JS_CFUNC_DEF("append", 1, &HTMLElement::append::invoke),
+    JS_CFUNC_DEF("after", 1, &bridge::Function<&NodeMixin::after_t<HTMLNodeMixin>>::invoke),
+    JS_CFUNC_DEF("append", 1,  &bridge::Function<&NodeMixin::append_t<HTMLNodeMixin>>::invoke),
     JS_CFUNC_DEF("appendChild", 1, &HTMLElement::appendChild::invoke),
-    JS_CFUNC_DEF("before", 1, &HTMLElement::before::invoke),
-    JS_CFUNC_DEF("closest", 1, &bridge::Function<&HTMLElement::closest>::invoke),
+    JS_CFUNC_DEF("before", 1,  &bridge::Function<&NodeMixin::before_t<HTMLNodeMixin>>::invoke),
     JS_CFUNC_DEF("getAttributeNode", 1, &bridge::Function<&HTMLElement::getAttributeNode>::invoke),
     JS_CFUNC_DEF("getAttributeNodeNS", 2, &HTMLElement::getAttributeNodeNS::invoke),
     JS_CFUNC_DEF("getAttributeNS", 2, &HTMLElement::getAttributeNS::invoke),
@@ -714,13 +729,13 @@ JSCFunctionListEntry const HTMLElement::funcs[] = {
     JS_CFUNC_DEF("insertAdjacentElement", 2, &HTMLElement::insertAdjacentElement::invoke),
     JS_CFUNC_DEF("insertAdjacentHTML", 2, &HTMLElement::insertAdjacentHTML::invoke),
     JS_CFUNC_DEF("insertBefore", 2, &HTMLElement::insertBefore::invoke),
-    JS_CFUNC_DEF("matches", 1, &bridge::Function<&HTMLElement::matches>::invoke),
-    JS_CFUNC_DEF("moveBefore", 2, HTMLElement::insertBefore::invoke),
-    JS_CFUNC_DEF("prepend", 0, &HTMLElement::prepend::invoke),
+    JS_CFUNC_DEF("moveBefore", 2, &HTMLElement::insertBefore::invoke),
+    JS_CFUNC_DEF("prepend", 1, &bridge::Function<&NodeMixin::prepend_t<HTMLNodeMixin>>::invoke),
     JS_CFUNC_DEF("removeAttributeNS", 2, &HTMLElement::removeAttributeNS::invoke),
     JS_CFUNC_DEF("removeAttributeNode", 1, &bridge::Function<&HTMLElement::removeAttributeNode>::invoke),
-    JS_CFUNC_DEF("replaceChildren", 1, &HTMLElement::replaceChildren::invoke),
+    JS_CFUNC_DEF("replaceChildren", 1, &bridge::Function<&NodeMixin::replaceChildren_t<HTMLNodeMixin>>::invoke),
     JS_CFUNC_DEF("replaceChild", 2, &HTMLElement::replaceChild::invoke),
+    JS_CFUNC_DEF("replaceWith", 1,  &bridge::Function<&NodeMixin::replaceWith_t<HTMLNodeMixin>>::invoke),
     JS_CFUNC_DEF("setAttributeNS", 3, &HTMLElement::setAttributeNS::invoke),
     JS_CFUNC_DEF("setAttributeNode", 1, &bridge::Function<&HTMLElement::setAttributeNode>::invoke),
     JS_CFUNC_DEF("setAttributeNodeNS", 1, &bridge::Function<&HTMLElement::setAttributeNode>::invoke),
@@ -730,98 +745,81 @@ JSCFunctionListEntry const HTMLElement::funcs[] = {
     JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<HTMLElement>::toJSON)
 };
 
-struct HTMLAnchorElement : bridge::Interface<HTMLAnchorElement, dom::HTMLElement, HTMLElement>
-{
-    HTMLAnchorElement(JSContext *ctx, JSValue self) : Base{ctx, self} {}
-    HTMLAnchorElement(std::reference_wrapper<dom::HTMLElement> &&rw) : Base(std::move(rw)) {}
-
-    ELEMENT_ATTRIBUTE_PROPERTY(href)
-    ELEMENT_ATTRIBUTE_PROPERTY(hreflang)
-    ELEMENT_ATTRIBUTE_PROPERTY(rel)
-    ELEMENT_ATTRIBUTE_PROPERTY(target)
-
-    using Base::Base;
-    using ctor = bridge::Unconstructable<HTMLAnchorElement>;
-    static JSCFunctionListEntry const funcs[];
+#define HTML_ELEMENT_STUB(...) BOOST_PP_OVERLOAD(HTML_ELEMENT_STUB_, __VA_ARGS__)(__VA_ARGS__)
+#define HTML_ELEMENT_STUB_1(name) HTML_ELEMENT_STUB_2(name, HTMLElement)
+#define HTML_ELEMENT_STUB_2(name, base) \
+struct name : bridge::Interface<name, dom::HTMLElement, base> \
+{ \
+    name(JSContext *ctx, JSValue self) : Base{ctx, self} {} \
+    name(std::reference_wrapper<dom::HTMLElement> &&rw) : Base(std::move(rw)) {} \
+ \
+    using Base::Base; \
+    using ctor = bridge::Unconstructable<name>; \
 };
 
-JSCFunctionListEntry const HTMLAnchorElement::funcs[] = {
-    JS_CGETSET_DEF("href", &bridge::Getter<&HTMLAnchorElement::href>, &bridge::Setter<&HTMLAnchorElement::set_href>),
-    JS_CGETSET_DEF("hreflang", &bridge::Getter<&HTMLAnchorElement::hreflang>, &bridge::Setter<&HTMLAnchorElement::set_hreflang>),
-    JS_CGETSET_DEF("rel", &bridge::Getter<&HTMLAnchorElement::rel>, &bridge::Setter<&HTMLAnchorElement::set_rel>),
-    JS_CGETSET_DEF("relList", &bridge::Getter<&HTMLElement::relList>, NULL),
-    JS_CGETSET_DEF("target", &bridge::Getter<&HTMLAnchorElement::target>, &bridge::Setter<&HTMLAnchorElement::set_target>)
-};
+HTML_ELEMENT_STUB(HTMLAreaElement)
+HTML_ELEMENT_STUB(HTMLBodyElement)
+HTML_ELEMENT_STUB(HTMLBRElement)
+HTML_ELEMENT_STUB(HTMLCanvasElement)
+HTML_ELEMENT_STUB(HTMLDetailsElement)
+HTML_ELEMENT_STUB(HTMLDialogElement)
+HTML_ELEMENT_STUB(HTMLDivElement)
+HTML_ELEMENT_STUB(HTMLEmbedElement)
+HTML_ELEMENT_STUB(HTMLHeadElement)
+HTML_ELEMENT_STUB(HTMLHeadingElement)
+HTML_ELEMENT_STUB(HTMLHRElement)
+HTML_ELEMENT_STUB(HTMLHtmlElement)
+HTML_ELEMENT_STUB(HTMLIFrameElement)
+HTML_ELEMENT_STUB(HTMLLegendElement)
+HTML_ELEMENT_STUB(HTMLMapElement)
+HTML_ELEMENT_STUB(HTMLMediaElement)
+HTML_ELEMENT_STUB(HTMLAudioElement, HTMLMediaElement)
+HTML_ELEMENT_STUB(HTMLMenuElement)
+HTML_ELEMENT_STUB(HTMLMeterElement)
+HTML_ELEMENT_STUB(HTMLModElement)
+HTML_ELEMENT_STUB(HTMLObjectElement)
+HTML_ELEMENT_STUB(HTMLOutputElement)
+HTML_ELEMENT_STUB(HTMLParagraphElement)
+HTML_ELEMENT_STUB(HTMLParamElement)
+HTML_ELEMENT_STUB(HTMLPictureElement)
+HTML_ELEMENT_STUB(HTMLPreElement)
+HTML_ELEMENT_STUB(HTMLProgressElement)
+HTML_ELEMENT_STUB(HTMLQuoteElement)
+HTML_ELEMENT_STUB(HTMLScriptElement)
+HTML_ELEMENT_STUB(HTMLSourceElement)
+HTML_ELEMENT_STUB(HTMLSpanElement)
+HTML_ELEMENT_STUB(HTMLTableCaptionElement)
+HTML_ELEMENT_STUB(HTMLTableColElement)
+HTML_ELEMENT_STUB(HTMLTitleElement)
+HTML_ELEMENT_STUB(HTMLTrackElement)
+HTML_ELEMENT_STUB(HTMLUListElement)
+HTML_ELEMENT_STUB(HTMLVideoElement, HTMLMediaElement)
 
-struct HTMLImageElement : bridge::Interface<HTMLImageElement, dom::HTMLElement, HTMLElement>
-{
-    HTMLImageElement(JSContext *ctx, JSValue self) : Base{ctx, self} {}
-    HTMLImageElement(std::reference_wrapper<dom::HTMLElement> &&rw) : Base(std::move(rw)) {}
+#undef HTML_ELEMENT_STUB_2
+#undef HTML_ELEMENT_STUB_1
+#undef HTML_ELEMENT_STUB
 
-    ELEMENT_ATTRIBUTE_PROPERTY(alt)
-    ELEMENT_ATTRIBUTE_PROPERTY(src)
-
-    struct I : Base::I<I, Image::Interface>
-    {
-        using Base::Base;
-        std::string get() const override
-        {
-            return std::string{ref.getAttribute({"src"}).value_or("")};
-        }
-    };
-
-    using Base::Base;
-    using impl = bridge::Implements<I>;
-    using ctor = bridge::Unconstructable<HTMLImageElement>;
-    static JSCFunctionListEntry const funcs[];
-};
-
-JSCFunctionListEntry const HTMLImageElement::funcs[] = {
-    JS_CGETSET_DEF("alt", &bridge::Getter<&HTMLImageElement::alt>, &bridge::Setter<&HTMLImageElement::set_alt>),
-    JS_CGETSET_DEF("src", &bridge::Getter<&HTMLImageElement::src>, &bridge::Setter<&HTMLImageElement::set_src>)
-};
-
-struct HTMLLinkElement : bridge::Interface<HTMLLinkElement, dom::HTMLElement, HTMLElement>
-{
-    HTMLLinkElement(JSContext *ctx, JSValue self) : Base{ctx, self} {}
-    HTMLLinkElement(std::reference_wrapper<dom::HTMLElement> &&rw) : Base(std::move(rw)) {}
-
-    ELEMENT_ATTRIBUTE_PROPERTY(href)
-    ELEMENT_ATTRIBUTE_PROPERTY(hreflang)
-    ELEMENT_ATTRIBUTE_PROPERTY(rel)
-
-    using Base::Base;
-    using ctor = bridge::Unconstructable<HTMLLinkElement>;
-    static JSCFunctionListEntry const funcs[];
-};
-
-JSCFunctionListEntry const HTMLLinkElement::funcs[] = {
-    JS_CGETSET_DEF("href", &bridge::Getter<&HTMLLinkElement::href>, &bridge::Setter<&HTMLLinkElement::set_href>),
-    JS_CGETSET_DEF("hreflang", &bridge::Getter<&HTMLLinkElement::hreflang>, &bridge::Setter<&HTMLLinkElement::set_hreflang>),
-    JS_CGETSET_DEF("rel", &bridge::Getter<&HTMLLinkElement::rel>, &bridge::Setter<&HTMLLinkElement::set_rel>),
-    JS_CGETSET_DEF("relList", &bridge::Getter<&HTMLElement::relList>, NULL)
-};
-
-struct HTMLStyleElement : bridge::Interface<HTMLStyleElement, dom::HTMLElement, HTMLElement>
-{
-    HTMLStyleElement(JSContext *ctx, JSValue self) : Base{ctx, self} {}
-    HTMLStyleElement(std::reference_wrapper<dom::HTMLElement> &&rw) : Base(std::move(rw)) {}
-
-    JSValue sheet(JSContext *ctx) const
-    {
-        auto doc = dynamic_cast<dom::HTMLBackend *>(ref().doc.get());
-        auto ptr = static_cast<lxb_html_element_t *>(ref());
-
-        if(auto it = doc->sheets.find(ptr); it != std::end(doc->sheets))
-            return JS_DupValue(ctx, it->second);
-        return doc->sheets[ptr] = CSSStyleSheet::from(ctx, dom::CSSStyleSheet{ref()});
-    }
-
-    using Base::Base;
-    using ctor = bridge::Unconstructable<HTMLStyleElement>;
-    static JSCFunctionListEntry const funcs[];
-};
-
-JSCFunctionListEntry const HTMLStyleElement::funcs[] = {
-    JS_CGETSET_DEF("sheet", &bridge::Getter<&HTMLStyleElement::sheet>, NULL)
-};
+#include <notojs/module/dom/html_element/html_anchor_element.hxx>
+#include <notojs/module/dom/html_element/html_base_element.hxx>
+#include <notojs/module/dom/html_element/html_button_element.hxx>
+#include <notojs/module/dom/html_element/html_data_element.hxx>
+#include <notojs/module/dom/html_element/html_label_element.hxx>
+#include <notojs/module/dom/html_element/html_form_element.hxx>
+#include <notojs/module/dom/html_element/html_field_set_element.hxx>
+#include <notojs/module/dom/html_element/html_input_element.hxx>
+#include <notojs/module/dom/html_element/html_image_element.hxx>
+#include <notojs/module/dom/html_element/html_li_element.hxx>
+#include <notojs/module/dom/html_element/html_link_element.hxx>
+#include <notojs/module/dom/html_element/html_meta_element.hxx>
+#include <notojs/module/dom/html_element/html_style_element.hxx>
+#include <notojs/module/dom/html_element/html_time_element.hxx>
+#include <notojs/module/dom/html_element/html_table_element.hxx>
+#include <notojs/module/dom/html_element/html_table_cell_element.hxx>
+#include <notojs/module/dom/html_element/html_table_row_element.hxx>
+#include <notojs/module/dom/html_element/html_table_section_element.hxx>
+#include <notojs/module/dom/html_element/html_data_list_element.hxx>
+#include <notojs/module/dom/html_element/html_o_list_element.hxx>
+#include <notojs/module/dom/html_element/html_opt_group_element.hxx>
+#include <notojs/module/dom/html_element/html_option_element.hxx>
+#include <notojs/module/dom/html_element/html_select_element.hxx>
+#include <notojs/module/dom/html_element/html_text_area_element.hxx>

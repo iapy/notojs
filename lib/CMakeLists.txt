@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 set(LMDB_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/lmdb/libraries/liblmdb/liblmdb.a CACHE PATH "lib/lmdb.a")
 set(QUICKJS_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/quickjs/libquickjs.a CACHE PATH "lib/quickjs.a")

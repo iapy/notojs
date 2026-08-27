@@ -8,6 +8,33 @@ struct XMLDocument : bridge::Interface<XMLDocument, dom::XMLDocument, Document>
         self.doc->self.reset();
     }
 
+    JSValue createAttribute(JSContext *ctx, bridge::String name)
+    {
+        auto const &n = static_cast<std::string_view const &>(name);
+        if(n == "*" || !dom::Element::isTagName(n))
+            return DOMException::throwInvalidCharacterError(ctx);
+        return Attr::from(ctx, dom::Attr{ref().doc->shared_from_this(), dom::Attr::Name{std::string{n}}, std::string{}});
+    }
+
+    JSValue createCDATASection(JSContext *, bridge::String text)
+    {
+        return ref().createCDATASection(text);
+    }
+
+    JSValue createComment(JSContext *, bridge::String text)
+    {
+        return ref().createComment(text);
+    }
+
+    JSValue createProcessingInstruction(JSContext *ctx, bridge::String target, bridge::String data)
+    {
+        auto const &t = static_cast<std::string_view const &>(target);
+        auto const &d = static_cast<std::string_view const &>(data);
+        if(!dom::Element::isTagName(t) || d.find("?>") != std::string_view::npos)
+            return DOMException::throwInvalidCharacterError(ctx);
+        return ref().createProcessingInstruction(t, d);
+    }
+
     JSValue createElement(JSContext *ctx, bridge::String name)
     {
         return ref().createElement(name);
@@ -63,6 +90,10 @@ JSCFunctionListEntry const XMLDocument::funcs[] = {
     // XMLDocumented interface
     JS_CGETSET_DEF("documentElement", &bridge::Getter<&XMLDocument::documentElement>, NULL),
 
+    JS_CFUNC_DEF("createAttribute", 1, &bridge::Function<&XMLDocument::createAttribute>::invoke),
+    JS_CFUNC_DEF("createCDATASection", 1, &bridge::Function<&XMLDocument::createCDATASection>::invoke),
+    JS_CFUNC_DEF("createComment", 1, &bridge::Function<&XMLDocument::createComment>::invoke),
+    JS_CFUNC_DEF("createProcessingInstruction", 2, &bridge::Function<&XMLDocument::createProcessingInstruction>::invoke),
     JS_CFUNC_DEF("createElement", 1, &bridge::Function<&XMLDocument::createElement>::invoke),
     JS_CFUNC_DEF("createTextNode", 1, &bridge::Function<&XMLDocument::createTextNode>::invoke),
     JS_CFUNC_DEF("getElementsByTagName", 1, &bridge::Function<&XMLDocument::getElementsByTagName>::invoke),

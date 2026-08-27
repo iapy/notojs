@@ -74,7 +74,7 @@ struct LiveStyle
         }
         BOOST_FORCEINLINE void reg(lxb_dom_node_t *node)
         {
-            emplace(node, LiveStyle{});
+            ++operator [](node).count;
         }
         BOOST_FORCEINLINE bool upd(lxb_dom_node_t *node, std::uint32_t &v)
         {
@@ -82,11 +82,16 @@ struct LiveStyle
                 return it->second.upd(v);
             return false;
         }
-        using std::unordered_map<lxb_dom_node_t *, LiveStyle>::erase;
+        BOOST_FORCEINLINE void erase(lxb_dom_node_t *node)
+        {
+            if(auto it = find(node); it != end() && !--it->second.count)
+                std::unordered_map<lxb_dom_node_t *, LiveStyle>::erase(it);
+        }
         using std::unordered_map<lxb_dom_node_t *, LiveStyle>::size;
     };
 
 private:
+    std::size_t count{0};
     std::uint32_t version{0};
 };
 

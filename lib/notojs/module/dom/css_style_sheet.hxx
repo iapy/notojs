@@ -5,23 +5,46 @@ struct CSSStyleSheet : bridge::Interface<CSSStyleSheet, dom::CSSStyleSheet>
 
     JSValue cssRules(JSContext *ctx, JSValue self)
     {
-        return CSSRuleList::from(ctx, dom::CSSRuleList{ref()}, self);
+        auto doc = dynamic_cast<dom::HTMLBackend *>(ref().doc.get());
+        auto ptr = static_cast<lxb_html_element_t *>(ref());
+
+        if(auto it = doc->cssrules.find(ptr); it != std::end(doc->cssrules))
+            return JS_DupValue(ctx, it->second);
+        return doc->cssrules[ptr] = CSSRuleList::from(ctx, dom::CSSRuleList{ref()}, self);
+    }
+
+    static JSValue mutationError(JSContext *ctx, dom::CSSStyleSheet::MutationError error)
+    {
+        switch(error)
+        {
+        case dom::CSSStyleSheet::MutationError::index_size:
+            return DOMException::throwIndexSizeError(ctx);
+        case dom::CSSStyleSheet::MutationError::syntax:
+            return DOMException::throwSyntaxError(ctx);
+        default:
+            return JS_UNDEFINED;
+        }
     }
 
     JSValue deleteRule(JSContext *ctx, bridge::Number index)
     {
-        ref().deleteRule(index);
-        return JS_UNDEFINED;
+        return mutationError(ctx, ref().deleteRule(css_rule_index(index)));
     }
 
     JSValue insertRule_0(JSContext *ctx, bridge::String rule)
     {
-        return bridge::Number{ctx, ref().insertRule(0, rule)};
+        auto const [error, index] = ref().insertRule(0, rule);
+        if(dom::CSSStyleSheet::MutationError::none != error)
+            return mutationError(ctx, error);
+        return bridge::Number{ctx, index};
     }
 
     JSValue insertRule_1(JSContext *ctx, bridge::String rule, bridge::Number index)
     {
-        return bridge::Number{ctx, ref().insertRule(index, rule)};
+        auto const [error, inserted] = ref().insertRule(css_rule_index(index), rule);
+        if(dom::CSSStyleSheet::MutationError::none != error)
+            return mutationError(ctx, error);
+        return bridge::Number{ctx, inserted};
     }
 
     using insertRule = bridge::Function
@@ -39,22 +62,30 @@ struct CSSStyleSheet : bridge::Interface<CSSStyleSheet, dom::CSSStyleSheet>
     {
         (void)replaceSync(ctx, text);
 
-        JSValue funcs[2];
+        JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
         JSValue promise = JS_NewPromiseCapability(ctx, funcs);
-
-        if(!JS_IsException(promise))
+        if(JS_IsException(promise))
         {
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, &self));
+            JS_FreeValue(ctx, funcs[0]);
+            JS_FreeValue(ctx, funcs[1]);
+            return promise;
         }
 
+        JSValue settled = JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, &self);
         JS_FreeValue(ctx, funcs[0]);
         JS_FreeValue(ctx, funcs[1]);
+        if(JS_IsException(settled))
+        {
+            JS_FreeValue(ctx, promise);
+            return settled;
+        }
+        JS_FreeValue(ctx, settled);
         return promise;
     }
 
     JSValue replaceSync(JSContext *ctx, bridge::String text)
     {
-        ref().doc->textContent(ref(), text);
+        ref().replace(text);
         return JS_UNDEFINED;
     }
 

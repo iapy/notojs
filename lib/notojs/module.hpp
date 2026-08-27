@@ -1,5 +1,5 @@
 #pragma once
-#include <boost/property_tree/ptree.hpp>
+#include <notojs/detail/config.hpp>
 #include <nanodi.hpp>
 
 #include <boost/url.hpp>
@@ -39,14 +39,14 @@ private:
     {
         void (*init0)();
         void (*init1)(JSRuntime *);
-        void (*init2)(boost::property_tree::ptree const &);
+        void (*init2)(detail::Config const &);
         JSModuleDef *(*init3)(JSContext *, const char *);
     };
     std::unordered_map<std::string, Impl> const modules;
     std::unordered_map<std::string, decltype(Impl{}.init3)> plugins;
 
 private:
-    void configure(boost::property_tree::ptree const &);
+    void configure(detail::Config const &);
     friend class Config;
     friend class Plugin;
 };

@@ -32,11 +32,11 @@ struct HTMLCollection : bridge::Interface<Collection<HTMLCollection, dom::HTMLCo
     JSValue namedItem(JSContext *, bridge::String name)
     {
         return std::visit(boost::hana::overload_linearly(
+            [&name](dom::HTMLCollection const &list) -> JSValue {
+                return list.at(name, JS_NULL);
+            },
             [&name](dom::Node const &node) -> JSValue {
                 return node.doc->childElement(node, name);
-            },
-            [&name](dom::HTMLCollection const &list) -> JSValue {
-                return JS_UNDEFINED;
             }), Base::ref());
     }
 

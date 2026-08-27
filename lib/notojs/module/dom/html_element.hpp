@@ -26,7 +26,9 @@ struct HTMLElement : Element
         return lxb_html_interface_element(static_cast<lxb_dom_node_t *>(node));
     }
 
-    lxb_dom_node_t *closest(std::string_view const &, std::optional<std::string> &) const;
+    lxb_dom_node_t *root() const;
+    lxb_dom_node_t *closest(lxb_tag_id_t) const;
+    lxb_dom_node_t *directChild(lxb_tag_id_t) const;
 
     std::vector<Attr::Name> attrs() const override;
     std::uint64_t attributesCount() const override;
@@ -35,7 +37,6 @@ struct HTMLElement : Element
     std::optional<Attr::Name> getAttributeName(std::int64_t) const override;
     std::optional<std::string_view> getAttribute(Attr::Name::View const &a) const override;
     bool hasAttribute(Attr::Name::View const &) const override;
-    bool matches(std::string_view const &, std::optional<std::string> &) const;
 
     std::string innerHTML() const;
     std::string innerText() const;
@@ -53,12 +54,6 @@ struct HTMLElement : Element
     bool toggleAttribute(Attr::Name::View const &) override;
     bool toggleAttribute(Attr::Name::View const &, bool) override;
     std::string toString() const;
-
-    template<typename T>
-    lxb_dom_node_t *appendChild(T const &, std::optional<std::string> &);
-
-    template<typename T>
-    lxb_dom_node_t *insertBefore(T const &, Node const &, std::optional<std::string> &);
 
     static std::string className(std::string_view const &str);
 };

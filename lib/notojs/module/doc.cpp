@@ -1,8 +1,10 @@
 #include <notojs/module/doc/data.hpp>
 #include <notojs/module/doc.hpp>
 #include <notojs/notojs.hpp>
+#include <algorithm>
 #include <filesystem>
 #include <functional>
+#include <cctype>
 #include <mutex>
 #include <set>
 
@@ -53,6 +55,36 @@ Document(T const &, std::optional<std::string> const &, std::function<void()> &&
 
 struct Handler
 {
+    static bool is_package(std::string const &name)
+    {
+        return name.size() >= 3 && 0 == name.compare(name.size() - 3, 3, ".so");
+    }
+
+    static std::string module_name(std::string const &name)
+    {
+        return is_package(name) ? name : "noto:" + name;
+    }
+
+    static bool global_symbol(doc::Suite const *suite, std::string const &name)
+    {
+        if(!suite) return false;
+        auto const global = suite->modules.find("global");
+        return global != std::end(suite->modules) &&
+            (global->second.exceptions.count(name) ||
+             global->second.classes.count(name) ||
+             global->second.functions.count(name));
+    }
+
+    static std::string member_reference(
+        doc::Suite const *suite,
+        std::string const &source,
+        std::string const &name)
+    {
+        return "noto:global" == source || !global_symbol(suite, name)
+            ? name
+            : source + "." + name;
+    }
+
     struct Abstract
     {
         using Header = Document<doc::Header>;
@@ -112,6 +144,82 @@ struct Handler
         }
     };
 
+    struct Index
+    {
+        struct Less
+        {
+            bool operator () (std::string const &a, std::string const &b) const
+            {
+                auto const compare = [](unsigned char x, unsigned char y) {
+                    return std::tolower(x) < std::tolower(y);
+                };
+                if(std::lexicographical_compare(
+                    std::begin(a), std::end(a), std::begin(b), std::end(b), compare
+                )) return true;
+                if(std::lexicographical_compare(
+                    std::begin(b), std::end(b), std::begin(a), std::end(a), compare
+                )) return false;
+                return a < b;
+            }
+        };
+
+        template<typename C>
+        void operator () (C &ctx)
+        {
+            auto &self = x3::_val(ctx);
+            if(!self.suite) return;
+
+            std::map<std::string, std::set<std::string, Less>, Less> references;
+            for(auto const &[name, script]: self.suite->scripts)
+            {
+                references[name].insert(name);
+                for(auto const &[name, _]: script.functions) references[name].insert(name);
+            }
+            for(auto const &[name, module]: self.suite->modules)
+            {
+                auto const source = module_name(name);
+                references[source].insert(source);
+                for(auto const &[name, _]: module.classes)
+                    references[name].insert(member_reference(self.suite, source, name));
+                for(auto const &[name, _]: module.functions)
+                    references[name].insert(member_reference(self.suite, source, name));
+            }
+
+            char letter = '\0';
+            for(auto const &[name, queries]: references)
+            {
+                auto const initial = std::find_if(std::begin(name), std::end(name), [](unsigned char c) {
+                    return std::isalpha(c);
+                });
+                if(initial == std::end(name)) continue;
+                auto const current = static_cast<char>(std::toupper(static_cast<unsigned char>(*initial)));
+                if(current != letter)
+                {
+                    if(letter) self.output.append("\n");
+                    self.output.append("### ");
+                    self.output.push_back(current);
+                    self.output.append("\n");
+                    letter = current;
+                }
+                auto const append = [&self](std::string const &query) {
+                    self.output.append("- `doc('");
+                    self.output.append(query);
+                    self.output.append("')`\n");
+                };
+                if(global_symbol(self.suite, name))
+                {
+                    append(name);
+                    for(auto const &query: queries)
+                        if(name != query) append(query);
+                }
+                else
+                {
+                    for(auto const &query: queries) append(query);
+                }
+            }
+        }
+    };
+
     struct Header
     {
         template<typename C>
@@ -142,13 +250,27 @@ struct Handler
         {
             auto &self = x3::_val(ctx);
             if(auto it = self.suite->modules.find(x3::_attr(ctx)); it != std::end(self.suite->modules))
-                self.target = Document{it->second, "noto:" + it->first};
+                self.target = Document{it->second, module_name(it->first)};
+        }
+    };
+
+    struct Package
+    {
+        template<typename C>
+        void operator () (C &ctx)
+        {
+            auto &self = x3::_val(ctx);
+            std::string const name{std::begin(x3::_attr(ctx)), std::end(x3::_attr(ctx))};
+            if(auto it = self.suite->modules.find(name); it != std::end(self.suite->modules))
+                self.target = Document{it->second, it->first};
         }
     };
 
     struct Search
     {
+        using Module = Document<doc::Module>;
         using Class = Document<doc::Module::Class>;
+        using Script = Document<doc::Script>;
 
         template<typename C>
         void operator () (C &ctx)
@@ -165,25 +287,34 @@ struct Handler
                 }
                 else
                 {
-                    for(auto it = std::begin(self.suite->modules); it != std::end(self.suite->modules); ++it)
+                    auto const find = [&](auto const &entry) {
+                        if(auto p = entry.second.exceptions.find(attr); p != std::end(entry.second.exceptions))
+                        {
+                            self.target = Document{p->second, attr};
+                            self.defined = module_name(entry.first);
+                            return true;
+                        }
+                        if(auto p = entry.second.classes.find(attr); p != std::end(entry.second.classes))
+                        {
+                            self.target = Document{p->second, attr};
+                            self.defined = module_name(entry.first);
+                            return true;
+                        }
+                        if(auto p = entry.second.functions.find(attr); p != std::end(entry.second.functions))
+                        {
+                            self.target = Document{p->second, attr};
+                            self.defined = module_name(entry.first);
+                            return true;
+                        }
+                        return false;
+                    };
+
+                    auto const global = self.suite->modules.find("global");
+                    if(global == std::end(self.suite->modules) || !find(*global))
                     {
-                        if(auto p = it->second.exceptions.find(attr); p != std::end(it->second.exceptions))
+                        for(auto const &entry: self.suite->modules)
                         {
-                            self.target = Document{p->second, attr};
-                            self.defined = "noto:" + it->first;
-                            break;
-                        }
-                        if(auto p = it->second.classes.find(attr); p != std::end(it->second.classes))
-                        {
-                            self.target = Document{p->second, attr};
-                            self.defined = "noto:" + it->first;
-                            break;
-                        }
-                        if(auto p = it->second.functions.find(attr); p != std::end(it->second.functions))
-                        {
-                            self.target = Document{p->second, attr};
-                            self.defined = "noto:" + it->first;
-                            break;
+                            if("global" != entry.first && find(entry)) break;
                         }
                     }
                 }
@@ -203,6 +334,61 @@ struct Handler
                             self.defined = it->first;
                             break;
                         }
+                    }
+                }
+            }
+            else if(std::holds_alternative<Module>(self.target))
+            {
+                auto &m = std::get<Module>(self.target);
+                auto const source = *m.top;
+                auto const name = source + "." + attr;
+                if(auto it = m.get().exceptions.find(attr); it != std::end(m.get().exceptions))
+                {
+                    self.target = Document{it->second, name};
+                    self.defined = source;
+                }
+                else if(auto it = m.get().classes.find(attr); it != std::end(m.get().classes))
+                {
+                    self.target = Document{it->second, name};
+                    self.defined = source;
+                }
+                else if(auto it = m.get().functions.find(attr); it != std::end(m.get().functions))
+                {
+                    self.target = Document{it->second, name};
+                    self.defined = source;
+                }
+                else
+                {
+                    self.target.template emplace<std::monostate>();
+                    self.suite = nullptr;
+                }
+            }
+            else if(std::holds_alternative<Script>(self.target))
+            {
+                auto &s = std::get<Script>(self.target);
+                auto const name = *s.top + "." + attr;
+                if(auto it = s.get().types.find(name); it != std::end(s.get().types))
+                {
+                    self.target = Document{it->second, name};
+                }
+                else if(auto it = s.get().functions.find(name); it != std::end(s.get().functions))
+                {
+                    self.target = Document{it->second, name};
+                }
+                else
+                {
+                    auto const prefix = name + ".";
+                    auto const type = s.get().types.lower_bound(prefix);
+                    auto const function = s.get().functions.lower_bound(prefix);
+                    if((type != std::end(s.get().types) && 0 == type->first.compare(0, prefix.size(), prefix)) ||
+                       (function != std::end(s.get().functions) && 0 == function->first.compare(0, prefix.size(), prefix)))
+                    {
+                        s.top = name;
+                    }
+                    else
+                    {
+                        self.target.template emplace<std::monostate>();
+                        self.suite = nullptr;
                     }
                 }
             }
@@ -404,6 +590,8 @@ struct Handler
                         for(auto const &[name, e]: doc.get().exceptions)
                         {
                             self.output.append("\n");
+                            if(doc.top)
+                                self.reference = member_reference(self.suite, *doc.top, name);
                             fn(Document(e, name));
                         }
                     }
@@ -413,6 +601,8 @@ struct Handler
                         for(auto const &[name, e]: doc.get().classes)
                         {
                             self.output.append("\n");
+                            if(doc.top)
+                                self.reference = member_reference(self.suite, *doc.top, name);
                             fn(Document(e, name));
                         }
                     }
@@ -422,11 +612,15 @@ struct Handler
                         for(auto const &[name, e]: doc.get().functions)
                         {
                             self.output.append("\n");
+                            if(doc.top)
+                                self.reference = member_reference(self.suite, *doc.top, name);
                             fn(Document(e, name));
                         }
                     }
                 },
                 [&self](auto, Document<doc::Module::Doc> const &doc) {
+                    std::string reference;
+                    reference.swap(self.reference);
                     if(doc.top)
                     {
                         if(self.suite) self.output.append("#");
@@ -466,7 +660,7 @@ struct Handler
                     if(doc.top && (self.brief || !self.suite))
                     {
                         self.output.append("- `doc('");
-                        self.output.append(*doc.top);
+                        self.output.append(reference.empty() ? *doc.top : reference);
                         self.output.append("')`\n");
                     }
                 },
@@ -735,17 +929,20 @@ struct Handler
     > target;
     std::string output;
     std::string defined;
+    std::string reference;
     bool brief{false};
 };
 
+auto const I = x3::lit("index")[Handler::Index()];
 auto const H = (+x3::alnum >> x3::lit(".hpp"))[Handler::Header()] >> -(x3::lit("#abstract")[Handler::Abstract()]);
 auto const C = x3::raw[x3::lit("noto::") >> +(x3::char_ - x3::eoi)][Handler::API()];
-auto const M = x3::lit("noto:") >> (+x3::alnum)[Handler::Module()] >> -(x3::lit("#abstract")[Handler::Abstract()]);
+auto const Q = *("." >> (+x3::alnum)[Handler::Search()]) >> -(x3::lit("#abstract")[Handler::Abstract()]);
+auto const M = x3::lit("noto:") >> (+x3::alnum)[Handler::Module()] >> Q;
+auto const P = x3::raw[+x3::alnum >> x3::lit(".so")][Handler::Package()] >> Q;
 auto const T = x3::lit("topic:") >> (+x3::alnum)[Handler::Topic()] >> -(x3::lit(":") >> (+x3::alnum)[Handler::Subtopic()]);
-auto const Q = (x3::lit("#abstract")[Handler::Abstract()] | -("." >> (+x3::alnum)[Handler::Search()]));
 auto const S = (+x3::alnum)[Handler::Search()] >> Q;
 auto const D = x3::raw[(x3::lit("$") | x3::lit("console") | x3::lit("require")) >> -("." >> +x3::alnum)][Handler::Search()] >> Q;
-auto const Parser = (H | C | D | M | T | S) >> x3::eoi[Handler::Flush()];
+auto const Parser = (I | H | C | D | M | P | T | S) >> x3::eoi[Handler::Flush()];
 
 auto const parser = std::invoke([]{
     x3::rule<class parser, Handler> const parser = "parser";
@@ -784,7 +981,10 @@ void Handler::append(doc::Suite const *suite, std::string &output)
 {
     output.append("## Built-in packages\n");
     for(auto const &[k, _]: suite->scripts) append(suite, output, k + "#abstract");
-    for(auto const &[k, _]: suite->modules) append(suite, output, "noto:" + k + "#abstract");
+    for(auto const &[k, _]: suite->modules)
+        if(!is_package(k)) append(suite, output, module_name(k) + "#abstract");
+    for(auto const &[k, _]: suite->modules)
+        if(is_package(k)) append(suite, output, module_name(k) + "#abstract");
 }
 
 void Handler::append(doc::Suite const *suite, std::string &output, std::string const &q)
@@ -846,9 +1046,9 @@ int init(JSContext *ctx, JSModuleDef *m)
 void notojs_init_doc() {}
 void notojs_init_doc(JSRuntime *) {}
 
-void notojs_init_doc(boost::property_tree::ptree const &pt)
+void notojs_init_doc(detail::Config const &cfg)
 {
-    docs.configure(pt);
+    docs.configure(cfg);
 }
 
 JSModuleDef *notojs_init_doc(JSContext *ctx, const char *name)

@@ -8,6 +8,8 @@ struct HTML : bridge::Interface<HTML>
     using Base::Base;
     static constexpr bool constructible = false;
 
+    void *fragment{nullptr};
+
     struct Interface : bridge::Interface<Interface, void*>
     {
         virtual bool json() const = 0;
@@ -23,6 +25,8 @@ struct Image : bridge::Interface<Image>
 {
     using Base::Base;
     static constexpr bool constructible = false;
+
+    void *fragment{nullptr};
 
     struct Interface : bridge::Interface<Interface, void*>
     {
@@ -47,6 +51,8 @@ struct SVG : bridge::Interface<SVG>
 {
     using Base::Base;
     static constexpr bool constructible = false;
+
+    void *fragment{nullptr};
 
     struct Interface : bridge::Interface<Interface, void*>
     {

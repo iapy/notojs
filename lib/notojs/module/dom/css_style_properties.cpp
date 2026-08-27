@@ -1,4 +1,5 @@
 #include <notojs/module/dom/css_style_properties.hpp>
+#include <notojs/module/dom/css_style_sheet.hpp>
 #include <notojs/module/dom/lexbor.hpp>
 #include <lexbor/style/style.h>
 #include <bridge.hpp>
@@ -11,8 +12,6 @@
 namespace notojs::dom {
 namespace {
 
-constexpr std::string_view EMPTY_STRING_VIEW{};
-
 BOOST_FORCEINLINE char const *get_attribute(lxb_dom_element_t *el, std::size_t *len = NULL)
 {
     return reinterpret_cast<char const *>(lxb_dom_element_get_attribute(el, reinterpret_cast<lxb_char_t const *>("style"), 5, len));
@@ -21,6 +20,22 @@ BOOST_FORCEINLINE char const *get_attribute(lxb_dom_element_t *el, std::size_t *
 BOOST_FORCEINLINE void set_attribute(lxb_dom_element_t *el, std::string const &value)
 {
     lxb_dom_element_set_attribute(el, reinterpret_cast<lxb_char_t const *>("style"), 5, reinterpret_cast<lxb_char_t const *>(value.data()), value.size());
+}
+
+void append_declaration_delimiter(std::string &value)
+{
+    if(value.empty()) return;
+
+    auto const end = value.find_last_not_of(" \t\r\n\f");
+    if(end == std::string::npos)
+    {
+        value.clear();
+        return;
+    }
+
+    value.resize(end + 1);
+    if(value.back() != ';') value.append(";");
+    value.append(" ");
 }
 
 std::string to_snake(char const *n)
@@ -41,10 +56,18 @@ std::string to_snake(char const *n)
     return result == "css-float" ? "float" : result;
 }
 
-lxb_status_t match(lxb_dom_node_t*, lxb_css_selector_specificity_t, void *ctx)
+struct Match
 {
-    *reinterpret_cast<bool*>(ctx) = true;
-    return LXB_STATUS_STOP;
+    lxb_css_selector_specificity_t specificity{0};
+    bool found{false};
+};
+
+lxb_status_t match(lxb_dom_node_t*, lxb_css_selector_specificity_t specificity, void *ctx)
+{
+    auto &result = *reinterpret_cast<Match*>(ctx);
+    result.found = true;
+    result.specificity = std::max(result.specificity, specificity);
+    return LXB_STATUS_OK;
 }
 
 std::unordered_set<std::string_view> const html = {
@@ -358,7 +381,9 @@ std::map<std::string_view, std::string_view> const global = {
 
 bool inherits(lxb_dom_node_t *node, std::string const &key)
 {
-    return html.count(key) || (LXB_NS_SVG == node->ns && svg.count(key));
+    return (key.size() >= 2 && key[0] == '-' && key[1] == '-')
+        || html.count(key)
+        || (LXB_NS_SVG == node->ns && svg.count(key));
 }
 
 } // namespace
@@ -373,7 +398,7 @@ JSValue CSSStyleProperties::Attr::cssText(HTMLElement const &el) const
 {
     std::size_t len;
     if(auto *str = get_attribute(el, &len)) return bridge::String{el.doc->ctx, std::string_view{str, len}};
-    return bridge::String{el.doc->ctx, EMPTY_STRING_VIEW};
+    return bridge::String{el.doc->ctx};
 }
 
 std::uint32_t CSSStyleProperties::Attr::length(HTMLElement const &el) const
@@ -415,7 +440,7 @@ JSValue CSSStyleProperties::Attr::item(HTMLElement const &el, std::int32_t x) co
             return bridge::String{el.doc->ctx, std::string_view{attr + bs[x].first, bs[x].second - bs[x].first}};
         }
     }
-    return bridge::String{el.doc->ctx, EMPTY_STRING_VIEW};
+    return bridge::String{el.doc->ctx};
 }
 
 JSValue CSSStyleProperties::Attr::getPropertyPriority(HTMLElement const &el, std::string_view const &name) const
@@ -427,7 +452,7 @@ JSValue CSSStyleProperties::Attr::getPropertyPriority(HTMLElement const &el, std
             attr + rule->offset.important_begin + 1,
             rule->offset.important_end - rule->offset.important_begin - 1
         }};
-    return bridge::String{el.doc->ctx, EMPTY_STRING_VIEW};
+    return bridge::String{el.doc->ctx};
 }
 
 JSValue CSSStyleProperties::Attr::getPropertyValue(HTMLElement const &el, std::string_view const &name) const
@@ -438,7 +463,7 @@ JSValue CSSStyleProperties::Attr::getPropertyValue(HTMLElement const &el, std::s
                 attr + rule->offset.value_begin,
                 rule->offset.value_end - rule->offset.value_begin
             }};
-    return JS_NULL;
+    return bridge::String{el.doc->ctx};
 }
 
 JSValue CSSStyleProperties::Attr::removeProperty(HTMLElement &el, std::string_view const &name)
@@ -466,7 +491,7 @@ JSValue CSSStyleProperties::Attr::removeProperty(HTMLElement &el, std::string_vi
             else lxb_dom_element_set_attribute(el, reinterpret_cast<lxb_char_t const *>("style"), 5, reinterpret_cast<lxb_char_t const *>(value.data()), value.size());
         }
     }
-    return JS_IsNull(result) ? bridge::String{el.doc->ctx, EMPTY_STRING_VIEW} : result;
+    return JS_IsNull(result) ? bridge::String{el.doc->ctx} : result;
 }
 
 void CSSStyleProperties::Attr::setProperty(HTMLElement &el, std::string_view const &name, std::string_view const &v)
@@ -488,7 +513,7 @@ void CSSStyleProperties::Attr::setProperty(HTMLElement &el, std::string_view con
         else value.append(attr, len);
     }
 
-    if(!value.empty()) value.append(" ");
+    append_declaration_delimiter(value);
     value.append(name);
     value.append(": ");
     value.append(v);
@@ -513,6 +538,7 @@ void CSSStyleProperties::Attr::setProperty(HTMLElement &el, std::string_view con
         else value.append(attr, len);
     }
 
+    append_declaration_delimiter(value);
     value.append(name);
     value.append(": ");
     value.append(v);
@@ -525,14 +551,16 @@ void CSSStyleProperties::Attr::setProperty(HTMLElement &el, std::string_view con
 
 JSValue CSSStyleProperties::Attr::get_property(HTMLElement const &el, char const *name) const
 {
-    if(auto v = getPropertyValue(el, to_snake(name)); !JS_IsNull(v)) return v;
+    auto const n = to_snake(name);
+    if(global.count(n) || lxb_html_element_style_by_name(el, reinterpret_cast<lxb_char_t const *>(n.c_str()), n.size()))
+        return getPropertyValue(el, n);
     return JS_UNDEFINED;
 }
 
 bool CSSStyleProperties::Attr::has_property(HTMLElement const &el, char const *name) const
 {
     auto const n = to_snake(name);
-    return static_cast<bool>(lxb_html_element_style_by_name(el, reinterpret_cast<lxb_char_t const *>(n.c_str()), n.size()));
+    return global.count(n) || static_cast<bool>(lxb_html_element_style_by_name(el, reinterpret_cast<lxb_char_t const *>(n.c_str()), n.size()));
 }
 
 void CSSStyleProperties::Attr::set_property(HTMLElement &el, char const *name, std::string_view const &v)
@@ -581,12 +609,12 @@ std::uint32_t CSSStyleProperties::Comp::length(HTMLElement const &el, Attr const
 
 JSValue CSSStyleProperties::Comp::item(HTMLElement const &el, Attr const &a, std::int32_t x) const
 {
-    if(x < 0) return bridge::String{el.doc->ctx, EMPTY_STRING_VIEW};
+    if(x < 0) return bridge::String{el.doc->ctx};
     if(x < global.size())
     {
         auto it = std::begin(global);
         std::advance(it, x);
-        return bridge::String{el.doc->ctx, it->second};
+        return bridge::String{el.doc->ctx, it->first};
     }
     x -= global.size();
 
@@ -607,7 +635,7 @@ JSValue CSSStyleProperties::Comp::item(HTMLElement const &el, Attr const &a, std
         std::advance(it, x);
         return bridge::String{el.doc->ctx, *it};
     }
-    return bridge::String{el.doc->ctx, EMPTY_STRING_VIEW};
+    return bridge::String{el.doc->ctx};
 }
 
 JSValue CSSStyleProperties::Comp::names(HTMLElement const &el, Attr const &a) const
@@ -633,32 +661,66 @@ JSValue CSSStyleProperties::Comp::names(HTMLElement const &el, Attr const &a) co
     return arr;
 }
 
+void CSSStyleProperties::Comp::cascade(std::string name, std::string value,
+                                        lxb_css_selector_specificity_t specificity,
+                                        std::uint64_t order, std::uint32_t depth,
+                                        bool important) const
+{
+    Candidate candidate{std::move(value), specificity, order, depth, important};
+    auto it = style.find(name);
+    if(it == std::end(style))
+    {
+        style.emplace(std::move(name), std::move(candidate));
+        return;
+    }
+
+    auto const &current = it->second;
+    bool const wins = candidate.depth < current.depth
+        || (candidate.depth == current.depth && (
+            candidate.important > current.important
+            || (candidate.important == current.important && (
+                candidate.specificity > current.specificity
+                || (candidate.specificity == current.specificity
+                    && candidate.order >= current.order)))));
+
+    if(wins) it->second = std::move(candidate);
+}
+
 void CSSStyleProperties::Comp::update(HTMLElement const &el) const
 {
     auto *doc = dynamic_cast<dom::HTMLBackend *>(el.doc.get());
-    if(auto *root = static_cast<lxb_dom_node_t *>(el); doc->comp.upd(root, gen))
+    auto *target = static_cast<lxb_dom_node_t *>(el);
+    if(doc->comp.upd(target, gen))
     {
+        auto *root = target;
         while(root->parent != nullptr) root = root->parent;
 
         auto *css = lxb_dom_interface_document(doc->doc.get())->css;
         auto *lst = lxb_css_selectors_parse(css->parser, (lxb_char_t const *)"style", 5);
 
-        using Output = std::pair<lxb_dom_node_t *, CSSStyleProperties::Comp const*>;
-        Output parsed{el, this};
+        struct Output
+        {
+            lxb_dom_node_t *target;
+            CSSStyleProperties::Comp const *computed;
+            std::shared_ptr<Backend> document;
+            std::uint64_t order{0};
+        };
+        Output parsed{target, this, el.doc};
 
         style.clear();
         lxb_selectors_find(css->selectors, root, lst, [](lxb_dom_node_t *node, lxb_css_selector_specificity_t, void *ctx) -> lxb_status_t {
-            std::string const data = lexbor::get_text(node);
+            auto &output = *reinterpret_cast<Output*>(ctx);
+            HTMLElement element{output.document, lxb_html_interface_element(node)};
+            auto state = CSSStyleSheet::getState(element);
+            if(!state->update(element)) return LXB_STATUS_OK;
+
+            auto const *source = state->source();
+            if(!source) return LXB_STATUS_OK;
+            auto const &data = *source;
             auto *css = lxb_dom_interface_document(node->owner_document)->css;
 
-            std::unique_ptr<lxb_css_parser_t, HTMLBackend::Deleter> parser{lxb_css_parser_create()};
-            if(LXB_STATUS_OK != lxb_css_parser_init(parser.get(), NULL)) return LXB_STATUS_STOP;
-
-            std::unique_ptr<lxb_css_stylesheet_t, HTMLBackend::Deleter> sst{lxb_css_stylesheet_create(nullptr)};
-            if(LXB_STATUS_OK != lxb_css_stylesheet_parse(sst.get(), parser.get(), (lxb_char_t const *)data.c_str(), data.size())) return LXB_STATUS_STOP;
-
             std::unique_ptr<lxb_selectors_t, HTMLBackend::Deleter> sel{nullptr};
-            for(auto *list = sst->root; list; list = list->next)
+            for(auto *list = state->root(); list; list = list->next)
             {
                 if(LXB_CSS_RULE_LIST != list->type) continue;
                 for(auto *rule = lxb_css_rule_list(list)->first; rule; rule = rule->next)
@@ -671,41 +733,28 @@ void CSSStyleProperties::Comp::update(HTMLElement const &el) const
                         if(LXB_STATUS_OK != lxb_selectors_init(sel.get())) break;
                     }
 
-                    bool matched{false};
-                    std::int32_t depth{-1};
                     auto *s = lxb_css_rule_style(rule);
-                    auto &p = *reinterpret_cast<Output*>(ctx);
-                    for(auto *node = p.first; node; node = node->parent, ++depth)
+                    std::uint32_t depth{0};
+                    for(auto *ancestor = output.target; ancestor; ancestor = ancestor->parent, ++depth)
                     {
-                        if(lxb_selectors_match_node(sel.get(), node, s->selector, match, &matched); matched)
+                        Match matched;
+                        lxb_selectors_match_node(sel.get(), ancestor, s->selector, match, &matched);
+                        if(!matched.found) continue;
+
+                        for(auto *declaration = s->declarations->first; declaration; declaration = declaration->next)
                         {
-                            for(auto *rule = s->declarations->first; rule; rule = rule->next)
-                            {
-                                if(LXB_CSS_RULE_DECLARATION != rule->type) continue;
-                                auto *decl = lxb_css_rule_declaration(rule);
+                            if(LXB_CSS_RULE_DECLARATION != declaration->type) continue;
+                            auto *decl = lxb_css_rule_declaration(declaration);
 
-                                std::string key{data.c_str() + decl->offset.name_begin, decl->offset.name_end - decl->offset.name_begin};
-                                if(node == p.first || inherits(node, key))
-                                {
-                                    auto &pair = p.second->style[std::move(key)];
+                            std::string name{data.c_str() + decl->offset.name_begin,
+                                             decl->offset.name_end - decl->offset.name_begin};
+                            auto const order = output.order++;
+                            if(ancestor != output.target && !inherits(output.target, name)) continue;
 
-                                    std::uint32_t id{0}, tag{0}, other{0};
-                                    for(auto *n = s->selector->first; n; n = n->next) switch(n->type) {
-                                    case LXB_CSS_SELECTOR_TYPE_ID:
-                                        ++id; break;
-                                    case LXB_CSS_SELECTOR_TYPE_ELEMENT:
-                                        ++tag; break;
-                                    default:
-                                        ++other; break;
-                                    }
-
-                                    if(std::uint32_t const score = (id << 24) + (tag << 16) + (other << 8) - depth + (decl->important << 31); score > pair.second) {
-                                        pair.first.assign(data.c_str() + decl->offset.value_begin, decl->offset.value_end - decl->offset.value_begin);
-                                        pair.second = score;
-                                    }
-                                }
-                            }
-                            matched = false;
+                            output.computed->cascade(std::move(name), std::string{
+                                data.c_str() + decl->offset.value_begin,
+                                decl->offset.value_end - decl->offset.value_begin
+                            }, matched.specificity, order, depth, decl->important);
                         }
                     }
                 }
@@ -713,17 +762,42 @@ void CSSStyleProperties::Comp::update(HTMLElement const &el) const
             return LXB_STATUS_OK;
         }, &parsed);
         lxb_css_selector_list_destroy(lst);
+
+        lxb_css_selector_specificity_t inline_specificity{0};
+        lxb_css_selector_sp_set_s(inline_specificity, 1);
+        std::uint32_t depth{0};
+        for(auto *ancestor = target; ancestor; ancestor = ancestor->parent, ++depth)
+        {
+            if(LXB_DOM_NODE_TYPE_ELEMENT != ancestor->type) continue;
+
+            HTMLElement element{el.doc, lxb_html_interface_element(ancestor)};
+            auto *attribute = get_attribute(element);
+            if(!attribute) continue;
+
+            for(auto const &[begin, end]: Attr{}.bounds(element))
+            {
+                std::string name{attribute + begin, end - begin};
+                if(ancestor != target && !inherits(target, name)) continue;
+
+                auto *decl = lxb_html_element_style_by_name(element,
+                    reinterpret_cast<lxb_char_t const *>(name.data()), name.size());
+                if(!decl) continue;
+
+                cascade(std::move(name), std::string{
+                    attribute + decl->offset.value_begin,
+                    decl->offset.value_end - decl->offset.value_begin
+                }, inline_specificity, parsed.order++, depth, decl->important);
+            }
+        }
     }
 }
 
-JSValue CSSStyleProperties::Comp::getPropertyValue(HTMLElement const &el, Attr const &attr, std::string_view const &name) const
+JSValue CSSStyleProperties::Comp::getPropertyValue(HTMLElement const &el, Attr const &, std::string_view const &name) const
 {
-    if(auto v = attr.getPropertyValue(el, name); !JS_IsNull(v)) return v;
-
     update(el);
 
     if(auto it = style.find(std::string{name.data(), name.size()}); it != std::end(style))
-        return bridge::String{el.doc->ctx, it->second.first};
+        return bridge::String{el.doc->ctx, it->second.value};
 
     if(auto *node = static_cast<lxb_dom_node_t *>(el); LXB_NS_SVG == node->ns && LXB_TAG_SVG != lxb_dom_node_tag_id(node))
     {
@@ -733,19 +807,21 @@ JSValue CSSStyleProperties::Comp::getPropertyValue(HTMLElement const &el, Attr c
     }
 
     auto it = global.find(std::string{name.data(), name.size()});
-    return it == std::end(global) ? JS_NULL : bridge::String{el.doc->ctx, it->second};
+    return it == std::end(global) ? bridge::String{el.doc->ctx} : bridge::String{el.doc->ctx, it->second};
 }
 
 JSValue CSSStyleProperties::Comp::get_property(HTMLElement const &el, Attr const &attr, char const *name) const
 {
-    if(auto v = getPropertyValue(el, attr, to_snake(name)); !JS_IsNull(v)) return v;
+    auto const n = to_snake(name);
+    if(has_property(el, attr, name)) return getPropertyValue(el, attr, n);
     return JS_UNDEFINED;
 }
 
 bool CSSStyleProperties::Comp::has_property(HTMLElement const &el, Attr const &attr, char const *name) const
 {
+    auto const n = to_snake(name);
     update(el);
-    return style.find(name) != std::end(style);
+    return global.count(n) || attr.has_property(el, name) || style.find(n) != std::end(style);
 }
 
 } // namespace notojs:dom

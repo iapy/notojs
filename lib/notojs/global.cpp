@@ -1,19 +1,25 @@
 #include "quickjs/quickjs.h"
 #include <notojs/config.hpp>
 #include <notojs/global.hpp>
-#include <notojs/folder.hpp>
 #include <notojs/logger.hpp>
 #include <notojs/module.hpp>
 #include <notojs/notojs.hpp>
 #include <notojs/server.hpp>
 #include <notojs/socket.hpp>
 
-#include <notojs/detail/config.hpp>
+#include <notojs/detail/module.hpp>
 #include <notojs/detail/header.hpp>
 #include <notojs/detail/jscode.hpp>
+
+#include <notojs/parser/multipart.hpp>
 #include <notojs/parser/search.hpp>
-#include <notojs/script/dollar.hpp>
+
 #include <notojs/script/console.hpp>
+#include <notojs/script/crypto.hpp>
+#include <notojs/script/dollar.hpp>
+#include <notojs/script/dom.hpp>
+#include <notojs/script/storage.hpp>
+
 #include <bridge.hpp>
 #include <engine.hpp>
 #include <global.hpp>
@@ -21,6 +27,8 @@
 
 #include <rapidjson/rapidjson.h>
 #include <boost/asio/ssl/stream.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 #include <condition_variable>
 #include <unordered_map>
@@ -31,6 +39,52 @@ namespace notojs {
 extern const std::string_view MUSTACHE_JS;
 
 namespace {
+
+JSValue settle_promise(JSContext *ctx, JSValue funcs[2], JSValue value)
+{
+    int resolver = 0;
+    if(JS_IsException(value))
+    {
+        value = JS_GetException(ctx);
+        resolver = 1;
+    }
+
+    JSValue result = JS_Call(ctx, funcs[resolver], JS_UNDEFINED, 1, &value);
+    JS_FreeValue(ctx, value);
+    return result;
+}
+
+JSValue finish_promise(JSContext *ctx, JSValue promise, JSValue funcs[2], JSValue value)
+{
+    JSValue settled = settle_promise(ctx, funcs, value);
+    JS_FreeValue(ctx, funcs[0]);
+    JS_FreeValue(ctx, funcs[1]);
+
+    if(JS_IsException(settled))
+    {
+        JS_FreeValue(ctx, promise);
+        return settled;
+    }
+    JS_FreeValue(ctx, settled);
+    return promise;
+}
+
+void settle_async(JSContext *ctx, JSValue funcs[2], JSValue value)
+{
+    JSValue settled = settle_promise(ctx, funcs, value);
+    if(JS_IsException(settled))
+    {
+        JSValue error = JS_GetException(ctx);
+        if(auto *context = Global::Context::ptr(ctx); context && !context->perror)
+            context->perror = error;
+        else
+            JS_FreeValue(ctx, error);
+    }
+    else
+    {
+        JS_FreeValue(ctx, settled);
+    }
+}
 
 struct Blob_
 {
@@ -62,7 +116,7 @@ struct Blob : bridge::Interface<Blob, Blob_>
             Parts p(ctx, *value);
             for(std::size_t i = 0; i < p.size(); ++i)
             {
-                if(!p.at<bridge::String>(i) && !p.at<bridge::ArrayBuffer>(i))
+                if(!p.at<bridge::String>(i) && !p.at<bridge::ArrayBuffer>(i) && !p.is_blob(i))
                 {
                     message.append("invalid type [");
                     message.append(std::to_string(i));
@@ -71,6 +125,19 @@ struct Blob : bridge::Interface<Blob, Blob_>
                 }
             }
             return true;
+        }
+
+        bool is_blob(std::uint32_t i) const
+        {
+            auto value = (*this)[i];
+            return IBlob::Impl::check(ctx, +value);
+        }
+
+        Blob_::Data blob(std::uint32_t i) const
+        {
+            auto value = (*this)[i];
+            if(!IBlob::Impl::check(ctx, +value)) return nullptr;
+            return IBlob::Impl{ctx, value}->copy();
         }
     };
 
@@ -82,52 +149,59 @@ struct Blob : bridge::Interface<Blob, Blob_>
         );
     };
 
-    Blob(Parts parts)
-    : bridge::Interface<Blob, Blob_>(Blob_{})
+    static Blob_ make(Parts parts, std::string type = {})
     {
-        ref().data = Blob_::from();
+        Blob_ result{
+            .type = std::move(type),
+            .data = Blob_::from(),
+            .size = 0,
+            .dptr = nullptr
+        };
         for(std::size_t i = 0; i < parts.size(); ++i)
         {
             if(auto s = parts.at<bridge::String>(i); s)
             {
-                ref().data->insert(std::end(*ref().data), s->begin(), s->end());
+                result.data->insert(std::end(*result.data), s->begin(), s->end());
             }
             else if(auto a = parts.at<bridge::ArrayBuffer>(i); a)
             {
-                auto const [d, s] = a->data();
-                ref().data->insert(std::end(*ref().data), d, d + s);
+                auto const [data, size] = a->data();
+                result.data->insert(std::end(*result.data), data, data + size);
+            }
+            else if(auto data = parts.blob(i); data)
+            {
+                result.data->insert(std::end(*result.data), std::begin(*data), std::end(*data));
             }
         }
-        ref().dptr = ref().data->empty() ? nullptr : &ref().data->at(0);
-        ref().size = ref().data->size();
+        result.dptr = result.data->empty() ? nullptr : result.data->data();
+        result.size = result.data->size();
+        return result;
     }
 
-    Blob(Parts parts, Options options)
-    : Base(Blob_{})
+    static Blob_ make(Parts parts, Options &options)
     {
-        ref().data = Blob_::from();
-        for(std::size_t i = 0; i < parts.size(); ++i)
-        {
-            if(auto s = parts.at<bridge::String>(i); s)
-            {
-                ref().data->insert(std::end(*ref().data), s->begin(), s->end());
-            }
-            else if(auto a = parts.at<bridge::ArrayBuffer>(i); a)
-            {
-                auto const [d, s] = a->data();
-                ref().data->insert(std::end(*ref().data), d, d + s);
-            }
-        }
         if(auto type = options.get<bridge::String>("type"); type)
-        {
-            ref().type = static_cast<std::string>(*type);
-        }
-        ref().dptr = ref().data->empty() ? nullptr : &ref().data->at(0);
-        ref().size = ref().data->size();
+            return make(parts, static_cast<std::string>(*type));
+        return make(parts);
     }
+
+    Blob()
+    : Base(Blob_{.data = Blob_::from(), .size = 0, .dptr = nullptr})
+    {}
+
+    Blob(Parts parts)
+    : Base(make(parts))
+    {}
+
+    Blob(Parts parts, Options options)
+    : Base(make(parts, options))
+    {}
 
     Blob(JSContext *ctx, JSValue val)
     : Base{ctx, val} {}
+
+    Blob(std::reference_wrapper<Wrapped> &&rw)
+    : Base(std::move(rw)) {}
 
     JSValue get_size(JSContext *ctx) const
     {
@@ -142,67 +216,69 @@ struct Blob : bridge::Interface<Blob, Blob_>
         return bridge::String(ctx, ref().type);
     }
 
-    void set_type(JSContext *ctx, bridge::String type)
-    {
-        ref().type = type;
-    }
 
     JSValue arrayBuffer(JSValue self, JSContext *ctx)
     {
-        JSValue funcs[2];
+        JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
         JSValue promise = JS_NewPromiseCapability(ctx, funcs);
 
-        if(auto &r = ref(); !JS_IsException(promise))
+        if(JS_IsException(promise))
         {
-            auto blob = bridge::Strong<bridge::ArrayBuffer>(ctx, bridge::ArrayBuffer(ctx, r.dptr, r.size, self));
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, +blob));
+            JS_FreeValue(ctx, funcs[0]);
+            JS_FreeValue(ctx, funcs[1]);
+            return promise;
         }
 
-        JS_FreeValue(ctx, funcs[0]);
-        JS_FreeValue(ctx, funcs[1]);
-        return promise;
+        auto &r = ref();
+        JSValue blob = bridge::ArrayBuffer(ctx, r.dptr, r.size, self);
+        return finish_promise(ctx, promise, funcs, blob);
     }
 
     JSValue bytes(JSValue self, JSContext *ctx)
     {
-        JSValue funcs[2];
+        JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
         JSValue promise = JS_NewPromiseCapability(ctx, funcs);
 
-        if(auto &r = ref(); !JS_IsException(promise))
+        if(JS_IsException(promise))
         {
-            auto blob = bridge::Strong<bridge::ArrayBuffer>(ctx, bridge::ArrayBuffer(ctx, r.dptr, r.size, self));
-            JSValue args[3] = {blob, JS_NewFloat64(ctx, 0), JS_UNDEFINED};
-            auto arr8 = JS_NewTypedArray(ctx, 3, &args[0], JS_TYPED_ARRAY_UINT8);
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, &arr8));
-            JS_FreeValue(ctx, arr8);
-            JS_FreeValue(ctx, args[1]);
+            JS_FreeValue(ctx, funcs[0]);
+            JS_FreeValue(ctx, funcs[1]);
+            return promise;
         }
 
-        JS_FreeValue(ctx, funcs[0]);
-        JS_FreeValue(ctx, funcs[1]);
-        return promise;
+        auto &r = ref();
+        JSValue blob = bridge::ArrayBuffer(ctx, r.dptr, r.size, self);
+        JSValue args[3] = {blob, JS_NewFloat64(ctx, 0), JS_UNDEFINED};
+        JSValue arr8 = JS_IsException(blob) || JS_IsException(args[1])
+            ? JS_EXCEPTION
+            : JS_NewTypedArray(ctx, 3, &args[0], JS_TYPED_ARRAY_UINT8);
+        JS_FreeValue(ctx, blob);
+        JS_FreeValue(ctx, args[1]);
+        return finish_promise(ctx, promise, funcs, arr8);
     }
 
     JSValue text(JSContext *ctx) const
     {
-        JSValue funcs[2];
+        JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
         JSValue promise = JS_NewPromiseCapability(ctx, funcs);
 
-        if(auto const &r = ref(); !JS_IsException(promise))
+        if(JS_IsException(promise))
         {
-            auto text = bridge::Strong<bridge::String>(ctx, bridge::String(ctx, std::string_view{
-                reinterpret_cast<const char *>(r.dptr), r.size
-            }));
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, +text));
+            JS_FreeValue(ctx, funcs[0]);
+            JS_FreeValue(ctx, funcs[1]);
+            return promise;
         }
 
-        JS_FreeValue(ctx, funcs[0]);
-        JS_FreeValue(ctx, funcs[1]);
-        return promise;
+        auto const &r = ref();
+        JSValue text = bridge::String(ctx, std::string_view{
+            reinterpret_cast<const char *>(r.dptr), r.size
+        });
+        return finish_promise(ctx, promise, funcs, text);
     }
 
     using ctor = bridge::Constructor
     <
+        Blob(),
         Blob(Parts),
         Blob(Parts, Options)
     >;
@@ -322,7 +398,7 @@ struct Blob : bridge::Interface<Blob, Blob_>
 
 JSCFunctionListEntry const Blob::funcs[] = {
     JS_CGETSET_DEF("size", &bridge::Getter<&Blob::get_size>, NULL),
-    JS_CGETSET_DEF("type", &bridge::Getter<&Blob::get_type>, &bridge::Setter<&Blob::set_type>),
+    JS_CGETSET_DEF("type", &bridge::Getter<&Blob::get_type>, NULL),
 
     JS_CFUNC_DEF("arrayBuffer", 0, &bridge::Function<&Blob::arrayBuffer>::invoke),
     JS_CFUNC_DEF("bytes", 0, &bridge::Function<&Blob::bytes>::invoke),
@@ -330,6 +406,439 @@ JSCFunctionListEntry const Blob::funcs[] = {
     JS_CFUNC_DEF("slice", 0, &Blob::slice::invoke),
 
     JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<Blob>::toJSON)
+};
+
+struct File_ : Blob_
+{
+    std::string name;
+    std::int64_t last_modified;
+};
+
+struct File : bridge::Interface<File, File_, Blob>
+{
+    struct Options : bridge::Struct<Options>
+    {
+        BRIDGE_DEFINE_STRUCT(Options);
+        static constexpr auto fields = bridge::fields(
+            bridge::field<bridge::String>("type"),
+            bridge::field<bridge::Number>("lastModified")
+        );
+    };
+
+    static std::int64_t now()
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+        ).count();
+    }
+
+    static File_ make(Blob::Parts parts, bridge::String filename, std::string type, std::int64_t last_modified)
+    {
+        File_ result;
+        static_cast<Blob_ &>(result) = Blob::make(parts, std::move(type));
+        result.name = static_cast<std::string>(filename);
+        result.last_modified = last_modified;
+        return result;
+    }
+
+    static File_ make(Blob::Parts parts, bridge::String filename, Options &options)
+    {
+        std::string type;
+        if(auto value = options.get<bridge::String>("type"); value)
+            type = static_cast<std::string>(*value);
+
+        std::int64_t last_modified = now();
+        if(auto value = options.get<bridge::Number>("lastModified"); value)
+            last_modified = static_cast<std::int64_t>(*value);
+
+        return make(parts, filename, std::move(type), last_modified);
+    }
+
+    File(Blob::Parts parts, bridge::String filename)
+    : Base(make(parts, filename, {}, now()))
+    {}
+
+    File(Blob::Parts parts, bridge::String filename, Options options)
+    : Base(make(parts, filename, options))
+    {}
+
+    File(JSContext *ctx, JSValue val)
+    : Base{ctx, val} {}
+
+    JSValue get_name(JSContext *ctx) const
+    {
+        return bridge::String(ctx, ref().name);
+    }
+
+    JSValue get_lastModified(JSContext *ctx) const
+    {
+        return bridge::Number(ctx, ref().last_modified);
+    }
+
+    JSValue get_webkitRelativePath(JSContext *ctx) const
+    {
+        return bridge::String(ctx, std::string{});
+    }
+
+    using ctor = bridge::Constructor
+    <
+        File(Blob::Parts, bridge::String),
+        File(Blob::Parts, bridge::String, Options)
+    >;
+
+    struct I : Base::I<I, IFile>
+    {
+        using Base::Base;
+
+        std::string name() const override
+        {
+            return ref.name;
+        }
+
+        std::string type() const override
+        {
+            return ref.type;
+        }
+
+        std::int64_t last_modified() const override
+        {
+            return ref.last_modified;
+        }
+
+        std::shared_ptr<std::vector<std::uint8_t>> copy() const override
+        {
+            if(ref.data) return ref.data;
+            return std::make_shared<Blob_::Data::element_type>(ref.dptr, ref.dptr + ref.size);
+        }
+
+        std::pair<std::uint8_t const *, std::size_t> data() const override
+        {
+            return {ref.dptr, ref.size};
+        }
+    };
+
+    using impl = bridge::Implements<I>;
+    static JSCFunctionListEntry const funcs[];
+
+    using Base::ref;
+    using Base::get;
+};
+
+JSCFunctionListEntry const File::funcs[] = {
+    JS_CGETSET_DEF("name", &bridge::Getter<&File::get_name>, NULL),
+    JS_CGETSET_DEF("lastModified", &bridge::Getter<&File::get_lastModified>, NULL),
+    JS_CGETSET_DEF("webkitRelativePath", &bridge::Getter<&File::get_webkitRelativePath>, NULL)
+};
+
+struct FormData_
+{
+    struct BlobValue
+    {
+        Blob_::Data data;
+        std::string type;
+        std::string filename;
+        std::int64_t last_modified;
+    };
+
+    struct Entry
+    {
+        std::string name;
+        std::variant<std::string, BlobValue> value;
+    };
+
+    std::vector<Entry> entries;
+};
+
+struct FormData : bridge::Interface<FormData, FormData_>
+{
+    FormData() : Base(FormData_{}) {}
+
+    FormData(JSContext *ctx, JSValue val)
+    : Base{ctx, val} {}
+
+    static FormData_::BlobValue blob(IBlob::Impl const &value, std::string filename)
+    {
+        return FormData_::BlobValue{
+            .data = value->copy(),
+            .type = value->type(),
+            .filename = std::move(filename),
+            .last_modified = File::now()
+        };
+    }
+
+    static FormData_::BlobValue file(File const &value)
+    {
+        auto const &source = value.ref();
+        return FormData_::BlobValue{
+            .data = source.data ? source.data : std::make_shared<Blob_::Data::element_type>(source.dptr, source.dptr + source.size),
+            .type = source.type,
+            .filename = source.name,
+            .last_modified = source.last_modified
+        };
+    }
+
+    static JSValue value(JSContext *ctx, FormData_::Entry const &entry)
+    {
+        if(auto text = std::get_if<std::string>(&entry.value))
+            return bridge::String(ctx, *text);
+
+        auto const &value = std::get<FormData_::BlobValue>(entry.value);
+        File_ file;
+        file.type = value.type;
+        file.data = value.data;
+        file.size = value.data->size();
+        file.dptr = value.data->empty() ? nullptr : value.data->data();
+        file.name = value.filename;
+        file.last_modified = value.last_modified;
+        return File::from(ctx, std::move(file));
+    }
+
+    JSValue append_0(JSContext *ctx, bridge::String name, bridge::String value)
+    {
+        ref().entries.push_back(FormData_::Entry{
+            static_cast<std::string>(name), static_cast<std::string>(value)
+        });
+        return JS_UNDEFINED;
+    }
+
+    JSValue append_1(JSContext *ctx, bridge::String name, File value)
+    {
+        ref().entries.push_back(FormData_::Entry{
+            static_cast<std::string>(name), file(value)
+        });
+        return JS_UNDEFINED;
+    }
+
+    JSValue append_2(JSContext *ctx, bridge::String name, File value, bridge::String filename)
+    {
+        auto entry = file(value);
+        entry.filename = static_cast<std::string>(filename);
+        ref().entries.push_back(FormData_::Entry{static_cast<std::string>(name), std::move(entry)});
+        return JS_UNDEFINED;
+    }
+
+    JSValue append_3(JSContext *ctx, bridge::String name, IBlob::Impl value)
+    {
+        ref().entries.push_back(FormData_::Entry{
+            static_cast<std::string>(name), blob(value, "blob")
+        });
+        return JS_UNDEFINED;
+    }
+
+    JSValue append_4(JSContext *ctx, bridge::String name, IBlob::Impl value, bridge::String filename)
+    {
+        ref().entries.push_back(FormData_::Entry{
+            static_cast<std::string>(name), blob(value, static_cast<std::string>(filename))
+        });
+        return JS_UNDEFINED;
+    }
+
+    using append = bridge::Function
+    <
+        &FormData::append_0,
+        &FormData::append_1,
+        &FormData::append_2,
+        &FormData::append_3,
+        &FormData::append_4
+    >;
+
+    JSValue remove(JSContext *ctx, bridge::String name)
+    {
+        auto const key = static_cast<std::string_view const &>(name);
+        for(auto it = std::begin(ref().entries); it != std::end(ref().entries);)
+        {
+            if(it->name == key) it = ref().entries.erase(it);
+            else ++it;
+        }
+        return JS_UNDEFINED;
+    }
+
+    JSValue entries(JSContext *ctx) const
+    {
+        bridge::Strong<bridge::Array> array(ctx, bridge::Array{ctx});
+        for(auto const &item: ref().entries)
+        {
+            bridge::Array entry{ctx};
+            entry.append(bridge::String(ctx, item.name));
+            entry.append(value(ctx, item));
+            array.append(entry);
+        }
+        bridge::Strong<bridge::Lambda> values(ctx, JS_GetPropertyStr(ctx, array, "values"));
+        return values(array).release();
+    }
+
+    JSValue get(JSContext *ctx, bridge::String name) const
+    {
+        auto const key = static_cast<std::string_view const &>(name);
+        for(auto const &entry: ref().entries)
+            if(entry.name == key) return value(ctx, entry);
+        return JS_NULL;
+    }
+
+    JSValue getAll(JSContext *ctx, bridge::String name) const
+    {
+        bridge::Array result{ctx};
+        auto const key = static_cast<std::string_view const &>(name);
+        for(auto const &entry: ref().entries)
+            if(entry.name == key) result.append(value(ctx, entry));
+        return result;
+    }
+
+    JSValue has(JSContext *ctx, bridge::String name) const
+    {
+        auto const key = static_cast<std::string_view const &>(name);
+        for(auto const &entry: ref().entries)
+            if(entry.name == key) return JS_TRUE;
+        return JS_FALSE;
+    }
+
+    JSValue keys(JSContext *ctx) const
+    {
+        bridge::Strong<bridge::Array> array(ctx, bridge::Array{ctx});
+        for(auto const &entry: ref().entries)
+            array.append(bridge::String(ctx, entry.name));
+        bridge::Strong<bridge::Lambda> values(ctx, JS_GetPropertyStr(ctx, array, "values"));
+        return values(array).release();
+    }
+
+    void set(std::string name, std::variant<std::string, FormData_::BlobValue> value)
+    {
+        bool replaced = false;
+        for(auto it = std::begin(ref().entries); it != std::end(ref().entries);)
+        {
+            if(it->name == name)
+            {
+                if(std::exchange(replaced, true))
+                {
+                    it = ref().entries.erase(it);
+                    continue;
+                }
+                it->value = value;
+            }
+            ++it;
+        }
+        if(!replaced) ref().entries.push_back(FormData_::Entry{std::move(name), std::move(value)});
+    }
+
+    JSValue set_0(JSContext *ctx, bridge::String name, bridge::String value)
+    {
+        set(static_cast<std::string>(name), static_cast<std::string>(value));
+        return JS_UNDEFINED;
+    }
+
+    JSValue set_1(JSContext *ctx, bridge::String name, File value)
+    {
+        set(static_cast<std::string>(name), file(value));
+        return JS_UNDEFINED;
+    }
+
+    JSValue set_2(JSContext *ctx, bridge::String name, File value, bridge::String filename)
+    {
+        auto entry = file(value);
+        entry.filename = static_cast<std::string>(filename);
+        set(static_cast<std::string>(name), std::move(entry));
+        return JS_UNDEFINED;
+    }
+
+    JSValue set_3(JSContext *ctx, bridge::String name, IBlob::Impl value)
+    {
+        set(static_cast<std::string>(name), blob(value, "blob"));
+        return JS_UNDEFINED;
+    }
+
+    JSValue set_4(JSContext *ctx, bridge::String name, IBlob::Impl value, bridge::String filename)
+    {
+        set(static_cast<std::string>(name), blob(value, static_cast<std::string>(filename)));
+        return JS_UNDEFINED;
+    }
+
+    using set_value = bridge::Function
+    <
+        &FormData::set_0,
+        &FormData::set_1,
+        &FormData::set_2,
+        &FormData::set_3,
+        &FormData::set_4
+    >;
+
+    JSValue values(JSContext *ctx) const
+    {
+        bridge::Strong<bridge::Array> array(ctx, bridge::Array{ctx});
+        for(auto const &entry: ref().entries)
+            array.append(value(ctx, entry));
+        bridge::Strong<bridge::Lambda> values(ctx, JS_GetPropertyStr(ctx, array, "values"));
+        return values(array).release();
+    }
+
+    static std::string escape(std::string_view value)
+    {
+        std::string result;
+        result.reserve(value.size());
+        for(char ch: value)
+        {
+            switch(ch)
+            {
+            case '\r': result.append("%0D"); break;
+            case '\n': result.append("%0A"); break;
+            case '"': result.append("%22"); break;
+            default: result.push_back(ch); break;
+            }
+        }
+        return result;
+    }
+
+    static std::string encode(FormData_ const &form, std::string_view boundary)
+    {
+        std::string result;
+        for(auto const &entry: form.entries)
+        {
+            result.append("--");
+            result.append(boundary);
+            result.append("\r\nContent-Disposition: form-data; name=\"");
+            result.append(escape(entry.name));
+            result.append("\"");
+
+            if(auto blob = std::get_if<FormData_::BlobValue>(&entry.value))
+            {
+                result.append("; filename=\"");
+                result.append(escape(blob->filename));
+                result.append("\"\r\nContent-Type: ");
+                result.append(blob->type.empty() ? "application/octet-stream" : blob->type);
+                result.append("\r\n\r\n");
+                if(!blob->data->empty()) result.append(
+                    reinterpret_cast<char const *>(blob->data->data()), blob->data->size()
+                );
+            }
+            else
+            {
+                result.append("\r\n\r\n");
+                result.append(std::get<std::string>(entry.value));
+            }
+            result.append("\r\n");
+        }
+        result.append("--");
+        result.append(boundary);
+        result.append("--\r\n");
+        return result;
+    }
+
+    using ctor = bridge::Constructor<FormData()>;
+    static JSCFunctionListEntry const funcs[];
+
+    using Base::ref;
+};
+
+JSCFunctionListEntry const FormData::funcs[] = {
+    JS_CFUNC_DEF("append", 2, &FormData::append::invoke),
+    JS_CFUNC_DEF("delete", 1, &bridge::Function<&FormData::remove>::invoke),
+    JS_CFUNC_DEF("entries", 0, &bridge::Function<&FormData::entries>::invoke),
+    JS_CFUNC_DEF("get", 1, &bridge::Function<&FormData::get>::invoke),
+    JS_CFUNC_DEF("getAll", 1, &bridge::Function<&FormData::getAll>::invoke),
+    JS_CFUNC_DEF("has", 1, &bridge::Function<&FormData::has>::invoke),
+    JS_CFUNC_DEF("keys", 0, &bridge::Function<&FormData::keys>::invoke),
+    JS_CFUNC_DEF("set", 2, &FormData::set_value::invoke),
+    JS_CFUNC_DEF("values", 0, &bridge::Function<&FormData::values>::invoke),
+    JS_CFUNC_DEF("[Symbol.iterator]", 0, &bridge::Function<&FormData::entries>::invoke)
 };
 
 struct Headers : bridge::Interface<Headers, boost::beast::http::fields>
@@ -702,79 +1211,184 @@ struct Content : Base
 
     JSValue arrayBuffer(JSValue self, JSContext *ctx)
     {
-        JSValue funcs[2];
+        JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
         JSValue promise = JS_NewPromiseCapability(ctx, funcs);
 
-        if (!JS_IsException(promise))
+        if(JS_IsException(promise))
         {
-            bridge::Strong<bridge::ArrayBuffer> body{ctx, bridge::ArrayBuffer{ctx, Base::ref().body(), self}};
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, +body));
+            JS_FreeValue(ctx, funcs[0]);
+            JS_FreeValue(ctx, funcs[1]);
+            return promise;
         }
 
-        JS_FreeValue(ctx, funcs[0]);
-        JS_FreeValue(ctx, funcs[1]);
-        return promise;
+        JSValue body = bridge::ArrayBuffer{ctx, Base::ref().body(), self};
+        return finish_promise(ctx, promise, funcs, body);
     }
 
     JSValue bytes(JSValue self, JSContext *ctx)
     {
-        JSValue funcs[2];
+        JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
         JSValue promise = JS_NewPromiseCapability(ctx, funcs);
 
-        if(!JS_IsException(promise))
+        if(JS_IsException(promise))
         {
-            auto blob = bridge::Strong<bridge::ArrayBuffer>(ctx, bridge::ArrayBuffer(ctx, Base::ref().body(), self));
-            JSValue args[3] = {blob, JS_NewFloat64(ctx, 0), JS_UNDEFINED};
-            auto arr8 = JS_NewTypedArray(ctx, 3, &args[0], JS_TYPED_ARRAY_UINT8);
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, &arr8));
-            JS_FreeValue(ctx, arr8);
-            JS_FreeValue(ctx, args[1]);
+            JS_FreeValue(ctx, funcs[0]);
+            JS_FreeValue(ctx, funcs[1]);
+            return promise;
         }
 
-        JS_FreeValue(ctx, funcs[0]);
-        JS_FreeValue(ctx, funcs[1]);
-        return promise;
+        JSValue blob = bridge::ArrayBuffer(ctx, Base::ref().body(), self);
+        JSValue args[3] = {blob, JS_NewFloat64(ctx, 0), JS_UNDEFINED};
+        JSValue arr8 = JS_IsException(blob)
+            ? JS_EXCEPTION
+            : JS_NewTypedArray(ctx, 3, &args[0], JS_TYPED_ARRAY_UINT8);
+        JS_FreeValue(ctx, blob);
+        JS_FreeValue(ctx, args[1]);
+        return finish_promise(ctx, promise, funcs, arr8);
     }
 
     JSValue blob(JSValue self, JSContext *ctx)
     {
-        JSValue funcs[2];
+        JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
         JSValue promise = JS_NewPromiseCapability(ctx, funcs);
 
-        if(auto const &r = Base::ref(); !JS_IsException(promise))
+        if(JS_IsException(promise))
         {
-            JSValue blob = Blob::from(ctx, Blob_{
-                .type = std::invoke([&r]{
-                    if(auto it = r.find(boost::beast::http::field::content_type); std::end(r) != it)
-                        return std::string{it->value()};
-                    return std::string{};
-                }),
-                .data = nullptr,
-                .size = r.body().size(),
-                .dptr = reinterpret_cast<std::uint8_t const *>(r.body().data())
-            }, self);
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, &blob));
-            JS_FreeValue(ctx, blob);
+            JS_FreeValue(ctx, funcs[0]);
+            JS_FreeValue(ctx, funcs[1]);
+            return promise;
         }
 
-        JS_FreeValue(ctx, funcs[0]);
-        JS_FreeValue(ctx, funcs[1]);
-        return promise;
+        auto const &r = Base::ref();
+        JSValue blob = Blob::from(ctx, Blob_{
+            .type = std::invoke([&r]{
+                if(auto it = r.find(boost::beast::http::field::content_type); std::end(r) != it)
+                    return std::string{it->value()};
+                return std::string{};
+            }),
+            .data = nullptr,
+            .size = r.body().size(),
+            .dptr = reinterpret_cast<std::uint8_t const *>(r.body().data())
+        }, self);
+        return finish_promise(ctx, promise, funcs, blob);
     }
 
     JSValue formData(JSContext *ctx) const
     {
-        if(auto it = Base::ref().find(boost::beast::http::field::content_type); std::end(Base::ref()) != it && "multipart/form-data" == it->value())
-            return JS_NULL; //TODO: support multipart/form-data
-
-        JSValue funcs[2];
+        JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
         JSValue promise = JS_NewPromiseCapability(ctx, funcs);
+
+        auto reject = [ctx, &funcs](std::string_view message)
+        {
+            JSValue global = JS_GetGlobalObject(ctx);
+            JSValue constructor = JS_GetPropertyStr(ctx, global, "TypeError");
+            JSValue text = JS_NewStringLen(ctx, message.data(), message.size());
+            JSValue error = JS_CallConstructor(ctx, constructor, 1, &text);
+            JS_FreeValue(ctx, text);
+            JS_FreeValue(ctx, constructor);
+            JS_FreeValue(ctx, global);
+            if(JS_IsException(error))
+            {
+                settle_async(ctx, funcs, error);
+            }
+            else
+            {
+                JSValue rejected = JS_Call(ctx, funcs[1], JS_UNDEFINED, 1, &error);
+                JS_FreeValue(ctx, error);
+                if(JS_IsException(rejected))
+                {
+                    JSValue exception = JS_GetException(ctx);
+                    if(auto *context = Global::Context::ptr(ctx); context && !context->perror)
+                        context->perror = exception;
+                    else
+                        JS_FreeValue(ctx, exception);
+                }
+                else
+                {
+                    JS_FreeValue(ctx, rejected);
+                }
+            }
+        };
+
+        auto resolve = [ctx, &funcs](JSValue data)
+        {
+            settle_async(ctx, funcs, data);
+        };
+
+        auto is_type = [](std::string_view value, std::string_view expected)
+        {
+            value = value.substr(0, value.find(';'));
+            while(!value.empty() && (value.front() == ' ' || value.front() == '\t')) value.remove_prefix(1);
+            while(!value.empty() && (value.back() == ' ' || value.back() == '\t')) value.remove_suffix(1);
+            return value.size() == expected.size() && std::equal(
+                std::begin(value), std::end(value), std::begin(expected),
+                [](unsigned char left, unsigned char right){ return std::tolower(left) == std::tolower(right); }
+            );
+        };
 
         if(auto const &r = Base::ref(); !JS_IsException(promise))
         {
-            JSValue data = URLSearchParams::from(ctx, std::move(parser::Search<URLSearchParams::Handler>{}.parse(Base::ref().body()).result));
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, &data));
-            JS_FreeValue(ctx, data);
+            auto content_type = r.find(boost::beast::http::field::content_type);
+            std::string_view type = content_type == std::end(r)
+                ? std::string_view{}
+                : std::string_view{content_type->value().data(), content_type->value().size()};
+
+            if(parser::Multipart::is(type))
+            {
+                auto parsed = parser::Multipart::parse(type, r.body());
+                if(!parsed)
+                {
+                    reject(parsed.error);
+                }
+                else
+                {
+                    FormData_ form;
+                    form.entries.reserve(parsed.parts.size());
+                    for(auto &part: parsed.parts)
+                    {
+                        if(part.filename)
+                        {
+                            std::vector<std::uint8_t> bytes(std::begin(part.body), std::end(part.body));
+                            form.entries.push_back(FormData_::Entry{
+                                std::move(part.name),
+                                FormData_::BlobValue{
+                                    .data = Blob_::from(std::move(bytes)),
+                                    .type = std::string(part.type),
+                                    .filename = std::move(*part.filename),
+                                    .last_modified = File::now()
+                                }
+                            });
+                        }
+                        else
+                        {
+                            form.entries.push_back(FormData_::Entry{
+                                std::move(part.name), std::string(part.body)
+                            });
+                        }
+                    }
+
+                    resolve(FormData::from(ctx, std::move(form)));
+                }
+            }
+            else if(is_type(type, "application/x-www-form-urlencoded"))
+            {
+                auto decoded = std::move(parser::Search<URLSearchParams::Handler>{}.parse(r.body()).result);
+                FormData_ form;
+                form.entries.reserve(decoded.size());
+                for(auto &[name, value]: decoded)
+                    form.entries.push_back(FormData_::Entry{std::move(name), std::move(value)});
+                resolve(FormData::from(ctx, std::move(form)));
+            }
+            else if(type.empty())
+            {
+                reject("Missing Content-Type");
+            }
+            else
+            {
+                std::string message{"Unsupported form data Content-Type: "};
+                message.append(type);
+                reject(message);
+            }
         }
 
         JS_FreeValue(ctx, funcs[0]);
@@ -784,40 +1398,33 @@ struct Content : Base
 
     JSValue json(JSContext *ctx) const
     {
-        JSValue parsed = JS_ParseJSON(ctx, Base::ref().body().c_str(), Base::ref().body().size(), "<json>");
-        if(JS_IsException(parsed))
-        {
-            return parsed;
-        }
-
-        JSValue funcs[2];
+        JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
         JSValue promise = JS_NewPromiseCapability(ctx, funcs);
-
-        if (!JS_IsException(promise))
+        if(JS_IsException(promise))
         {
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, &parsed));
+            JS_FreeValue(ctx, funcs[0]);
+            JS_FreeValue(ctx, funcs[1]);
+            return promise;
         }
 
-        JS_FreeValue(ctx, funcs[0]);
-        JS_FreeValue(ctx, funcs[1]);
-        JS_FreeValue(ctx, parsed);
-        return promise;
+        JSValue parsed = JS_ParseJSON(ctx, Base::ref().body().c_str(), Base::ref().body().size(), "<json>");
+        return finish_promise(ctx, promise, funcs, parsed);
     }
 
     JSValue text(JSContext *ctx) const
     {
-        JSValue funcs[2];
+        JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
         JSValue promise = JS_NewPromiseCapability(ctx, funcs);
 
-        if (!JS_IsException(promise))
+        if(JS_IsException(promise))
         {
-            auto body = bridge::String(ctx, Base::ref().body());
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, +body));
+            JS_FreeValue(ctx, funcs[0]);
+            JS_FreeValue(ctx, funcs[1]);
+            return promise;
         }
 
-        JS_FreeValue(ctx, funcs[0]);
-        JS_FreeValue(ctx, funcs[1]);
-        return promise;
+        JSValue body = bridge::String(ctx, Base::ref().body());
+        return finish_promise(ctx, promise, funcs, body);
     }
 };
 
@@ -908,7 +1515,7 @@ struct Request_ : boost::beast::http::request<boost::beast::http::string_body>
     : Base(std::move(base))
     , url{std::move(url)}
     {
-        normalize();
+        maybenoto(this->url);
         set(boost::beast::http::field::host, this->url.host());
         if(agent) set(boost::beast::http::field::user_agent, *agent);
     }
@@ -925,7 +1532,7 @@ struct Request_ : boost::beast::http::request<boost::beast::http::string_body>
     }), 11}
     , url{std::move(url)}
     {
-        normalize();
+        maybenoto(this->url);
         set(boost::beast::http::field::host, this->url.host());
         if(agent) set(boost::beast::http::field::user_agent, *agent);
     }
@@ -945,16 +1552,16 @@ struct Request_ : boost::beast::http::request<boost::beast::http::string_body>
     Redirect redirect{Redirect::follow};
     std::chrono::milliseconds timeout{10000};
 
+public: // static
     static std::optional<std::string> agent;
 
-private:
-    void normalize()
+    BOOST_FORCEINLINE static void maybenoto(boost::urls::url &url)
     {
-        if(boost::urls::scheme::unknown == url.scheme_id() && SCHEME == url.scheme())
+        if(boost::urls::scheme::unknown == url.scheme_id() && url.is_path_absolute() && SCHEME == url.scheme())
         {
             std::string u{"http://"};
             u.append(local).append(url.buffer().substr(url.scheme().size() + 1));
-            if(auto p = boost::urls::parse_uri(u); p) url = std::move(*p);
+            if(auto p = boost::urls::parse_uri(u)) url = std::move(*p);
         }
     }
 };
@@ -1401,7 +2008,7 @@ struct Request : bridge::Interface<Request, Request_, ServerRequest>
     {
         BRIDGE_DEFINE_STRUCT(Config);
         static constexpr auto fields = bridge::fields(
-            bridge::field<bridge::Either<bridge::String, bridge::ArrayBuffer, bridge::Object>>("body"),
+            bridge::field<bridge::Either<bridge::String, bridge::ArrayBuffer, FormData, bridge::Object>>("body"),
             bridge::field<bridge::Either<Headers, bridge::Dict<bridge::String>>>("headers"),
             bridge::field<bridge::Number>("timeout"),
             bridge::field<Redirect>("redirect"),
@@ -1467,6 +2074,16 @@ struct Request : bridge::Interface<Request, Request_, ServerRequest>
         {
             auto [data, size] = abuf->data();
             ref().body().assign(reinterpret_cast<char const *>(data), size);
+        }
+        else if(auto form = config.get<FormData>("body"); form)
+        {
+            static thread_local boost::uuids::random_generator generator;
+            std::string boundary = "----notojs-" + boost::uuids::to_string(generator());
+            ref().body() = FormData::encode(form->ref(), boundary);
+            ref().set(
+                boost::beast::http::field::content_type,
+                "multipart/form-data; boundary=" + boundary
+            );
         }
         else if(auto json = config.get<bridge::Object>("body"); json)
         {
@@ -1657,6 +2274,7 @@ JSCFunctionListEntry const ServerResponse::funcs[] = {
     JS_CFUNC_DEF("bytes", 0, &bridge::Function<&Content<ServerResponse>::bytes>::invoke),
     JS_CFUNC_DEF("text", 0, &bridge::Function<&Content<ServerResponse>::text>::invoke),
     JS_CFUNC_DEF("json", 0, &bridge::Function<&Content<ServerResponse>::json>::invoke),
+    JS_CFUNC_DEF("formData", 0, &bridge::Function<&Content<ServerResponse>::formData>::invoke),
 
     JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<ServerResponse>::toJSON)
 };
@@ -1754,10 +2372,7 @@ public:
 
         BOOST_FORCEINLINE void failed(JSContext *ctx)
         {
-            JSValue error = JS_ThrowInternalError(ctx, "%s", std::get<1>(result).c_str());
-            JSValue exception = JS_GetException(ctx);
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[1], JS_UNDEFINED, 1, &exception));
-            JS_FreeValue(ctx, exception);
+            settle_async(ctx, funcs, JS_ThrowInternalError(ctx, "%s", std::get<1>(result).c_str()));
             JS_FreeValue(ctx, funcs[0]);
             JS_FreeValue(ctx, funcs[1]);
         }
@@ -1799,8 +2414,7 @@ public:
                 raw->get().set(detail::CACHE_USE, "updated");
             } catch(std::runtime_error const &) {}
             JSValue response = notojs::Response::from(ctx, std::move(*raw));
-            JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, &response));
-            JS_FreeValue(ctx, response);
+            settle_async(ctx, funcs, response);
             JS_FreeValue(ctx, funcs[0]);
             JS_FreeValue(ctx, funcs[1]);
         }
@@ -2227,8 +2841,23 @@ void Worker::write(Server &server, Connection &con, Stream &stream)
 
 void Worker::wait(JSContext *ctx)
 {
-    JSContext *ctx1;
-    while(JS_ExecutePendingJob(JS_GetRuntime(ctx), &ctx1) > 0);
+    auto execute_jobs = [](JSRuntime *runtime) {
+        for(;;)
+        {
+            JSContext *job_ctx{nullptr};
+            int const status = JS_ExecutePendingJob(runtime, &job_ctx);
+            if(status > 0) continue;
+            if(status == 0) break;
+
+            JSValue error = JS_GetException(job_ctx);
+            if(auto *context = Global::Context::ptr(job_ctx); context && !context->perror)
+                context->perror = error;
+            else
+                JS_FreeValue(job_ctx, error);
+        }
+    };
+
+    execute_jobs(JS_GetRuntime(ctx));
 
     std::unique_lock<std::mutex> guard(mu);
     while(!queue.empty() || !tasks.empty())
@@ -2276,15 +2905,21 @@ void Worker::wait(JSContext *ctx)
         }
 
         guard.unlock();
-        while(JS_ExecutePendingJob(JS_GetRuntime(ctx), &ctx1) > 0);
+        execute_jobs(JS_GetRuntime(ctx));
         guard.lock();
     };
 }
 
 JSValue fetch_(JSContext *ctx, Request &&request)
 {
-    JSValue funcs[2];
+    JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
     JSValue promise = JS_NewPromiseCapability(ctx, funcs);
+    if(JS_IsException(promise))
+    {
+        JS_FreeValue(ctx, funcs[0]);
+        JS_FreeValue(ctx, funcs[1]);
+        return promise;
+    }
 
     Worker::get().enqueue(
         Worker::Connection{ctx, std::move(request), funcs}, Global::ptr(ctx)->get<Server>());
@@ -2323,35 +2958,61 @@ JSValue fetch_5(JSContext *ctx, Request::HTTPURL url, Request::Config config)
     return fetch_(ctx, std::move(Request(ctx, req).set_config(config)));
 }
 
-using fetch = bridge::Function<fetch_1, fetch_3, fetch_2, fetch_5, fetch_4>;
+JSValue fetch_6(JSContext *ctx, Request::HTTPString url, bridge::Undefined)
+{
+    auto req = bridge::Strong<bridge::Object>{ctx, Request::from(ctx, Request_{url})};
+    return fetch_(ctx, Request(ctx, req));
+}
+
+JSValue fetch_7(JSContext *ctx, Request::HTTPURL url, bridge::Undefined)
+{
+    auto req = bridge::Strong<bridge::Object>{ctx, Request::from(ctx, Request_{boost::urls::url{url.ref()}})};
+    return fetch_(ctx, Request(ctx, req));
+}
+
+using fetch = bridge::Function<fetch_1, fetch_3, fetch_2, fetch_5, fetch_4, fetch_6, fetch_7>;
 
 JSValue print(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv)
 {
     if(argc == 0) return JS_UNDEFINED;
 
-    auto &array = Global::Context::ptr(ctx)->output;
-    JSValue length = JS_GetPropertyStr(ctx, array, "length");
-    uint32_t len = 0;
-    if(JS_IsNumber(length))
-        JS_ToUint32(ctx, &len, length);
-    JS_FreeValue(ctx, length);
+    bool const g = JS_IsString(self);
+    auto &output = Global::Context::ptr(ctx)->output;
 
-    JSValue out = JS_NewArray(ctx);
-    int i = 0;
-    if(JS_IsString(self))
+    if(argc == 1 && !g && IPrint::Impl::check(ctx, argv))
     {
-        bridge::Object obj{ctx};
-        using namespace std::string_view_literals;
-        obj.set("type", bridge::String{ctx, "notojs.Grid"sv});
-        obj.set("data", self);
-        JS_SetPropertyUint32(ctx, out, i++, obj);
+        return IPrint::Impl{ctx, *argv}->print(ctx, bridge::Array{ctx, output});
     }
-    for(int j = 0; j < argc; ++j)
+    else
     {
-        JS_SetPropertyUint32(ctx, out, i++, JS_DupValue(ctx, *(argv + j)));
+        JSValue length = JS_GetPropertyStr(ctx, output, "length");
+        uint32_t len = 0;
+        if(JS_IsNumber(length))
+            JS_ToUint32(ctx, &len, length);
+        JS_FreeValue(ctx, length);
+
+        JSValue out = JS_NewArray(ctx);
+        int i = 0;
+        if(g)
+        {
+            bridge::Object obj{ctx};
+            using namespace std::string_view_literals;
+            obj.set("type", bridge::String{ctx, "notojs.Grid"sv});
+            obj.set("data", self);
+            JS_SetPropertyUint32(ctx, out, i++, obj);
+        }
+        for(int j = 0; j < argc; ++j)
+        {
+            if(IPrint::Impl::check(ctx, argv + j))
+            {
+                JS_FreeValue(ctx, out);
+                return JS_ThrowRangeError(ctx, "Printable object must be only argument");
+            }
+            JS_SetPropertyUint32(ctx, out, i++, bridge::Lambda::check(ctx, argv + j) ? JS_NewString(ctx, "function") : JS_DupValue(ctx, *(argv + j)));
+        }
+        JS_SetPropertyUint32(ctx, output, len, out);
+        return JS_UNDEFINED;
     }
-    JS_SetPropertyUint32(ctx, array, len, out);
-    return JS_UNDEFINED;
 }
 
 JSValue renderer(JSContext *ctx, bridge::String name)
@@ -2490,39 +3151,6 @@ struct Storage : bridge::Interface<Storage, DB::Storage>
         }
     }
 
-    struct Config : bridge::Struct<Config>
-    {
-        BRIDGE_DEFINE_STRUCT(Config);
-        static constexpr auto fields = bridge::fields(
-            bridge::field<bridge::Boolean>("notebook")
-        );
-    };
-
-    JSValue attach_0(JSValue self, JSContext *ctx)
-    {
-        JSValue glob = JS_GetGlobalObject(ctx);
-        JS_SetPropertyStr(ctx, glob, "localStorage", JS_DupValue(ctx, self));
-        JS_FreeValue(ctx, glob);
-        Global::Context::ptr(ctx)->cleanup.insert("localStorage");
-        return JS_DupValue(ctx, self);
-    }
-
-    JSValue attach_1(JSValue self, JSContext *ctx, Config config)
-    {
-        JSValue glob = JS_GetGlobalObject(ctx);
-        JS_SetPropertyStr(ctx, glob, "localStorage", JS_DupValue(ctx, self));
-        JS_FreeValue(ctx, glob);
-        if(auto notebook = config.get<bridge::Boolean>("notebook"); !notebook || !*notebook)
-            Global::Context::ptr(ctx)->cleanup.insert("localStorage");
-        return JS_DupValue(ctx, self);
-    }
-
-    using attach = bridge::Function
-    <
-        &Storage::attach_0,
-        &Storage::attach_1
-    >;
-
     using ctor = bridge::Constructor
     <
         Storage(Namespace)
@@ -2532,7 +3160,6 @@ struct Storage : bridge::Interface<Storage, DB::Storage>
 };
 
 JSCFunctionListEntry const Storage::funcs[] = {
-    JS_CFUNC_DEF("attach", 0, &Storage::attach::invoke),
     JS_CFUNC_DEF("key", 1, &bridge::Function<&Storage::key>::invoke),
     JS_CFUNC_DEF("clear", 0, &bridge::Function<&Storage::clear>::invoke),
     JS_CFUNC_DEF("getItem", 1, &bridge::Function<&Storage::getItem>::invoke),
@@ -2540,6 +3167,501 @@ JSCFunctionListEntry const Storage::funcs[] = {
     JS_CFUNC_DEF("removeItem", 1, &bridge::Function<&Storage::removeItem>::invoke),
 
     JS_CGETSET_DEF("length", &bridge::Getter<&Storage::get_length>, NULL)
+};
+
+struct TextEncoder : bridge::Interface<TextEncoder>
+{
+    static bool encode_(JSContext *ctx, JSValue source, std::vector<std::uint8_t> &output,
+                       std::size_t capacity, std::size_t &read)
+    {
+        std::size_t size;
+        char const *text = JS_ToCStringLen2(ctx, &size, source, true);
+        if(!text) return false;
+
+        auto const *data = reinterpret_cast<std::uint8_t const *>(text);
+        auto unit = [data, size](std::size_t offset, std::uint32_t &value, std::size_t &length) {
+            if(offset >= size) return false;
+            std::uint8_t const c = data[offset];
+            if(c < 0x80)
+            {
+                value = c;
+                length = 1;
+                return true;
+            }
+            if(c >= 0xC2 && c <= 0xDF && offset + 1 < size && (data[offset + 1] & 0xC0) == 0x80)
+            {
+                value = ((c & 0x1F) << 6) | (data[offset + 1] & 0x3F);
+                length = 2;
+                return true;
+            }
+            if(c >= 0xE0 && c <= 0xEF && offset + 2 < size &&
+               (data[offset + 1] & 0xC0) == 0x80 && (data[offset + 2] & 0xC0) == 0x80)
+            {
+                value = ((c & 0x0F) << 12) | ((data[offset + 1] & 0x3F) << 6) | (data[offset + 2] & 0x3F);
+                length = 3;
+                return true;
+            }
+            return false;
+        };
+
+        read = 0;
+        std::size_t offset = 0;
+        while(offset < size)
+        {
+            std::uint32_t codepoint;
+            std::size_t consumed;
+            if(!unit(offset, codepoint, consumed))
+            {
+                codepoint = 0xFFFD;
+                consumed = 1;
+            }
+
+            std::size_t units = 1;
+            if(codepoint >= 0xD800 && codepoint <= 0xDBFF)
+            {
+                std::uint32_t low;
+                std::size_t low_size;
+                if(unit(offset + consumed, low, low_size) && low >= 0xDC00 && low <= 0xDFFF)
+                {
+                    codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00);
+                    consumed += low_size;
+                    units = 2;
+                }
+                else
+                {
+                    codepoint = 0xFFFD;
+                }
+            }
+            else if(codepoint >= 0xDC00 && codepoint <= 0xDFFF)
+            {
+                codepoint = 0xFFFD;
+            }
+
+            std::size_t const required = codepoint < 0x80 ? 1 : codepoint < 0x800 ? 2 : codepoint < 0x10000 ? 3 : 4;
+            if(output.size() + required > capacity) break;
+
+            if(required == 1)
+                output.push_back(static_cast<std::uint8_t>(codepoint));
+            else if(required == 2)
+            {
+                output.push_back(static_cast<std::uint8_t>(0xC0 | (codepoint >> 6)));
+                output.push_back(static_cast<std::uint8_t>(0x80 | (codepoint & 0x3F)));
+            }
+            else if(required == 3)
+            {
+                output.push_back(static_cast<std::uint8_t>(0xE0 | (codepoint >> 12)));
+                output.push_back(static_cast<std::uint8_t>(0x80 | ((codepoint >> 6) & 0x3F)));
+                output.push_back(static_cast<std::uint8_t>(0x80 | (codepoint & 0x3F)));
+            }
+            else
+            {
+                output.push_back(static_cast<std::uint8_t>(0xF0 | (codepoint >> 18)));
+                output.push_back(static_cast<std::uint8_t>(0x80 | ((codepoint >> 12) & 0x3F)));
+                output.push_back(static_cast<std::uint8_t>(0x80 | ((codepoint >> 6) & 0x3F)));
+                output.push_back(static_cast<std::uint8_t>(0x80 | (codepoint & 0x3F)));
+            }
+            offset += consumed;
+            read += units;
+        }
+
+        JS_FreeCString(ctx, text);
+        return true;
+    }
+
+    static JSValue array(JSContext *ctx, std::vector<std::uint8_t> const &data)
+    {
+        JSValue args[3] = {
+            JS_NewArrayBufferCopy(ctx, data.data(), data.size()),
+            JS_NewInt32(ctx, 0),
+            JS_UNDEFINED
+        };
+        if(JS_IsException(args[0])) return args[0];
+
+        JSValue result = JS_NewTypedArray(ctx, 3, args, JS_TYPED_ARRAY_UINT8);
+        JS_FreeValue(ctx, args[0]);
+        JS_FreeValue(ctx, args[1]);
+        return result;
+    }
+
+    JSValue get_encoding(JSContext *ctx) const
+    {
+        return JS_NewString(ctx, "utf-8");
+    }
+
+    JSValue encode_0(JSContext *ctx)
+    {
+        std::vector<std::uint8_t> output;
+        return array(ctx, output);
+    }
+
+    JSValue encode_1(JSContext *ctx, bridge::Value source)
+    {
+        if(JS_IsUndefined(source)) return encode_0(ctx);
+
+        std::vector<std::uint8_t> output;
+        std::size_t read;
+        if(!encode_(ctx, source, output, std::numeric_limits<std::size_t>::max(), read))
+            return JS_EXCEPTION;
+        return array(ctx, output);
+    }
+
+    JSValue encodeInto(JSContext *ctx, bridge::Value source, bridge::Value destination)
+    {
+        JSValue glob = JS_GetGlobalObject(ctx);
+        JSValue ctor = JS_GetPropertyStr(ctx, glob, "Uint8Array");
+        int const is_uint8 = JS_IsInstanceOf(ctx, destination, ctor);
+        JS_FreeValue(ctx, ctor);
+        JS_FreeValue(ctx, glob);
+        if(is_uint8 < 0) return JS_EXCEPTION;
+        if(!is_uint8) return JS_ThrowTypeError(ctx, "encodeInto destination must be a Uint8Array");
+
+        std::size_t offset;
+        std::size_t length;
+        JSValue buffer = JS_GetTypedArrayBuffer(ctx, destination, &offset, &length, nullptr);
+        if(JS_IsException(buffer)) return buffer;
+
+        std::vector<std::uint8_t> output;
+        output.reserve(length);
+        std::size_t read;
+        if(!encode_(ctx, source, output, length, read))
+        {
+            JS_FreeValue(ctx, buffer);
+            return JS_EXCEPTION;
+        }
+
+        std::size_t buffer_size;
+        std::uint8_t *bytes = JS_GetArrayBuffer(ctx, &buffer_size, buffer);
+        if(!bytes)
+        {
+            JS_FreeValue(ctx, buffer);
+            return JS_EXCEPTION;
+        }
+        if(offset > buffer_size || output.size() > buffer_size - offset)
+        {
+            JS_FreeValue(ctx, buffer);
+            return JS_ThrowRangeError(ctx, "Uint8Array range exceeds its ArrayBuffer");
+        }
+        std::copy(output.begin(), output.end(), bytes + offset);
+        JS_FreeValue(ctx, buffer);
+
+        JSValue result = JS_NewObject(ctx);
+        JS_SetPropertyStr(ctx, result, "read", JS_NewInt64(ctx, read));
+        JS_SetPropertyStr(ctx, result, "written", JS_NewInt64(ctx, output.size()));
+        return result;
+    }
+
+    using encode = bridge::Function<&TextEncoder::encode_0, &TextEncoder::encode_1>;
+    using ctor = bridge::Constructor<TextEncoder()>;
+    static JSCFunctionListEntry const funcs[];
+};
+
+JSCFunctionListEntry const TextEncoder::funcs[] = {
+    JS_CGETSET_DEF("encoding", &bridge::Getter<&TextEncoder::get_encoding>, nullptr),
+    JS_CFUNC_DEF("encode", 1, &TextEncoder::encode::invoke),
+    JS_CFUNC_DEF("encodeInto", 2, &bridge::Function<&TextEncoder::encodeInto>::invoke)
+};
+
+struct TextDecoder_
+{
+    bool fatal{false};
+    bool ignore_bom{false};
+    bool bom_seen{false};
+    std::vector<std::uint8_t> pending;
+};
+
+struct TextDecoder : bridge::Interface<TextDecoder, TextDecoder_>
+{
+    struct Encoding : bridge::Value
+    {
+        using bridge::Value::Value;
+        static constexpr bool check(JSContext *, JSValue *) { return true; }
+        static bool valid(JSContext *ctx, JSValue *value, std::string &message)
+        {
+            if(JS_IsUndefined(*value)) return true;
+
+            bridge::Strong<bridge::String> encoding{ctx, JS_ToString(ctx, *value)};
+            if(JS_IsException(encoding)) return false;
+            std::string label = static_cast<std::string>(encoding);
+            auto first = label.find_first_not_of("\t\n\f\r ");
+            auto last = label.find_last_not_of("\t\n\f\r ");
+            if(first == std::string::npos) label.clear();
+            else label = label.substr(first, last - first + 1);
+            std::transform(label.begin(), label.end(), label.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+            if(label == "utf-8" || label == "utf8" || label == "unicode-1-1-utf-8") return true;
+            message = "unsupported encoding [" + label + "]";
+            return false;
+        }
+    };
+
+    struct Options : bridge::Struct<Options>
+    {
+        BRIDGE_DEFINE_STRUCT(Options);
+        static constexpr auto fields = bridge::fields(
+            bridge::field<bridge::Boolean>("fatal"),
+            bridge::field<bridge::Boolean>("ignoreBOM")
+        );
+    };
+
+    struct DecodeOptions : bridge::Struct<DecodeOptions>
+    {
+        BRIDGE_DEFINE_STRUCT(DecodeOptions);
+        static constexpr auto fields = bridge::fields(
+            bridge::field<bridge::Boolean>("stream")
+        );
+    };
+
+    TextDecoder() : Base{TextDecoder_{}} {}
+    TextDecoder(Encoding) : Base{TextDecoder_{}} {}
+    TextDecoder(Encoding, Options options) : Base{TextDecoder_{}}
+    {
+        if(auto fatal = options.get<bridge::Boolean>("fatal"); fatal) ref().fatal = *fatal;
+        if(auto ignore = options.get<bridge::Boolean>("ignoreBOM"); ignore) ref().ignore_bom = *ignore;
+    }
+
+    JSValue get_encoding(JSContext *ctx) const { return JS_NewString(ctx, "utf-8"); }
+    JSValue get_fatal(JSContext *ctx) const { return JS_NewBool(ctx, ref().fatal); }
+    JSValue get_ignoreBOM(JSContext *ctx) const { return JS_NewBool(ctx, ref().ignore_bom); }
+
+    static void append(std::vector<std::uint8_t> &output, std::uint32_t codepoint)
+    {
+        if(codepoint < 0x80)
+            output.push_back(static_cast<std::uint8_t>(codepoint));
+        else if(codepoint < 0x800)
+        {
+            output.push_back(static_cast<std::uint8_t>(0xC0 | (codepoint >> 6)));
+            output.push_back(static_cast<std::uint8_t>(0x80 | (codepoint & 0x3F)));
+        }
+        else if(codepoint < 0x10000)
+        {
+            output.push_back(static_cast<std::uint8_t>(0xE0 | (codepoint >> 12)));
+            output.push_back(static_cast<std::uint8_t>(0x80 | ((codepoint >> 6) & 0x3F)));
+            output.push_back(static_cast<std::uint8_t>(0x80 | (codepoint & 0x3F)));
+        }
+        else
+        {
+            output.push_back(static_cast<std::uint8_t>(0xF0 | (codepoint >> 18)));
+            output.push_back(static_cast<std::uint8_t>(0x80 | ((codepoint >> 12) & 0x3F)));
+            output.push_back(static_cast<std::uint8_t>(0x80 | ((codepoint >> 6) & 0x3F)));
+            output.push_back(static_cast<std::uint8_t>(0x80 | (codepoint & 0x3F)));
+        }
+    }
+
+    bool decode_utf8(std::vector<std::uint8_t> const &input, bool stream, std::vector<std::uint8_t> &output)
+    {
+        auto &state = ref();
+        std::vector<std::uint8_t> data;
+        data.reserve(state.pending.size() + input.size());
+        data.insert(data.end(), state.pending.begin(), state.pending.end());
+        data.insert(data.end(), input.begin(), input.end());
+        state.pending.clear();
+
+        auto emit = [&state, &output](std::uint32_t codepoint) {
+            if(!state.bom_seen)
+            {
+                state.bom_seen = true;
+                if(codepoint == 0xFEFF && !state.ignore_bom) return;
+            }
+            append(output, codepoint);
+        };
+
+        auto invalid = [&state, &emit]() {
+            if(state.fatal) return false;
+            emit(0xFFFD);
+            return true;
+        };
+
+        std::size_t i = 0;
+        while(i < data.size())
+        {
+            std::uint8_t const c = data[i];
+            if(c < 0x80)
+            {
+                emit(c);
+                ++i;
+                continue;
+            }
+
+            std::size_t length = 0;
+            std::uint32_t codepoint = 0;
+            std::uint32_t minimum = 0;
+            if(c >= 0xC2 && c <= 0xDF) { length = 2; codepoint = c & 0x1F; minimum = 0x80; }
+            else if(c >= 0xE0 && c <= 0xEF) { length = 3; codepoint = c & 0x0F; minimum = 0x800; }
+            else if(c >= 0xF0 && c <= 0xF4) { length = 4; codepoint = c & 0x07; minimum = 0x10000; }
+            else
+            {
+                if(!invalid()) return false;
+                ++i;
+                continue;
+            }
+
+            if(data.size() - i < length)
+            {
+                bool prefix = true;
+                for(std::size_t j = i + 1; j < data.size(); ++j)
+                    prefix = prefix && (data[j] & 0xC0) == 0x80;
+                if(stream && prefix)
+                {
+                    state.pending.assign(data.begin() + i, data.end());
+                    break;
+                }
+                if(!invalid()) return false;
+                i = prefix ? data.size() : i + 1;
+                continue;
+            }
+
+            bool continuation = true;
+            for(std::size_t j = 1; j < length; ++j)
+            {
+                continuation = continuation && (data[i + j] & 0xC0) == 0x80;
+                codepoint = (codepoint << 6) | (data[i + j] & 0x3F);
+            }
+            if(!continuation || codepoint < minimum || codepoint > 0x10FFFF ||
+               (codepoint >= 0xD800 && codepoint <= 0xDFFF))
+            {
+                if(!invalid()) return false;
+                ++i;
+                continue;
+            }
+
+            emit(codepoint);
+            i += length;
+        }
+
+        if(!stream)
+        {
+            if(!state.pending.empty())
+            {
+                state.pending.clear();
+                if(!invalid()) return false;
+            }
+            state.bom_seen = false;
+        }
+        return true;
+    }
+
+    JSValue decode_0(JSContext *ctx)
+    {
+        std::vector<std::uint8_t> input;
+        std::vector<std::uint8_t> output;
+        if(!decode_utf8(input, false, output))
+            return JS_ThrowTypeError(ctx, "The encoded data was not valid UTF-8");
+        return JS_NewStringLen(ctx, reinterpret_cast<char const *>(output.data()), output.size());
+    }
+
+    JSValue decode_impl(JSContext *ctx, bridge::Value input, bool stream)
+    {
+        if(JS_IsUndefined(input))
+        {
+            std::vector<std::uint8_t> bytes;
+            std::vector<std::uint8_t> output;
+            if(!decode_utf8(bytes, stream, output))
+            {
+                ref().pending.clear();
+                ref().bom_seen = false;
+                return JS_ThrowTypeError(ctx, "The encoded data was not valid UTF-8");
+            }
+            return JS_NewStringLen(ctx, reinterpret_cast<char const *>(output.data()), output.size());
+        }
+
+        std::size_t offset = 0;
+        std::size_t length = 0;
+        JSValue buffer = JS_GetTypedArrayBuffer(ctx, input, &offset, &length, nullptr);
+        if(JS_IsException(buffer))
+        {
+            JS_FreeValue(ctx, JS_GetException(ctx));
+            std::size_t direct_size;
+            if(JS_GetArrayBuffer(ctx, &direct_size, input))
+            {
+                offset = 0;
+                length = direct_size;
+                buffer = JS_DupValue(ctx, input);
+            }
+            else
+            {
+                JS_FreeValue(ctx, JS_GetException(ctx));
+                JSValue glob = JS_GetGlobalObject(ctx);
+                JSValue ctor = JS_GetPropertyStr(ctx, glob, "DataView");
+                int const is_dataview = JS_IsInstanceOf(ctx, input, ctor);
+                JS_FreeValue(ctx, ctor);
+                JS_FreeValue(ctx, glob);
+                if(is_dataview < 0) return JS_EXCEPTION;
+                if(!is_dataview) return JS_ThrowTypeError(ctx, "decode input must be a BufferSource");
+
+                buffer = JS_GetPropertyStr(ctx, input, "buffer");
+                JSValue offset_value = JS_GetPropertyStr(ctx, input, "byteOffset");
+                JSValue length_value = JS_GetPropertyStr(ctx, input, "byteLength");
+                std::uint64_t view_offset;
+                std::uint64_t view_length;
+                bool const failed = JS_IsException(buffer) || JS_IsException(offset_value) ||
+                    JS_IsException(length_value) || JS_ToIndex(ctx, &view_offset, offset_value) ||
+                    JS_ToIndex(ctx, &view_length, length_value);
+                JS_FreeValue(ctx, offset_value);
+                JS_FreeValue(ctx, length_value);
+                if(failed)
+                {
+                    JS_FreeValue(ctx, buffer);
+                    return JS_EXCEPTION;
+                }
+                if(view_offset > std::numeric_limits<std::size_t>::max() ||
+                   view_length > std::numeric_limits<std::size_t>::max())
+                {
+                    JS_FreeValue(ctx, buffer);
+                    return JS_ThrowRangeError(ctx, "DataView range is too large");
+                }
+                offset = static_cast<std::size_t>(view_offset);
+                length = static_cast<std::size_t>(view_length);
+            }
+        }
+
+        std::size_t size;
+        std::uint8_t *data = JS_GetArrayBuffer(ctx, &size, buffer);
+        if(!data)
+        {
+            JS_FreeValue(ctx, buffer);
+            return JS_EXCEPTION;
+        }
+        if(offset > size || length > size - offset)
+        {
+            JS_FreeValue(ctx, buffer);
+            return JS_ThrowRangeError(ctx, "BufferSource range exceeds its ArrayBuffer");
+        }
+        std::vector<std::uint8_t> bytes(data + offset, data + offset + length);
+        JS_FreeValue(ctx, buffer);
+
+        std::vector<std::uint8_t> output;
+        if(!decode_utf8(bytes, stream, output))
+        {
+            ref().pending.clear();
+            ref().bom_seen = false;
+            return JS_ThrowTypeError(ctx, "The encoded data was not valid UTF-8");
+        }
+        return JS_NewStringLen(ctx, reinterpret_cast<char const *>(output.data()), output.size());
+    }
+
+    JSValue decode_1(JSContext *ctx, bridge::Value input)
+    {
+        return decode_impl(ctx, input, false);
+    }
+
+    JSValue decode_2(JSContext *ctx, bridge::Value input, DecodeOptions options)
+    {
+        bool stream = false;
+        if(auto value = options.get<bridge::Boolean>("stream"); value) stream = *value;
+        return decode_impl(ctx, input, stream);
+    }
+
+    using decode = bridge::Function<&TextDecoder::decode_0, &TextDecoder::decode_1, &TextDecoder::decode_2>;
+    using ctor = bridge::Constructor<TextDecoder(), TextDecoder(Encoding), TextDecoder(Encoding, Options)>;
+    static JSCFunctionListEntry const funcs[];
+};
+
+JSCFunctionListEntry const TextDecoder::funcs[] = {
+    JS_CGETSET_DEF("encoding", &bridge::Getter<&TextDecoder::get_encoding>, nullptr),
+    JS_CGETSET_DEF("fatal", &bridge::Getter<&TextDecoder::get_fatal>, nullptr),
+    JS_CGETSET_DEF("ignoreBOM", &bridge::Getter<&TextDecoder::get_ignoreBOM>, nullptr),
+    JS_CFUNC_DEF("decode", 1, &TextDecoder::decode::invoke)
 };
 
 JSValue atob(JSContext *ctx, bridge::String base64)
@@ -2688,7 +3810,7 @@ using dollar = bridge::Function<
     &dollar_<bridge::String>
 >;
 
-JSValue require(JSContext *ctx, bridge::String name)
+JSValue require_1(JSContext *ctx, bridge::String name)
 {
     Global *glob = Global::ptr(ctx);
     auto const n = static_cast<std::string>(name);
@@ -2696,7 +3818,9 @@ JSValue require(JSContext *ctx, bridge::String name)
     static std::unordered_map<std::string, JSValue(*)(JSContext *)> const scripts = {
 #define SCRIPT(name) {#name, &notojs_init_##name}
         SCRIPT(console),
+        SCRIPT(crypto),
         SCRIPT(dollar),
+        SCRIPT(dom),
         SCRIPT(mustache)
 #undef SCRIPT
     };
@@ -2712,7 +3836,7 @@ JSValue require(JSContext *ctx, bridge::String name)
         lmdb::val k{n.c_str(), n.size()};
 
         auto [tx, db] = DB(ctx).pkgs();
-        if(lmdb::val v; db.get(tx, k, v) && detail::INI::is_script(v))
+        if(lmdb::val v; db.get(tx, k, v) && detail::Module::is_script(v))
         {
             url = facade::URL::parse(v.data());
         }
@@ -2730,23 +3854,27 @@ JSValue require(JSContext *ctx, bridge::String name)
     return JS_ThrowReferenceError(ctx, "Module %s not found", n.data());
 }
 
-JSValue config_0(JSContext *ctx)
+JSValue require_2(JSContext *ctx, bridge::String name, ScriptConfig config)
 {
-    if(std::string data; boost::beast::http::status::ok != Global::ptr(ctx)->get<Folder>().get_packages(data))
-        return JS_ThrowInternalError(ctx, "Could not load packages config");
-    else
-        return bridge::String(ctx, std::move(data));
+    auto const n = static_cast<std::string>(name);
+
+    static std::unordered_map<std::string, JSValue(*)(JSContext *, ScriptConfig)> const scripts = {
+#define SCRIPT(name) {#name, &notojs_init_##name}
+        SCRIPT(console),
+            SCRIPT(crypto),
+        SCRIPT(dollar),
+        SCRIPT(dom),
+        SCRIPT(storage)
+#undef SCRIPT
+    };
+
+    if(auto it = scripts.find(n); it != std::end(scripts))
+        return it->second(ctx, config);
+
+    return JS_ThrowReferenceError(ctx, "Module %s not found", n.data());
 }
 
-JSValue config_1(JSContext *ctx, bridge::String config)
-{
-    if(std::string data = config; boost::beast::http::status::ok != Global::ptr(ctx)->get<Folder>().set_packages(data))
-        return JS_ThrowInternalError(ctx, "%s", data.c_str());
-    else
-        return JS_UNDEFINED;
-}
-
-using config = bridge::Function<&config_0, &config_1>;
+using require = bridge::Function<&require_1, &require_2>;
 
 template<typename Context>
 JSValue script_handler_(JSContext *ctx, JSValue *argv, JSValue *data)
@@ -2918,12 +4046,16 @@ JSClassID callback_id;
 Global::Global()
 {
     Blob::init();
+    File::init();
+    FormData::init();
     Headers::init();
     ServerRequest::init();
     Request::init();
     ServerResponse::init();
     Response::init();
     Storage::init();
+    TextDecoder::init();
+    TextEncoder::init();
     HTML::init();
     Image::init();
     SVG::init();
@@ -2937,12 +4069,16 @@ Global::Global()
 void Global::init(JSRuntime *rt) const
 {
     Blob::init(rt);
+    File::init(rt);
+    FormData::init(rt);
     Headers::init(rt);
     ServerRequest::init(rt);
     Request::init(rt);
     ServerResponse::init(rt);
     Response::init(rt);
     Storage::init(rt);
+    TextDecoder::init(rt);
+    TextEncoder::init(rt);
     HTML::init(rt);
     Image::init(rt);
     SVG::init(rt);
@@ -2980,9 +4116,8 @@ std::unique_ptr<Global::Context> Global::make(JSContext *ctx, JSValue glob) cons
         JS_SetPropertyStr(ctx, glob, "btoa", JS_NewCFunction(ctx, &bridge::Function<btoa>::invoke, "btoa", 1));
         JS_SetPropertyStr(ctx, glob, "fetch", JS_NewCFunction(ctx, &fetch::invoke, "fetch", 1));
 
-        JSValue r = JS_NewCFunction(ctx, &bridge::Function<&require>::invoke, "require", 1);
+        JSValue r = JS_NewCFunction(ctx, &require::invoke, "require", 1);
         JS_SetPropertyStr(ctx, r, "script", JS_NewCFunction(ctx, &script::invoke, "script", 1));
-        JS_SetPropertyStr(ctx, r, "config", JS_NewCFunction(ctx, &config::invoke, "config", 1));
         JS_SetPropertyStr(ctx, glob, "require", r);
 
         JS_SetPropertyStr(ctx, d, "__renderer", JS_NewCFunction(ctx, &bridge::Function<renderer>::invoke, NULL, 0));
@@ -2994,10 +4129,14 @@ std::unique_ptr<Global::Context> Global::make(JSContext *ctx, JSValue glob) cons
         }
 
         Blob::init(ctx, glob);
+        File::init(ctx, glob);
+        FormData::init(ctx, glob);
         Headers::init(ctx, glob);
         Request::init(ctx, glob);
         Response::init(ctx, glob);
         Storage::init(ctx, glob);
+        TextDecoder::init(ctx, glob);
+        TextEncoder::init(ctx, glob);
         HTML::init(ctx);
         Image::init(ctx);
         SVG::init(ctx);
@@ -3031,15 +4170,65 @@ void Global::Context::wait(JSContext *ctx)
     Worker::get().wait(ctx);
 }
 
+JSValue Global::Context::load(JSContext *ctx, char const *name)
+{
+    std::string base{"<require:"};
+    base.append(name);
+    base.append(">");
+
+    JSValue mod = JS_LoadModule(ctx, base.c_str(), name);
+    if(JS_IsException(mod)) return mod;
+
+    wait(ctx);
+    auto const state = JS_PromiseState(ctx, mod);
+    if(JS_PROMISE_REJECTED == state)
+    {
+        JSValue error = JS_PromiseResult(ctx, mod);
+        if(auto it = std::find_if(std::begin(rejections), std::end(rejections), [ctx, mod](auto const &entry) {
+            return JS_StrictEq(ctx, entry.promise, mod);
+        }); it != std::end(rejections))
+        {
+            JS_FreeValue(ctx, it->promise);
+            JS_FreeValue(ctx, it->reason);
+            rejections.erase(it);
+        }
+        JS_FreeValue(ctx, mod);
+        return JS_Throw(ctx, error);
+    }
+    if(JS_PROMISE_FULFILLED != state)
+    {
+        JS_FreeValue(ctx, mod);
+        return JS_ThrowInternalError(ctx, JS_PROMISE_PENDING == state
+            ? "Module %s did not finish loading"
+            : "Module %s did not return a promise", name);
+    }
+
+    JSValue res = JS_PromiseResult(ctx, mod);
+    JS_FreeValue(ctx, mod);
+    return res;
+}
+
 void Global::Context::free(JSContext *ctx)
 {
     JS_FreeValue(ctx, output);
     JSValue glob = JS_GetGlobalObject(ctx);
     for(auto const &name : cleanup)
     {
-        JSAtom atom = JS_NewAtom(ctx, name.c_str());
-        JS_DeleteProperty(ctx, glob, atom, 0);
-        JS_FreeAtom(ctx, atom);
+        if("$." == name.substr(0, 2))
+        {
+            JSAtom atom = JS_NewAtom(ctx, name.c_str() + 2);
+            JSValue dollar = JS_GetPropertyStr(ctx, glob, "$");
+            JS_DeleteProperty(ctx, dollar, atom, 0);
+            JS_FreeValue(ctx, dollar);
+            JS_FreeAtom(ctx, atom);
+        }
+        else
+        {
+            JSAtom atom = JS_NewAtom(ctx, name.c_str());
+            JS_DeleteProperty(ctx, glob, atom, 0);
+            JS_FreeAtom(ctx, atom);
+        }
+
     }
     JS_FreeValue(ctx, glob);
     if(perror)
@@ -3047,6 +4236,12 @@ void Global::Context::free(JSContext *ctx)
         JS_FreeValue(ctx, *perror);
         perror.reset();
     }
+    for(auto const &entry : rejections)
+    {
+        JS_FreeValue(ctx, entry.promise);
+        JS_FreeValue(ctx, entry.reason);
+    }
+    rejections.clear();
 }
 
 void Global::set_agent(std::string &&agent) const
@@ -3059,17 +4254,17 @@ void Global::set_prefix(std::string &&prefix) const
     Request::HTTPString::prefix = std::move(prefix);
 }
 
-void Global::configure(boost::property_tree::ptree const &pt)
+void Global::configure(detail::Config const &cfg)
 {
-    if(auto agent = pt.get_optional<std::string>("global.agent"); agent)
+    if(auto agent = cfg.get_optional<std::string>("global.agent"); agent)
         Request_::agent = *agent;
 
-    if(auto prefix = pt.get_optional<std::string>("global.prefix"); prefix)
+    if(auto prefix = cfg.get_optional<std::string>("global.prefix"); prefix)
         Request::HTTPString::prefix = *prefix;
     else
-        Request::HTTPString::prefix = "http://" + pt.get<std::string>("server.bind");
+        Request::HTTPString::prefix = "http://" + cfg.get<std::string>("server.bind");
 
-    Request_::local = pt.get<std::string>("server.bind");
+    Request_::local = cfg.get<std::string>("server.bind");
 }
 
 thread_local char Task::buffer[16384];
@@ -3089,12 +4284,29 @@ void Task::run()
 
 void Task::end(JSContext *ctx)
 {
-    JSValue result = JS_UNDEFINED;
-    if(then(ctx, result))
-        JS_FreeValue(ctx, JS_Call(ctx, funcs[0], JS_UNDEFINED, 1, &result));
+    JSValue value = JS_UNDEFINED;
+    auto const action = then(ctx, value);
+    if(action || JS_IsException(value))
+    {
+        settle_async(ctx, funcs, value);
+    }
     else
-        JS_FreeValue(ctx, JS_Call(ctx, funcs[1], JS_UNDEFINED, 1, &result));
-    JS_FreeValue(ctx, result);
+    {
+        JSValue settled = JS_Call(ctx, funcs[1], JS_UNDEFINED, 1, &value);
+        JS_FreeValue(ctx, value);
+        if(JS_IsException(settled))
+        {
+            JSValue error = JS_GetException(ctx);
+            if(auto *context = Global::Context::ptr(ctx); context && !context->perror)
+                context->perror = error;
+            else
+                JS_FreeValue(ctx, error);
+        }
+        else
+        {
+            JS_FreeValue(ctx, settled);
+        }
+    }
     JS_FreeValue(ctx, funcs[0]);
     JS_FreeValue(ctx, funcs[1]);
 }
@@ -3125,14 +4337,16 @@ std::optional<boost::urls::url> IURL::Static::parse(char const *uri)
 {
     if(notojs::Request::HTTPString::prefix && strlen(uri) && *uri == '/')
     {
-        std::string u = *notojs::Request::HTTPString::prefix;
+        std::string u{*notojs::Request::HTTPString::prefix};
         u.append(uri);
-        if(auto uv = boost::urls::parse_uri(u); uv)
+        if(auto uv = boost::urls::parse_uri(u))
             return std::move(*uv);
     }
-    else if(auto uv = boost::urls::parse_uri(uri); uv)
+    else if(auto uv = boost::urls::parse_uri(uri))
     {
-        return std::move(*uv);
+        boost::urls::url url{std::move(*uv)};
+        Request_::maybenoto(url);
+        return std::move(url);
     }
     return std::nullopt;
 }
@@ -3160,6 +4374,41 @@ JSValue IBlob::Static::make(JSContext *ctx, std::uint8_t const *data, std::size_
     });
     Blob::get(blob).dptr = size
         ? &Blob::get(blob).data->at(0)
+        : nullptr;
+    return blob;
+}
+
+JSValue IFile::Static::make(JSContext *ctx, std::vector<std::uint8_t> &&data, std::string const &name, std::int64_t time, std::string const &type)
+{
+    auto const size = data.size();
+    JSValue blob = File::from(ctx, File_{
+        Blob_{
+            .type = type,
+            .data = Blob_::from(std::move(data)),
+            .size = size
+        },
+        .name = name,
+        .last_modified = time
+    });
+    File::get(blob).dptr = size
+        ? &Blob::get(blob).data->at(0)
+        : nullptr;
+    return blob;
+}
+
+JSValue IFile::Static::make(JSContext *ctx, std::uint8_t const *data, std::size_t size, std::string const &name, std::int64_t time, std::string const &type)
+{
+    JSValue blob = File::from(ctx, File_{
+        Blob_{
+            .type = type,
+            .data = Blob_::from(std::vector<std::uint8_t>(data, data + size)),
+            .size = size
+        },
+        .name = name,
+        .last_modified = time
+    });
+    File::get(blob).dptr = size
+        ? &File::get(blob).data->at(0)
         : nullptr;
     return blob;
 }
@@ -3212,6 +4461,7 @@ JSValue facade::fetch(JSContext *ctx,
     JSValue cb = JS_NewObjectClass(ctx, callback_id);
     JS_SetOpaque(cb, (void*)callback);
 
+    Request_::maybenoto(url);
     auto req = bridge::Strong<bridge::Object>{ctx, Request::from(ctx, Request_{std::move(request), std::move(url)})};
     auto fut = bridge::Strong<bridge::Promise>{ctx, fetch_(ctx, Request{ctx, req})}.wrap(
         [](JSContext *ctx, JSValueConst, int, JSValue *resp, int size, JSValue *data)
@@ -3231,6 +4481,11 @@ JSValue facade::fetch(JSContext *ctx,
 JSValue facade::print(JSContext *ctx, int argc, JSValueConst *argv)
 {
     return notojs::print(ctx, JS_UNDEFINED, argc, argv);
+}
+
+JSValue facade::import(JSContext *ctx, char const *name)
+{
+    return Global::Context::ptr(ctx)->load(ctx, name);
 }
 
 } // namespace notojs

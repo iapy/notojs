@@ -125,9 +125,9 @@ void Timers::run()
     }
 }
 
-void Timers::configure(boost::property_tree::ptree const &pt)
+void Timers::configure(detail::Config const &cfg)
 {
-    if(auto config = pt.get_child_optional("timers"))
+    if(auto config = cfg.get_child_optional("timers"))
     {
         int n;
         std::string m;

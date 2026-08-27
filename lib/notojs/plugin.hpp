@@ -1,4 +1,5 @@
 #pragma once
+#include <notojs/detail/config.hpp>
 #include <notojs/detail/jscode.hpp>
 
 #include <nanodi.hpp>
@@ -19,7 +20,7 @@ class Server;
 class Plugin : public Requires<Cacher, Engine, Errors, Folder, Module, Server>, public IHost
 {
 private:
-    void configure(boost::property_tree::ptree const &);
+    void configure(detail::Config const &);
     friend class Config;
 
 public:
@@ -32,6 +33,7 @@ public:
 
 public:
     bool exec(std::string const &, IContext &) override;
+    void clog(std::string &&, IHost::Args &&) override;
     void load(std::string const &) override;
     void clog(std::string &&) override;
     MDB_env *lmdb() override;

@@ -8,6 +8,8 @@ file(GLOB SRC
     test_async.cpp
     test_client.cpp
     test_compile.cpp
+    test_css.cpp
+    test_crypto.cpp
     test_custom.cpp
     test_db.cpp
     test_doc.cpp
@@ -29,13 +31,17 @@ file(GLOB SRC
     test_jsdict.cpp
     test_layout.cpp
     test_method.cpp
+    test_mixin.cpp
     test_notojs.cpp
     test_pipeline.cpp
+    test_primitive.cpp
+    test_printable.cpp
     test_router.cpp
     test_search.cpp
     test_server.cpp
     test_setter.cpp
     test_simple.cpp
+    test_static.cpp
     test_struct.cpp
     test_storage.cpp
     test_template.cpp
@@ -59,8 +65,9 @@ target_compile_definitions(jstest PRIVATE -DNOTOJS_TEST)
 target_compile_definitions(jstest PRIVATE -DTEST_SERVER_PORT=58342)
 target_compile_definitions(jstest PRIVATE -DCMAKE_CURRENT_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}")
 target_compile_definitions(jstest PRIVATE -DCMAKE_CURRENT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(jstest PRIVATE NOTOJS_DOC_SUITE="$<TARGET_FILE:doc>")
 
-add_dependencies(jstest quickjs)
+add_dependencies(jstest quickjs doc)
 target_link_options(jstest PRIVATE -rdynamic)
 target_link_libraries(jstest PUBLIC -notojs module script Boost::unit_test_framework)
 
@@ -100,8 +107,12 @@ test_library(interface)
 test_library(intern)
 test_library(jsdict)
 test_library(method)
+test_library(mixin)
+test_library(primitive)
+test_library(printable)
 test_library(setter)
 test_library(simple)
+test_library(static)
 test_library(struct)
 test_library(validate)
 test_library(vararg)

@@ -184,7 +184,8 @@ BOOST_AUTO_TEST_CASE(Blob)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 
-assert(() => throws(() => new Blob(), 'Blob: no matching constructor found'));
+const empty = new Blob();
+assert(() => 0 == empty.size);
 assert(() => throws(() => new Blob('1'), 'Blob: no matching constructor found'));
 assert(() => throws(() => new Blob([1]), 'Blob constructor: invalid type [0]'));
 
@@ -206,6 +207,12 @@ assert(() => 'text/plain' == b2.type);
 
 const t2 = await b2.text();
 assert(() => 'foo bar baz' == t2);
+
+const bparts = new Blob([b2, '!'], {type: 'text/custom'});
+assert(() => 12 == bparts.size);
+assert(() => 'text/custom' == bparts.type);
+const tparts = await bparts.text();
+assert(() => 'foo bar baz!' == tparts);
 
 const a2 = await b2.arrayBuffer();
 assert(() => 11 == a2.byteLength);
@@ -259,6 +266,154 @@ assert(() => 10 == u3.length);
 
 for(var i = 0; i < 10; ++i)
     assert(() => i == u3[i]);
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(File)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+
+assert(() => throws(() => new File(), 'File: no matching constructor found'));
+
+const start = Date.now();
+const generated = new File(['generated'], 'generated.txt');
+assert(() => generated instanceof File);
+assert(() => generated instanceof Blob);
+assert(() => 'generated.txt' == generated.name);
+assert(() => '' == generated.type);
+assert(() => 9 == generated.size);
+assert(() => '' == generated.webkitRelativePath);
+assert(() => generated.lastModified >= start);
+const generatedText = await generated.text();
+assert(() => 'generated' == generatedText);
+
+const file = new File(
+    [new Blob(['hello']), ' world'],
+    'folder/report.txt',
+    {type: 'text/plain', lastModified: 42}
+);
+assert(() => file instanceof Blob);
+assert(() => 'folder/report.txt' == file.name);
+assert(() => 'text/plain' == file.type);
+assert(() => 11 == file.size);
+assert(() => 42 == file.lastModified);
+const fileText = await file.text();
+assert(() => 'hello world' == fileText);
+
+const copied = new Blob([file]);
+const copiedText = await copied.text();
+assert(() => 'hello world' == copiedText);
+
+const slice = file.slice(6);
+assert(() => slice instanceof Blob);
+assert(() => !(slice instanceof File));
+const sliceText = await slice.text();
+assert(() => 'world' == sliceText);
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(FormData)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+
+const data = new FormData();
+assert(() => throws(() => new FormData([]), 'FormData: no matching constructor found'));
+
+const blob = new Blob(['payload'], {type: 'text/plain'});
+const file = new File(['document'], 'document.txt', {type: 'text/plain', lastModified: 42});
+data.append('name', 'first');
+data.append('name', 'second');
+data.append('upload', blob, 'report.txt');
+data.append('document', file);
+
+assert(() => data.has('name'));
+assert(() => data.get('name') == 'first');
+assert(() => 2 == data.getAll('name').length);
+assert(() => data.get('upload') instanceof File);
+assert(() => data.get('upload') instanceof Blob);
+assert(() => 'report.txt' == data.get('upload').name);
+const uploadText = await data.get('upload').text();
+assert(() => 'payload' == uploadText);
+assert(() => 'text/plain' == data.get('upload').type);
+assert(() => data.get('document') instanceof File);
+assert(() => 'document.txt' == data.get('document').name);
+assert(() => 42 == data.get('document').lastModified);
+const renamed = new FormData();
+renamed.append('document', file, 'renamed.txt');
+assert(() => 'renamed.txt' == renamed.get('document').name);
+assert(() => 42 == renamed.get('document').lastModified);
+assert(() => 'name,name,upload,document' == Array.from(data.keys()).join(','));
+const values = await Promise.all(
+    Array.from(data.values()).map(value => value instanceof Blob ? value.text() : value)
+);
+assert(() => 'first,second,payload,document' == values.join(','));
+const entries = await Promise.all(
+    Array.from(data).map(async ([name, value]) => [name, value instanceof Blob ? await value.text() : value])
+);
+assert(() => 'name,first;name,second;upload,payload;document,document' == entries.map(value => value.join(',')).join(';'));
+
+data.set('name', 'replacement');
+assert(() => 1 == data.getAll('name').length);
+assert(() => 'replacement' == data.get('name'));
+
+data.set('upload', blob);
+const replacedUpload = await data.get('upload').text();
+assert(() => 'payload' == replacedUpload);
+assert(() => data.get('upload') instanceof File);
+assert(() => 'blob' == data.get('upload').name);
+
+data.delete('name');
+assert(() => !data.has('name'));
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(TextEncoding)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+
+const encoder = new TextEncoder();
+assert(() => 'utf-8' === encoder.encoding);
+assert(() => 0 === encoder.encode().length);
+assert(() => 0 === encoder.encode(undefined).length);
+assert(() => '65,240,159,152,128' === Array.from(encoder.encode('A😀')).join(','));
+assert(() => '239,191,189' === Array.from(encoder.encode('\uD800')).join(','));
+
+const destination = new Uint8Array(5);
+const encoded = encoder.encodeInto('A😀B', destination);
+assert(() => 3 === encoded.read);
+assert(() => 5 === encoded.written);
+assert(() => '65,240,159,152,128' === Array.from(destination).join(','));
+assert(() => throws(() => encoder.encodeInto('x', new Int8Array(1))));
+
+const decoder = new TextDecoder();
+assert(() => 'utf-8' === decoder.encoding);
+assert(() => !decoder.fatal);
+assert(() => !decoder.ignoreBOM);
+assert(() => '' === decoder.decode());
+assert(() => 'A😀' === decoder.decode(encoder.encode('A😀')));
+assert(() => 'payload' === decoder.decode(encoder.encode('payload').buffer));
+
+const viewBuffer = encoder.encode('xpayloady').buffer;
+assert(() => 'payload' === decoder.decode(new DataView(viewBuffer, 1, 7)));
+assert(() => 'x' === decoder.decode(new Uint8Array([0xEF, 0xBB, 0xBF, 0x78])));
+assert(() => '\uFEFFx' === new TextDecoder('utf8', {ignoreBOM: true}).decode(
+    new Uint8Array([0xEF, 0xBB, 0xBF, 0x78])));
+assert(() => '�(�' === decoder.decode(new Uint8Array([0xE2, 0x28, 0xA1])));
+assert(() => throws(() => new TextDecoder('utf-8', {fatal: true}).decode(
+    new Uint8Array([0xFF]))));
+
+const streaming = new TextDecoder('unicode-1-1-utf-8');
+assert(() => '' === streaming.decode(new Uint8Array([0xE2]), {stream: true}));
+assert(() => '€' === streaming.decode(new Uint8Array([0x82, 0xAC])));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);

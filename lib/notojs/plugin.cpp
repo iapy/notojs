@@ -10,7 +10,7 @@
 
 #include <notojs/detail/cellid.hpp>
 #include <notojs/detail/jscode.hpp>
-
+#include <boost/hana.hpp>
 #include <unordered_map>
 #include <shared_mutex>
 #include <filesystem>
@@ -51,15 +51,15 @@ std::unordered_map<std::string, std::optional<detail::Version>> versions;
 
 } // namespace
 
-void Plugin::configure(boost::property_tree::ptree const &pt)
+void Plugin::configure(detail::Config const &cfg)
 {
-    auto path = pt.get_optional<std::string>("plugin.path");
+    auto path = cfg.get_optional<std::string>("plugin.path");
     if(!path) return;
 
     constexpr std::string_view PLUGIN{"plugin:"};
     auto const sopath = std::filesystem::path{std::move(*path)};
 
-    for(auto const& [sec, subtree] : pt)
+    for(auto const& [sec, subtree] : cfg)
     {
         if(sec.size() > PLUGIN.size() && !sec.compare(0, PLUGIN.size(), PLUGIN))
         {
@@ -132,8 +132,8 @@ void Plugin::updated(std::string const &name)
 void Plugin::end()
 {
     for(auto &[name, plugin]: plugins) {
-        std::clog << "Plugin stopped" << notojs::values(name);
         plugin->end(*this);
+        NOTOJS_LOG("Plugin stopped", (name));
     }
 }
 
@@ -184,6 +184,38 @@ bool Plugin::exec(std::string const &name, IContext &context)
         return true;
     }
     return false;
+}
+
+void Plugin::clog(std::string &&line, IHost::Args &&args)
+{
+    std::ostringstream ss;
+    ss << line;
+    if(args.size())
+    {
+        ss << " ";
+        detail::Values::Writer writer(ss);
+        rapidjson::Writer<decltype(writer)> w(writer);
+
+        w.StartArray();
+        for(auto const &arg: args)
+        {
+            std::visit(boost::hana::overload_linearly(
+                [&w](std::string const &s) {
+                    w.String(s.c_str(), s.size());
+                },
+                [&w](std::int64_t const &i) {
+                    w.Int64(i);
+                }
+            ), arg);
+        }
+        w.EndArray();
+        w.Flush();
+        ss << '\n';
+    }
+
+    boost::asio::post(*get<Server>().disk, [line=std::move(ss.str())]{
+        (std::clog << line).flush();
+    });
 }
 
 void Plugin::clog(std::string &&line)

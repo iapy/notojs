@@ -1,5 +1,5 @@
 |-
-  *Global Object Extender* that defines the `console` object.
+  `globalThis` extender that defines the `console` object.
 
   ```js!noplay
   require('console');
@@ -26,5 +26,5 @@ args:
 text: |-
   Appends a log entry to the **NotoJS** server log.
 
-  - `arg0` — log message  
+  - `arg0` — log message
   - `arg1` — optional values, serialized as a JSON array

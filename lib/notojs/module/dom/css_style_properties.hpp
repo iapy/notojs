@@ -49,8 +49,20 @@ struct CSSStyleProperties : CSSStyleDeclaration
         JSValue names(HTMLElement const &, Attr const &a) const;
 
     private:
-        mutable std::map<std::string, std::pair<std::string, std::uint32_t>> style;
+        struct Candidate
+        {
+            std::string value;
+            lxb_css_selector_specificity_t specificity{0};
+            std::uint64_t order{0};
+            std::uint32_t depth{0};
+            bool important{false};
+        };
+
+        mutable std::map<std::string, Candidate> style;
         mutable std::uint32_t gen{std::numeric_limits<std::uint32_t>::max()};
+
+        void cascade(std::string, std::string, lxb_css_selector_specificity_t,
+                     std::uint64_t, std::uint32_t, bool) const;
         void update(HTMLElement const &el) const;
     };
 

@@ -898,6 +898,7 @@ JSCFunctionListEntry func[] = {
 
 int init(JSContext *ctx, JSModuleDef *m)
 {
+    DBException::init(ctx, m);
     Database::init(ctx);
     System::init(ctx);
     ErrorLog::init(ctx);
@@ -910,6 +911,7 @@ int init(JSContext *ctx, JSModuleDef *m)
 
 void notojs_init_db()
 {
+    DBException::init();
     Database::init();
     System::init();
     ErrorLog::init();
@@ -919,6 +921,7 @@ void notojs_init_db()
 
 void notojs_init_db(JSRuntime *rt)
 {
+    DBException::init(rt);
     Database::init(rt);
     System::init(rt);
     HTTPData::init(rt);
@@ -926,7 +929,7 @@ void notojs_init_db(JSRuntime *rt)
     Handle::init(rt);
 }
 
-void notojs_init_db(boost::property_tree::ptree const &) {}
+void notojs_init_db(detail::Config const &) {}
 
 JSModuleDef *notojs_init_db(JSContext *ctx, const char *name)
 {

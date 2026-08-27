@@ -6,7 +6,7 @@
 #include <notojs/timers.hpp>
 #include <notojs/writer.hpp>
 
-#include <notojs/detail/config.hpp>
+#include <notojs/detail/module.hpp>
 #include <boost/spirit/home/x3.hpp>
 #include <boost/spirit/include/support_istream_iterator.hpp>
 #include <boost/url.hpp>
@@ -353,6 +353,9 @@ Folder::~Folder()
 
 void Folder::init_db()
 {
+    if(auto const ignore = path / ".gitignore"; !std::filesystem::exists(ignore))
+        std::ofstream(ignore) << ".db\n";
+
     auto const db = (path / ".db");
     if(!std::filesystem::exists(db))
         std::filesystem::create_directories(db);
@@ -372,9 +375,9 @@ void Folder::init_db()
     } catch(...) {}
 }
 
-void Folder::configure(boost::property_tree::ptree const &pt)
+void Folder::configure(detail::Config const &cfg)
 {
-    if(auto path = pt.get_optional<std::string>("folder.path"))
+    if(auto path = cfg.get_optional<std::string>("folder.path"))
         this->path = std::move(*path);
     else
     {
@@ -394,7 +397,7 @@ void Folder::configure(boost::property_tree::ptree const &pt)
     if(auto const lib = (path / "lib"); !std::filesystem::exists(lib))
         std::filesystem::create_directory(lib);
 
-    if(auto size = pt.get_optional<std::string>("folder.lmdb"); size)
+    if(auto size = cfg.get_optional<std::string>("folder.lmdb"); size)
     {
         std::string mult;
         std::istringstream(*size) >> this->size >> mult;
@@ -470,12 +473,12 @@ boost::beast::http::status Folder::list(std::string &json) const
             {
                 writer.startObject();
                 writer.string("name", k.data(), k.size());
-                writer.string("url", v.data(), v.size() - detail::INI::tail_size);
-                if(ht && ht->get(tx, lmdb::val(v.data(), v.size() - detail::INI::tail_null), c))
+                writer.string("url", v.data(), v.size() - detail::Module::tail_size);
+                if(ht && ht->get(tx, lmdb::val(v.data(), v.size() - detail::Module::tail_null), c))
                 {
                     writer.integer("size", c.size());
                 }
-                writer.integer("type", static_cast<int>(detail::INI::line_type(v)) - 1);
+                writer.integer("type", static_cast<int>(detail::Module::line_type(v)) - 1);
                 writer.endObject();
             }
         } while(cr.get(k, v, MDB_NEXT));
@@ -803,7 +806,7 @@ boost::beast::http::status Folder::remove(std::string const &path)
 boost::beast::http::status Folder::get_packages(std::string &target) const
 {
     try {
-        std::map<detail::INI::size_type, std::string> lines;
+        std::map<detail::Module::size_type, std::string> lines;
         auto tx = lmdb::txn::begin(env_, nullptr, MDB_RDONLY);
         auto db = lmdb::dbi::open(tx, pkgs.c_str());
         auto cr = lmdb::cursor::open(tx, db);
@@ -815,7 +818,7 @@ boost::beast::http::status Folder::get_packages(std::string &target) const
             if(!k.data()[0])
             {
                 lines.emplace(
-                    ntohs(*reinterpret_cast<detail::INI::size_type*>(&k.data()[1])),
+                    ntohs(*reinterpret_cast<detail::Module::size_type*>(&k.data()[1])),
                     std::string(v.data(), v.size())
                 );
             }
@@ -823,9 +826,9 @@ boost::beast::http::status Folder::get_packages(std::string &target) const
             {
                 std::string line(k.data(), k.size());
                 line.append(" = ", 3);
-                line.append(v.data(), v.size() - 2 - sizeof(detail::INI::size_type));
+                line.append(v.data(), v.size() - 2 - sizeof(detail::Module::size_type));
                 lines.emplace(
-                    htons(*reinterpret_cast<detail::INI::size_type*>(&v.data()[v.size() - sizeof(detail::INI::size_type)])),
+                    htons(*reinterpret_cast<detail::Module::size_type*>(&v.data()[v.size() - sizeof(detail::Module::size_type)])),
                     std::move(line)
                 );
             }
@@ -846,9 +849,9 @@ boost::beast::http::status Folder::get_packages(std::string &target) const
 
 boost::beast::http::status Folder::set_packages(std::string &source) const
 {
-    detail::INI::Line type = detail::INI::Line::SYNTAX;
+    detail::Module::Line type = detail::Module::Line::SYNTAX;
     std::unordered_set<std::string> names;
-    std::vector<detail::INI::Entry> lines;
+    std::vector<detail::Module::Entry> lines;
     int seen = 0;
 
     std::istringstream iss(source);
@@ -864,13 +867,13 @@ boost::beast::http::status Folder::set_packages(std::string &source) const
         {
             if(line == "[scripts]")
             {
-                if(seen & static_cast<int>(detail::INI::Line::SCRIPT))
+                if(seen & static_cast<int>(detail::Module::Line::SCRIPT))
                 {
                     source = "Duplicate section " + line + "@" + std::to_string(1 + lines.size());
                     return boost::beast::http::status::internal_server_error;
                 }
-                seen |= static_cast<int>(detail::INI::Line::SCRIPT);
-                type = detail::INI::Line::SCRIPT;
+                seen |= static_cast<int>(detail::Module::Line::SCRIPT);
+                type = detail::Module::Line::SCRIPT;
 
                 auto &entry = lines.emplace_back();
                 entry[0].line(lines.size());
@@ -878,13 +881,13 @@ boost::beast::http::status Folder::set_packages(std::string &source) const
             }
             else if(line == "[modules]")
             {
-                if(seen & static_cast<int>(detail::INI::Line::MODULE))
+                if(seen & static_cast<int>(detail::Module::Line::MODULE))
                 {
                     source = "Duplicate section " + line + "@" + std::to_string(1 + lines.size());
                     return boost::beast::http::status::internal_server_error;
                 }
-                seen |= static_cast<int>(detail::INI::Line::MODULE);
-                type = detail::INI::Line::MODULE;
+                seen |= static_cast<int>(detail::Module::Line::MODULE);
+                type = detail::Module::Line::MODULE;
 
                 auto &entry = lines.emplace_back();
                 entry[0].line(lines.size());
@@ -934,10 +937,10 @@ boost::beast::http::status Folder::set_packages(std::string &source) const
         entry[0].make();
         entry[1].make();
 
-        if(detail::INI::Line::SYNTAX != detail::INI::line_type(entry[1].val))
+        if(detail::Module::Line::SYNTAX != detail::Module::line_type(entry[1].val))
             urls.insert(std::string_view{
                 entry[1].val.data(),
-                entry[1].val.size() - detail::INI::tail_null
+                entry[1].val.size() - detail::Module::tail_null
             });
     }
 

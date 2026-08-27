@@ -1,5 +1,5 @@
 text: |-
-  *Global Object Extender* that defines the `$.ajax` function for limited compatibility with **jQuery**-based `fetch` API.
+  `globalThis` extender that defines the `$.ajax` function for limited compatibility with **jQuery**-based `fetch` API.
 
   ```js!noplay
   require('dollar');

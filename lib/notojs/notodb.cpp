@@ -1,10 +1,15 @@
 #include <notojs/detail/notodb.hpp>
+#include <notojs/detail/scoped.hpp>
 #include <notojs/global.hpp>
 #include <notojs/folder.hpp>
 #include <lmdbxx/lmdb++.h>
 
 #include <bridge.hpp>
 #include <notodb.hpp>
+
+#include <array>
+#include <fstream>
+#include <iterator>
 
 namespace notojs {
 namespace {
@@ -58,7 +63,61 @@ BOOST_FORCEINLINE int64_t decode_i64_key(lmdb::val const &in)
     return static_cast<std::int64_t>(from_be_u64(be) ^ 0x8000000000000000ULL);
 }
 
-} // namesoace
+class LMDBCategory : public std::error_category
+{
+public:
+    char const *name() const noexcept override
+    {
+        return "lmdb";
+    }
+
+    std::string message(int error) const override
+    {
+        return mdb_strerror(error);
+    }
+
+    static LMDBCategory const &get()
+    {
+        static LMDBCategory const instance;
+        return instance;
+    }
+};
+
+std::error_code data_path(JSContext *ctx, std::filesystem::path &path)
+{
+    if(path.empty() || path.has_root_path())
+        return std::make_error_code(std::errc::invalid_argument);
+
+    path = path.lexically_normal();
+    for(auto const &part : path)
+        if(part == "..") return std::make_error_code(std::errc::invalid_argument);
+
+    path = Global::ptr(ctx)->get<Folder>().env(path);
+    return {};
+}
+
+DB::Data read_data(std::filesystem::path const &path)
+{
+    std::error_code ec;
+    auto const status = std::filesystem::symlink_status(path, ec);
+    if(ec) return ec;
+    if(!std::filesystem::exists(status))
+        return std::make_error_code(std::errc::no_such_file_or_directory);
+    if(!std::filesystem::is_regular_file(status))
+        return std::make_error_code(std::errc::invalid_argument);
+
+    std::ifstream file(path, std::ios::binary);
+    if(!file) return std::make_error_code(std::errc::io_error);
+
+    std::variant_alternative_t<0, DB::Data> result{
+        std::istreambuf_iterator<char>{file},
+        std::istreambuf_iterator<char>{}
+    };
+    if(file.bad()) return std::make_error_code(std::errc::io_error);
+    return result;
+}
+
+} // namespace
 
 DB::DB(JSContext *ctx)
 : env{Global::ptr(ctx)->get<Folder>().env()}
@@ -72,6 +131,94 @@ std::uint64_t DB::db_to_host(std::uint64_t v)
 std::uint64_t DB::host_to_db(std::uint64_t v)
 {
     return to_be_u64(v);
+}
+
+DB::Data DB::data(JSContext *ctx, std::filesystem::path path)
+{
+    try {
+        if(auto ec = data_path(ctx, path); ec) return ec;
+        return read_data(path);
+    } catch(std::bad_alloc const &) {
+        return std::make_error_code(std::errc::not_enough_memory);
+    } catch(...) {
+        return std::make_error_code(std::errc::io_error);
+    }
+}
+
+DB::Data DB::data(
+    JSContext *ctx,
+    std::filesystem::path path,
+    std::variant_alternative_t<0, Data> &&candidate
+)
+{
+    try {
+        if(auto ec = data_path(ctx, path); ec) return ec;
+
+        DB database{ctx};
+        MDB_txn *txn{nullptr};
+
+        if(auto const error = mdb_txn_begin(database.env, nullptr, 0, &txn); error)
+            return std::error_code{error, LMDBCategory::get()};
+
+        detail::Scoped scoped{std::bind(mdb_txn_abort, txn)};
+
+        auto existing = read_data(path);
+        if(auto value = std::get_if<std::variant_alternative_t<0, Data>>(&existing))
+            return std::move(*value);
+        if(auto const ec = std::get<std::error_code>(existing);
+           ec != std::errc::no_such_file_or_directory)
+            return ec;
+
+        auto temporary = path;
+        temporary += ".tmp";
+
+        std::error_code ec;
+        std::filesystem::remove(temporary, ec);
+        if(ec && ec != std::errc::no_such_file_or_directory) return ec;
+
+        std::ofstream file(temporary, std::ios::binary | std::ios::trunc);
+        if(!file) return std::make_error_code(std::errc::io_error);
+
+        std::filesystem::permissions(
+            temporary,
+            std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+            std::filesystem::perm_options::replace,
+            ec
+        );
+        if(ec)
+        {
+            auto const error = ec;
+            file.close();
+            std::filesystem::remove(temporary, ec);
+            return error;
+        }
+
+        if(!candidate.empty())
+            file.write(
+                reinterpret_cast<char const *>(candidate.data()),
+                static_cast<std::streamsize>(candidate.size())
+            );
+        file.close();
+        if(!file)
+        {
+            std::filesystem::remove(temporary, ec);
+            return std::make_error_code(std::errc::io_error);
+        }
+
+        std::filesystem::rename(temporary, path, ec);
+        if(ec)
+        {
+            auto const error = ec;
+            std::filesystem::remove(temporary, ec);
+            return error;
+        }
+
+        return std::move(candidate);
+    } catch(std::bad_alloc const &) {
+        return std::make_error_code(std::errc::not_enough_memory);
+    } catch(...) {
+        return std::make_error_code(std::errc::io_error);
+    }
 }
 
 std::pair<lmdb::txn, lmdb::dbi> DB::open(Access a, DB::Namespace ns, std::string_view const &n) const

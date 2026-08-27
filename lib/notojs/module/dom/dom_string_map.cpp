@@ -67,7 +67,7 @@ JSValue DOMStringMap::get_property(char const *name) const
 
 bool DOMStringMap::has_property(char const *name) const
 {
-    return !!getAttribute({to_snake(name)});
+    return hasAttribute({to_snake(name)});
 }
 
 std::vector<std::string> DOMStringMap::own_properties() const
@@ -76,7 +76,7 @@ std::vector<std::string> DOMStringMap::own_properties() const
     std::vector<std::string> props;
     for(auto *attr = lxb_dom_element_first_attribute(*this); attr; attr = lxb_dom_element_next_attribute(attr))
     {
-        if(attr->node.ns != LXB_NS_HTML) continue;
+        if(!Attr::eq_ns(*this, attr->node.ns, LXB_NS__UNDEF)) continue;
 
         const char *a = reinterpret_cast<char const *>(lxb_dom_attr_qualified_name(attr, &nlen));
         if(auto name = to_camel(a, nlen); !name.empty())

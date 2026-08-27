@@ -1,5 +1,5 @@
 |-
-  `noto:global` defines the APIs available on the JavaScript global object. These APIs are available automatically and do not require an import statement.
+  `noto:global` defines the APIs available on the **JavaScript** global object. These APIs are available automatically and do not require an import statement.
 ---
 class: Blob
 docs: Blob
@@ -28,6 +28,8 @@ defs:
 ctor:
   args:
     -
+      []
+    -
       - Blob.Parts
     -
       - Blob.Parts
@@ -43,8 +45,6 @@ properties:
       The size, in bytes, of the data contained in the `Blob` object.
   type:
     getter: true
-    setter:
-      - String
     docs: Blob.type
     text: |-
       A string indicating the MIME type of the data contained in the `Blob`.
@@ -104,6 +104,177 @@ methods:
       - `size` — `Number`, size of the blob in bytes
       - `type` — `String`, MIME type of the blob
 ---
+class: File
+base: Blob
+docs: File
+text: |-
+  Represents immutable binary data with a file name and modification timestamp.
+  `File` extends `Blob`, so it supports the same body-reading and slicing operations.
+impl:
+  - IFile
+defs:
+  - struct: Options
+    fields:
+      type:
+        type: String
+        docs: File.Options.type
+        text: |-
+          MIME type for the file. Defaults to the empty string.
+      lastModified:
+        type: Number
+        docs: File.Options.lastModified
+        text: |-
+          Modification time in milliseconds since the Unix epoch.
+          Defaults to the current system time when the `File` is constructed.
+    docs: File.Options
+    text: |-
+      Optional metadata applied when constructing a `File`.
+ctor:
+  args:
+    -
+      - Blob.Parts
+      - String
+    -
+      - Blob.Parts
+      - String
+      - File.Options
+  docs: File.constructor
+  text: |-
+    Constructs a `File` by concatenating `arg0` (`Blob.Parts`), assigning the filename from `arg1`, and applying optional `File.Options` from `arg2`.
+properties:
+  lastModified:
+    getter: true
+    docs: File.lastModified
+    text: |-
+      Contains the stored modification time in milliseconds since the Unix epoch.
+  name:
+    getter: true
+    docs: File.name
+    text: |-
+      Contains the filename supplied to the constructor.
+  webkitRelativePath:
+    getter: true
+    docs: File.webkitRelativePath
+    text: |-
+      Contains an empty string. Directory-relative file paths are not implemented.
+---
+class: FormData
+docs: FormData
+text: |-
+  Represents an ordered collection of form fields.
+  Field names may occur more than once, and values are stored as strings or file-like objects.
+ctor:
+  args:
+    -
+      []
+  docs: FormData.constructor
+  text: |-
+    Constructs an empty `FormData` collection.
+methods:
+  "[Symbol.iterator]":
+    args:
+      -
+        []
+    docs: FormData.[Symbol.iterator]
+    text: |-
+      Returns the same snapshot iterator as `entries()`, yielding `[name, value]` pairs in insertion order.
+  append:
+    args:
+      -
+        - String
+        - String
+      -
+        - String
+        - File
+      -
+        - String
+        - File
+        - String
+      -
+        - String
+        - IBlob
+      -
+        - String
+        - IBlob
+        - String
+    docs: FormData.append
+    text: |-
+      Appends a field without replacing existing entries with the same name.
+      String values remain strings. `File` and `IBlob` values are returned as `File` objects; a plain blob uses `"blob"` as its default filename unless `arg2` supplies another name.
+  delete:
+    args:
+      -
+        - String
+    docs: FormData.delete
+    text: |-
+      Removes every entry whose name equals `arg0`. Returns `undefined`.
+  entries:
+    args:
+      -
+        []
+    docs: FormData.entries
+    text: |-
+      Returns an iterator over a snapshot of `[name, value]` pairs in insertion order.
+  get:
+    args:
+      -
+        - String
+    docs: FormData.get
+    text: |-
+      Returns the first value whose name equals `arg0`, or `null` if no entry matches.
+      The returned value is a `String` or `File`.
+  getAll:
+    args:
+      -
+        - String
+    docs: FormData.getAll
+    text: |-
+      Returns an array containing every value whose name equals `arg0`, preserving insertion order.
+  has:
+    args:
+      -
+        - String
+    docs: FormData.has
+    text: |-
+      Returns whether at least one entry has the name supplied in `arg0`.
+  keys:
+    args:
+      -
+        []
+    docs: FormData.keys
+    text: |-
+      Returns an iterator over a snapshot of field names in insertion order, including duplicate names.
+  set:
+    args:
+      -
+        - String
+        - String
+      -
+        - String
+        - File
+      -
+        - String
+        - File
+        - String
+      -
+        - String
+        - IBlob
+      -
+        - String
+        - IBlob
+        - String
+    docs: FormData.set
+    text: |-
+      Replaces the first entry named `arg0` and removes any later duplicates, or appends a new entry if the name is absent.
+      File and blob filename behavior matches `append()`. Returns `undefined`.
+  values:
+    args:
+      -
+        []
+    docs: FormData.values
+    text: |-
+      Returns an iterator over a snapshot of string and file values in insertion order.
+---
 class: Headers
 docs: Headers
 text: |-
@@ -157,10 +328,10 @@ methods:
     text: |-
       Executes a provided function once for each key/value pair in this Headers object.
 
-      - `arg0` — Function to execute for each entry in the map. It takes the following arguments:
-        - `arg0` — value of the currently visited header value.
-        - `arg1` — name of the currently visited header entry.
-        - `arg2` — the object that `forEach` is being applied to
+      - `arg0` — function to execute for each entry. This implementation invokes it with:
+        - `arg0` — name of the currently visited header entry
+        - `arg1` — value of the currently visited header
+        - `arg2` — the `Headers` object being iterated
       - `arg1` — value to use as `this` when executing `arg0`.
   get:
     args:
@@ -197,8 +368,7 @@ methods:
         []
     docs: Headers.toJSON
     text: |-
-      Headers.toJSON
-      Returns object mapping header names to values:
+      Returns a plain object mapping header names to values:
       - `key` — `String`, header name
       - `value` — `String`, header value
   values:
@@ -281,14 +451,14 @@ methods:
         - String
     docs: URLSearchParams.has
     text: |-
-      Returns a boolean value indicating if a given parameter, or parameter and value pair, exists.
+      Returns whether at least one search parameter has the name supplied in `arg0`.
   keys:
     args:
       -
         []
     docs: URLSearchParams.keys
     text: |-
-      Returns an iterator allowing iteration through all keys of the key/value pairs contained in this object.
+      Returns a snapshot iterator over distinct parameter names. Duplicate names are yielded once.wing iteration through all keys of the key/value pairs contained in this object.
   set:
     args:
       -
@@ -383,9 +553,9 @@ methods:
         []
     docs: ServerRequest.formData
     text: |-
-      Returns `Promise` that resolves to the request body as `URLSearchParams`.
-
-      > Multipart bodies aren't supported.{.warning}
+      Returns a `Promise` that resolves to the request body as `FormData`.
+      Supports `multipart/form-data` with a valid boundary and `application/x-www-form-urlencoded`.
+      Rejects with `TypeError` when `Content-Type` is missing or unsupported.
   json:
     args:
       -
@@ -622,6 +792,7 @@ defs:
           Any:
             - String
             - ArrayBuffer
+            - FormData
             - Object
         docs: Request.Config.body
         text: |-
@@ -764,6 +935,15 @@ methods:
     docs: ServerResponse.bytes
     text: |-
       Returns `Promise` that resolves to the response body as `Uint8Array`.
+  formData:
+    args:
+      -
+        []
+    docs: ServerResponse.formData
+    text: |-
+      Returns a `Promise` that resolves to the response body as `FormData`.
+      Supports `multipart/form-data` with a valid boundary and `application/x-www-form-urlencoded`.
+      Rejects with `TypeError` when `Content-Type` is missing or unsupported.
   json:
     args:
       -
@@ -778,7 +958,7 @@ methods:
         []
     docs: ServerResponse.text
     text: |-
-      Returns `Promise` resolving to `String` representation of request body.
+      Returns a `Promise` resolving to the response body as a `String`.
   toJSON:
     args:
       -
@@ -845,16 +1025,6 @@ defs:
       `Storage.Namespace` mimics browser-style `localStorage` domain separation.
       It must be a non-empty string and cannot contain spaces or forward slashes (/).
       Each namespace is stored in a separate **LMDB** database (`sys:storage:namespace`).
-  - struct: Config
-    fields:
-      notebook:
-        type: Boolean
-        docs: Storage.Config.notebook
-        text: |-
-          Attach `Storage` instance as `localStorage` to notebook if `true` and to current cell as `false`.
-    docs: Storage.Config
-    text: |-
-      An optional object passed as the second argument to the `Storage.attach` method.
 ctor:
   args:
     -
@@ -869,16 +1039,6 @@ properties:
     text: |-
       Returns an integer representing the number of data items stored in the `Storage` object.
 methods:
-  attach:
-    args:
-      -
-        []
-      -
-        - Storage.Config
-    docs: Storage.attach
-    text: |-
-      Attaches the Storage instance to the global context as `localStorage`.
-      If `arg0` is present and `arg0.notebook` is true, it is scoped to the notebook; otherwise, it is scoped to the current cell.
   clear:
     args:
       -
@@ -899,8 +1059,8 @@ methods:
         - Number
     docs: Storage.key
     text: |-
-      When passed a number `n`, this method will return the name of the nth key in the storage.
-      Unlike standard browser implementation, returns nth key with respect to alphabetical order.
+      Returns the name of the key at index `arg0`, or `null` when the index is negative or outside the storage range.
+      Key order follows the underlying **LMDB** database order and should not be treated as insertion order.
 
       > Complexity: O(n){.warning}
   removeItem:
@@ -921,6 +1081,137 @@ methods:
     docs: Storage.setItem
     text: |-
       When passed a key name and value, will add that key to the storage, or update that key's value if it already exists.
+---
+class: TextEncoder
+docs: TextEncoder
+text: |-
+  Converts **JavaScript** strings to UTF-8 byte sequences.
+  The encoder is stateless and always uses UTF-8.
+ctor:
+  args:
+    -
+      []
+  docs: TextEncoder.constructor
+  text: |-
+    Constructs a UTF-8 encoder. The constructor accepts no options.
+properties:
+  encoding:
+    getter: true
+    docs: TextEncoder.encoding
+    text: |-
+      Returns the canonical encoding name `"utf-8"`.
+methods:
+  encode:
+    args:
+      -
+        []
+      -
+        - Any
+    docs: TextEncoder.encode
+    text: |-
+      Converts `arg0` to a string and returns its UTF-8 representation in a new `Uint8Array`.
+      Omitted or `undefined` input produces an empty array. Lone UTF-16 surrogates are encoded as the replacement character U+FFFD.
+  encodeInto:
+    args:
+      -
+        - Any
+        - Any
+    docs: TextEncoder.encodeInto
+    text: |-
+      Encodes `arg0` into the destination `Uint8Array` supplied as `arg1`.
+      Only complete UTF-8 sequences that fit are written.
+
+      Returns an object containing:
+      - `read` — number of UTF-16 code units consumed from the source string
+      - `written` — number of bytes written to the destination
+
+      Throws `TypeError` if `arg1` is not a `Uint8Array`.
+---
+class: TextDecoder
+docs: TextDecoder
+text: |-
+  Decodes UTF-8 bytes into **JavaScript** strings.
+  Decoder instances retain partial input and BOM state when streaming mode is enabled.
+defs:
+  - type: Encoding
+    base: Any
+    docs: TextDecoder.Encoding
+    text: |-
+      Encoding label accepted by the constructor.
+      Omitted or `undefined` labels select UTF-8. Supported case-insensitive labels are `utf-8`, `utf8`, and `unicode-1-1-utf-8`; surrounding ASCII whitespace is ignored.
+  - struct: Options
+    fields:
+      fatal:
+        type: Boolean
+        docs: TextDecoder.Options.fatal
+        text: |-
+          When `true`, malformed UTF-8 causes `decode()` to throw `TypeError`.
+          When `false`, malformed sequences are replaced with U+FFFD. Defaults to `false`.
+      ignoreBOM:
+        type: Boolean
+        docs: TextDecoder.Options.ignoreBOM
+        text: |-
+          Controls whether an initial UTF-8 byte-order mark is preserved.
+          The default `false` removes the initial BOM; `true` includes it in the decoded string.
+    docs: TextDecoder.Options
+    text: |-
+      Constructor options controlling malformed-input and byte-order-mark handling.
+  - struct: DecodeOptions
+    fields:
+      stream:
+        type: Boolean
+        docs: TextDecoder.DecodeOptions.stream
+        text: |-
+          When `true`, retains incomplete trailing UTF-8 sequences for the next `decode()` call.
+          Defaults to `false`, which flushes pending input and resets stream BOM state.
+    docs: TextDecoder.DecodeOptions
+    text: |-
+      Per-call options for incremental decoding.
+ctor:
+  args:
+    -
+      []
+    -
+      - TextDecoder.Encoding
+    -
+      - TextDecoder.Encoding
+      - TextDecoder.Options
+  docs: TextDecoder.constructor
+  text: |-
+    Constructs a UTF-8 decoder using the optional encoding label `arg0` and `TextDecoder.Options` in `arg1`.
+    Unsupported encoding labels cause construction to fail.
+properties:
+  encoding:
+    getter: true
+    docs: TextDecoder.encoding
+    text: |-
+      Contains the canonical encoding name `"utf-8"`.
+  fatal:
+    getter: true
+    docs: TextDecoder.fatal
+    text: |-
+      Contains the effective `fatal` option supplied to the constructor.
+  ignoreBOM:
+    getter: true
+    docs: TextDecoder.ignoreBOM
+    text: |-
+      Contains the effective `ignoreBOM` option supplied to the constructor.
+methods:
+  decode:
+    args:
+      -
+        []
+      -
+        - Any
+      -
+        - Any
+        - TextDecoder.DecodeOptions
+    docs: TextDecoder.decode
+    text: |-
+      Decodes bytes from an `ArrayBuffer`, typed-array view, or `DataView` into a string.
+      Omitted or `undefined` input decodes an empty buffer and flushes pending state unless streaming is enabled.
+
+      Malformed UTF-8 is replaced with U+FFFD by default, or throws `TypeError` when `fatal` is enabled. Set `arg1.stream` to `true` when a byte sequence is split across multiple calls.
 ---
 function: $
 args:
@@ -1148,30 +1439,14 @@ text: |-
     - `console`
     - `mustache`
   - a valid `http` or `https` URL — the script is loaded from that URL.
-  - a script configured in `require.config` under the `[scripts]` section — the script is loaded from the configured URL and cached.
+  - a script configured in `packages` under the `[scripts]` section — the script is loaded from the configured URL and cached.
 
   Throws `ReferenceError` if the script cannot be loaded due to a network error, or if it is not found.
   Rethrows any exception from the script.
 also:
   - console
   - dollar
-  - topic:packages
----
-function: require.config
-args:
-  - []
-  -
-    - String
-text: |-
-  Gets or sets the module and script resolver configuration.
-
-  - Without arguments, returns the current configuration.
-  - With `arg0`, sets the configuration. The value must be a string in INI format.
-
-  Throws `SyntaxError` if the configuration cannot be parsed.
-
-  > The configuration format is a restricted subset of INI as described in `doc('topic:packages')`.{.warning}
-also:
+  - noto:noto
   - topic:packages
 ---
 function: require.script

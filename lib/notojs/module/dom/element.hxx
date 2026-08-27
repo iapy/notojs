@@ -3,65 +3,6 @@ struct Element : bridge::Interface<Element, dom::Element, Node>
     Element(JSContext *ctx, JSValue self) : Base{ctx, self} {}
     Element(std::reference_wrapper<dom::Element> &&rw) : Base(std::move(rw)) {}
 
-    template<typename Fallback, typename ...Ts>
-    JSValue after_t(JSContext *ctx, bridge::Tail<1, Ts...> nodes)
-    {
-        auto parent = ref().doc->parent(ref());
-        if(!parent) return DOMException::throwHierarchyRequestError(ctx);
-
-        auto next = ref().doc->next(ref());
-        for(std::size_t i = 0; i < nodes.size(); ++i)
-        {
-            if(auto n = nodes.template get<Node>(i); n)
-            {
-                if(ref().doc != n->ref().doc) return DOMException::throwWrongDocumentError(ctx);
-                if(ref().doc->contains(n->ref(), ref())) return DOMException::throwHierarchyRequestError(ctx);
-
-                if(next) ref().doc->insertBeforeVoid(*parent, n->ref(), *next);
-                else ref().doc->appendChildVoid(*parent, n->ref());
-            }
-            else if(auto s = nodes.template get<bridge::String>(i); s)
-            {
-                if(next) ref().doc->insertBeforeVoid(*parent, ref().doc->createTextNode(*s), *next);
-                else ref().doc->appendChildVoid(*parent, ref().doc->createTextNode(*s));
-            }
-            else if(auto e = Fallback::after_f(ctx, nodes, i, ref(), *parent, next)) return *e;
-        }
-        return JS_UNDEFINED;
-    }
-
-    BOOST_FORCEINLINE std::optional<JSValue> after_f(JSContext *, bridge::Tail<1, Node, bridge::String> &, std::size_t, dom::Node const &, dom::Node const &, std::optional<dom::Node> const &)
-    {
-        return std::nullopt;
-    }
-    using after = bridge::Function<&Element::after_t<Element, Node, bridge::String>>;
-
-    template<typename Fallback, typename ...Ts>
-    JSValue append_t(JSContext *ctx, bridge::Tail<1, Ts...> nodes)
-    {
-        for(std::size_t i = 0; i < nodes.size(); ++i)
-        {
-            if(auto n = nodes.template get<Node>(i); n)
-            {
-                if(ref().doc != n->ref().doc) return DOMException::throwWrongDocumentError(ctx);
-                if(ref().doc->contains(n->ref(), ref())) return DOMException::throwHierarchyRequestError(ctx);
-                ref().doc->appendChildVoid(ref(), n->ref());
-            }
-            else if(auto s = nodes.template get<bridge::String>(i); s)
-            {
-                ref().doc->appendChildVoid(ref(), ref().doc->createTextNode(*s));
-            }
-            else if(auto e = Fallback::append_f(ctx, nodes, i, ref())) return *e;
-        }
-        return JS_UNDEFINED;
-    }
-
-    BOOST_FORCEINLINE std::optional<JSValue> append_f(JSContext *, bridge::Tail<1, Node, bridge::String> &, std::size_t, dom::Node const &)
-    {
-        return std::nullopt;
-    }
-    using append = bridge::Function<&Element::append_t<Element, Node, bridge::String>>;
-
     JSValue attributes_(JSContext *ctx)
     {
         if(auto it = ref().doc->attributes.find(ref().node); it != std::end(ref().doc->attributes))
@@ -74,60 +15,22 @@ struct Element : bridge::Interface<Element, dom::Element, Node>
         return attributes_(ctx);
     }
 
-    template<typename Fallback, typename ...Ts>
-    JSValue before_t(JSContext *ctx, bridge::Tail<1, Ts...> nodes)
+    JSValue closest(JSContext *ctx, bridge::String query)
     {
-        auto parent = ref().doc->parent(ref());
-        if(!parent) return DOMException::throwHierarchyRequestError(ctx);
-
-        for(std::size_t i = 0; i < nodes.size(); ++i)
-        {
-            if(auto n = nodes.template get<Node>(i); n)
-            {
-                if(ref().doc != n->ref().doc) return DOMException::throwWrongDocumentError(ctx);
-                if(ref().doc->contains(n->ref(), ref())) return DOMException::throwHierarchyRequestError(ctx);
-                ref().doc->insertBeforeVoid(*parent, n->ref(), ref());
-            }
-            else if(auto s = nodes.template get<bridge::String>(i); s)
-            {
-                ref().doc->insertBeforeVoid(*parent, ref().doc->createTextNode(*s), ref());
-            }
-            else if(auto e = Fallback::before_f(ctx, nodes, i, ref(), *parent)) return *e;
-        }
-        return JS_UNDEFINED;
+        std::optional<std::string> error;
+        if(auto node = ref().doc->closest(ref(), query, error); error)
+            return DOMException::throwSyntaxError(ctx, std::move(error));
+        else return node;
     }
 
-    BOOST_FORCEINLINE std::optional<JSValue> before_f(JSContext *, bridge::Tail<1, Node, bridge::String> &, std::size_t, dom::Node const &, dom::Node const &)
+    JSValue getAttribute(JSContext *ctx, Attr::Name name)
     {
-        return std::nullopt;
-    }
-    using before = bridge::Function<&Element::before_t<Element, Node, bridge::String>>;
-
-    JSValue childElementCount(JSContext *ctx) const
-    {
-        return bridge::Number{ctx, ref().doc->childElementCount(ref())};
-    }
-
-    JSValue children(JSContext *ctx) const
-    {
-        if(auto it = ref().doc->child_e.find(ref().node); it != std::end(ref().doc->child_e))
-            return JS_DupValue(ctx, it->second);
-        return ref().doc->child_e[ref().node] = HTMLCollection::from(ctx, HTMLCollection::Wrapped{dom::Node{ref().doc, ref().node}});
-    }
-
-    JSValue firstElementChild(JSContext *) const
-    {
-        return ref().doc->firstElementChild(ref());
-    }
-
-    JSValue getAttribute(JSContext *ctx, bridge::String name)
-    {
-        if(auto value = ref().getAttribute({name}))
+        if(auto value = ref().getAttribute({name.get(ref())}))
             return bridge::String{ctx, *value};
         return JS_NULL;
     }
 
-    JSValue getAttributeNode(JSContext *ctx, bridge::String name)
+    JSValue getAttributeNode(JSContext *ctx, Attr::Name name)
     {
         bridge::Strong<NamedNodeMap> m{ctx, attributes_(ctx)};
         return (-m).getNamedItem(m, ctx, name);
@@ -144,9 +47,9 @@ struct Element : bridge::Interface<Element, dom::Element, Node>
         });
     }
 
-    JSValue hasAttribute(JSContext *ctx, bridge::String name)
+    JSValue hasAttribute(JSContext *ctx, Attr::Name name)
     {
-        return ref().hasAttribute({name}) ? JS_TRUE : JS_FALSE;
+        return ref().hasAttribute({name.get(ref())}) ? JS_TRUE : JS_FALSE;
     }
 
     struct Position : bridge::String
@@ -257,9 +160,12 @@ struct Element : bridge::Interface<Element, dom::Element, Node>
         }
     }
 
-    JSValue lastElementChild(JSContext *) const
+    JSValue matches(JSContext *ctx, bridge::String query)
     {
-        return ref().doc->lastElementChild(ref());
+        std::optional<std::string> error;
+        if(auto m = ref().doc->matches(ref(), query, error); error)
+            return DOMException::throwSyntaxError(ctx, std::move(error));
+        else return m ? JS_TRUE : JS_FALSE;
     }
 
     JSValue nextElementSibling(JSContext *) const
@@ -267,67 +173,14 @@ struct Element : bridge::Interface<Element, dom::Element, Node>
         return ref().doc->nextElementSibling(ref());
     }
 
-    template<typename Fallback, typename ...Ts>
-    JSValue prepend_t(JSContext *ctx, bridge::Tail<1, Ts...> nodes)
-    {
-        auto first = ref().doc->first(ref());
-        for(std::size_t i = 0; i < nodes.size(); ++i)
-        {
-            if(auto n = nodes.template get<Node>(i); n)
-            {
-                if(ref().doc != n->ref().doc) return DOMException::throwWrongDocumentError(ctx);
-                if(ref().doc->contains(n->ref(), ref())) return DOMException::throwHierarchyRequestError(ctx);
-                if(first) ref().doc->insertBeforeVoid(ref(), n->ref(), *first);
-                else ref().doc->appendChildVoid(ref(), n->ref());
-            }
-            else if(auto s = nodes.template get<bridge::String>(i); s)
-            {
-                if(first) ref().doc->insertBeforeVoid(ref(), ref().doc->createTextNode(*s), *first);
-                else ref().doc->appendChildVoid(ref(), ref().doc->createTextNode(*s));
-            }
-            else if(first)
-            {
-                if(auto e = Fallback::before_f(ctx, nodes, i, *first, ref())) return *e;
-            }
-            else
-            {
-                if(auto e = Fallback::append_f(ctx, nodes, i, ref())) return *e;
-            }
-        }
-        return JS_UNDEFINED;
-    }
-
-    using prepend = bridge::Function<&Element::prepend_t<Element, Node, bridge::String>>;
-
-    JSValue querySelector(JSContext *ctx, bridge::String query)
-    {
-        std::optional<std::string> error;
-        if(auto node = ref().doc->querySelector(ref(), query, error); error)
-            return DOMException::throwSyntaxError(ctx, std::move(error));
-        else return node;
-    }
-
-    JSValue querySelectorAll(JSContext *ctx, bridge::String query)
-    {
-        std::optional<std::string> error;
-        if(auto result = ref().doc->querySelectorAll(ref(), query, error); error)
-            return DOMException::throwSyntaxError(ctx, std::move(error));
-        else return NodeList::from(ctx, dom::NodeList{ref().doc->shared_from_this(), std::move(result)});
-    }
-
     JSValue previousElementSibling(JSContext *) const
     {
         return ref().doc->previousElementSibling(ref());
     }
 
-    JSValue remove(JSContext *ctx)
+    JSValue removeAttribute(JSContext *ctx, Attr::Name name)
     {
-        return ref().doc->removeVoid(ref()), JS_UNDEFINED;
-    }
-
-    JSValue removeAttribute(JSContext *ctx, bridge::String name)
-    {
-        auto const key = dom::Attr::Name{name};
+        auto const key = dom::Attr::Name{name.get(ref())};
         if(auto it = ref().doc->attributes.find(ref().node); it != std::end(ref().doc->attributes))
             NamedNodeMap::remove(it->second, key);
         return ref().removeAttribute(key), JS_UNDEFINED;
@@ -338,21 +191,13 @@ struct Element : bridge::Interface<Element, dom::Element, Node>
         if(ref().node != attr.ref().node) return DOMException::throwNotFoundError(ctx);
 
         bridge::Strong<NamedNodeMap> m{ctx, attributes_(ctx)};
-        bridge::Strong<bridge::String> n{ctx, attr.nodeName(ctx)};
+        bridge::Strong<Attr::Name> n{ctx, attr.nodeName(ctx)};
         return (-m).removeNamedItem(m, ctx, n);
     }
 
-    template<typename Fallback, typename ...Ts>
-    JSValue replaceChildren_t(JSContext *ctx, bridge::Tail<1, Ts...> nodes)
+    JSValue setAttribute(JSContext *ctx, Attr::Name name, bridge::Value value)
     {
-        ref().clear();
-        return append_t<Fallback, Ts...>(ctx, nodes);
-    }
-    using replaceChildren = bridge::Function<&Element::replaceChildren_t<Element, Node, bridge::String>>;
-
-    JSValue setAttribute(JSContext *ctx, bridge::String name, bridge::Value value)
-    {
-        return ref().setAttribute({name}, value.toString()), JS_UNDEFINED;
+        return ref().setAttribute({name.get(ref())}, value.toString()), JS_UNDEFINED;
     }
 
     JSValue setAttributeNode(JSContext *ctx, bridge::Object attr)
@@ -361,14 +206,14 @@ struct Element : bridge::Interface<Element, dom::Element, Node>
         return (-m).setNamedItem(m, ctx, attr);
     }
 
-    JSValue toggleAttribute_0(JSContext *ctx, bridge::String name)
+    JSValue toggleAttribute_0(JSContext *ctx, Attr::Name name)
     {
-        return ref().toggleAttribute({name}) ? JS_TRUE : JS_FALSE;
+        return ref().toggleAttribute({name.get(ref())}) ? JS_TRUE : JS_FALSE;
     }
 
-    JSValue toggleAttribute_1(JSContext *ctx, bridge::String name, bridge::Boolean force)
+    JSValue toggleAttribute_1(JSContext *ctx, Attr::Name name, bridge::Boolean force)
     {
-        return ref().toggleAttribute({name}, force) ? JS_TRUE : JS_FALSE;
+        return ref().toggleAttribute({name.get(ref())}, force) ? JS_TRUE : JS_FALSE;
     }
 
     using toggleAttribute = bridge::Function
@@ -411,34 +256,36 @@ struct Element : bridge::Interface<Element, dom::Element, Node>
 
 JSCFunctionListEntry const Element::funcs[] = {
     JS_CGETSET_DEF("attributes", &bridge::Getter<&Element::attributes>, NULL),
-    JS_CGETSET_DEF("childElementCount", &bridge::Getter<&Element::childElementCount>, NULL),
-    JS_CGETSET_DEF("children", &bridge::Getter<&Element::children>, NULL),
-    JS_CGETSET_DEF("firstElementChild", &bridge::Getter<&Element::firstElementChild>, NULL),
-    JS_CGETSET_DEF("innerText", &bridge::Getter<&Node::get_textContent>, &Node::set_textContent::invoke),
-    JS_CGETSET_DEF("lastElementChild", &bridge::Getter<&Element::lastElementChild>, NULL),
+    JS_CGETSET_DEF("childElementCount", &bridge::Getter<&NodeMixin::childElementCount>, NULL),
+    JS_CGETSET_DEF("children", &bridge::Getter<&NodeMixin::children>, NULL),
+    JS_CGETSET_DEF("firstElementChild", &bridge::Getter<&NodeMixin::firstElementChild>, NULL),
+    JS_CGETSET_DEF("lastElementChild", &bridge::Getter<&NodeMixin::lastElementChild>, NULL),
     JS_CGETSET_DEF("nextElementSibling", &bridge::Getter<&Element::nextElementSibling>, NULL),
     JS_CGETSET_DEF("previousElementSibling", &bridge::Getter<&Element::previousElementSibling>, NULL),
     JS_CGETSET_DEF("tagName", &bridge::Getter<&Node::nodeName>, NULL),
 
-    JS_CFUNC_DEF("after", 1, &Element::after::invoke),
-    JS_CFUNC_DEF("append", 1, &Element::append::invoke),
-    JS_CFUNC_DEF("before", 1, &Element::before::invoke),
+    JS_CFUNC_DEF("after", 1, &bridge::Function<&NodeMixin::after_t<>>::invoke),
+    JS_CFUNC_DEF("append", 1, &bridge::Function<&NodeMixin::append_t<>>::invoke),
+    JS_CFUNC_DEF("before", 1, &bridge::Function<&NodeMixin::before_t<>>::invoke),
+    JS_CFUNC_DEF("closest", 1, &bridge::Function<&Element::closest>::invoke),
     JS_CFUNC_DEF("getAttribute", 1, &bridge::Function<&Element::getAttribute>::invoke),
     JS_CFUNC_DEF("getAttributeNode", 1, &bridge::Function<&Element::getAttributeNode>::invoke),
     JS_CFUNC_DEF("getElementsByTagName", 1, &bridge::Function<&Element::getElementsByTagName>::invoke),
     JS_CFUNC_DEF("hasAttribute", 1, &bridge::Function<&Element::hasAttribute>::invoke),
     JS_CFUNC_DEF("insertAdjacentElement", 2, &bridge::Function<&Element::insertAdjacentElement>::invoke),
     JS_CFUNC_DEF("insertAdjacentText", 2, &bridge::Function<&Element::insertAdjacentText>::invoke),
+    JS_CFUNC_DEF("matches", 1, &bridge::Function<&Element::matches>::invoke),
     JS_CFUNC_DEF("moveBefore", 2, &Node::insertBefore::invoke),
-    JS_CFUNC_DEF("prepend", 0, &Element::prepend::invoke),
-    JS_CFUNC_DEF("querySelector", 1, &bridge::Function<&Element::querySelector>::invoke),
-    JS_CFUNC_DEF("querySelectorAll", 1, &bridge::Function<&Element::querySelectorAll>::invoke),
+    JS_CFUNC_DEF("prepend", 0, &bridge::Function<&NodeMixin::prepend_t<>>::invoke),
+    JS_CFUNC_DEF("querySelector", 1, &bridge::Function<&NodeMixin::querySelector>::invoke),
+    JS_CFUNC_DEF("querySelectorAll", 1, &bridge::Function<&NodeMixin::querySelectorAll>::invoke),
     JS_CFUNC_DEF("setAttribute", 2, &bridge::Function<&Element::setAttribute>::invoke),
     JS_CFUNC_DEF("setAttributeNode", 1, &bridge::Function<&Element::setAttributeNode>::invoke),
-    JS_CFUNC_DEF("remove", 0, &bridge::Function<&Element::remove>::invoke),
+    JS_CFUNC_DEF("remove", 0, &bridge::Function<&NodeMixin::remove>::invoke),
     JS_CFUNC_DEF("removeAttribute", 1, &bridge::Function<&Element::removeAttribute>::invoke),
     JS_CFUNC_DEF("removeAttributeNode", 1, &bridge::Function<&Element::removeAttributeNode>::invoke),
-    JS_CFUNC_DEF("replaceChildren", 1, &Element::replaceChildren::invoke),
+    JS_CFUNC_DEF("replaceChildren", 1,  &bridge::Function<&NodeMixin::replaceChildren_t<>>::invoke),
+    JS_CFUNC_DEF("replaceWith", 1, &bridge::Function<&NodeMixin::replaceWith_t<>>::invoke),
     JS_CFUNC_DEF("toggleAttribute", 1, &Element::toggleAttribute::invoke),
 
     // Integration interface

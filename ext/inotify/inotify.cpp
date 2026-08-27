@@ -310,7 +310,7 @@ JSValue Plugin::_path(JSContext *ctx)
 
 int Plugin::init(JSContext *ctx, JSModuleDef *m)
 {
-    notojs::fs::init(ctx);
+    JS_FreeValue(ctx, noto::import(ctx, "noto:fs"));
     return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
 }
 

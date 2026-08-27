@@ -8,6 +8,7 @@
 #include <notojs/timers.hpp>
 
 #include <boost/property_tree/ini_parser.hpp>
+#include <notojs/detail/config.hpp>
 #include <iostream>
 
 namespace notojs {
@@ -35,8 +36,9 @@ int Config::main(int argc, char **argv)
 
     binary = std::filesystem::absolute(argv[0]);
 
-    boost::property_tree::ptree pt;
-    boost::property_tree::ini_parser::read_ini(config, pt);
+    detail::Config pt;
+    boost::property_tree::ini_parser::read_ini<boost::property_tree::ptree>(config, pt);
+    pt.source = &config;
 
     get<Engine>().configure(pt);
     get<Folder>().configure(pt);

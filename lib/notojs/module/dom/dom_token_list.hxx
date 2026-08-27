@@ -208,6 +208,8 @@ struct DOMTokenList : bridge::Interface<DOMTokenList, dom::DOMTokenList>
                     if(n == attr.size())
                         while(p && dom::DOMTokenList::isspace(attr[p - 1])) --p;
                     attr.erase(p, n - p);
+                    ref().setAttribute(ref().attr, attr);
+                    return JS_FALSE;
                 }
                 else
                 {
@@ -238,7 +240,7 @@ struct DOMTokenList : bridge::Interface<DOMTokenList, dom::DOMTokenList>
                 attr.assign(std::begin(*a), std::end(*a));
                 if(auto p = find_(attr, *s); std::string::npos != p)
                 {
-                    if(force) return JS_FALSE;
+                    if(force) return JS_TRUE;
                     std::size_t n = p + s->size();
                     while(n < attr.size() && dom::DOMTokenList::isspace(attr[n])) ++n;
                     if(n == attr.size())
@@ -263,7 +265,7 @@ struct DOMTokenList : bridge::Interface<DOMTokenList, dom::DOMTokenList>
             }
             else ref().setAttribute(ref().attr, attr);
 
-            return JS_TRUE;
+            return force ? JS_TRUE : JS_FALSE;
         }
         else if(sv.empty()) return DOMException::throwSyntaxError(ctx);
         else return DOMException::throwInvalidCharacterError(ctx);
@@ -295,9 +297,12 @@ struct DOMTokenList : bridge::Interface<DOMTokenList, dom::DOMTokenList>
         return bridge::Strong<bridge::Lambda>{ctx, JS_GetPropertyStr(ctx, arr, "values")}(arr).release();
     }
 
-    BOOST_FORCEINLINE static void free(dom::HTMLElement &self)
+    BOOST_FORCEINLINE static void free(dom::DOMTokenList &self)
     {
-        dynamic_cast<dom::HTMLBackend *>(self.doc.get())->classes.erase(self);
+        if(auto *backend = dynamic_cast<dom::HTMLBackend *>(self.doc.get()); "class" == self.attr.name)
+            backend->classes.erase(self);
+        else if("rel" == self.attr.name)
+            backend->rels.erase(self);
     }
 
     using Base::Base;

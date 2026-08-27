@@ -9,6 +9,7 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <chrono>
 #include <stdexcept>
 
 namespace notojs {
@@ -38,24 +39,22 @@ std::map
     std::greater<std::filesystem::path>
 > mount;
 
-JSValue mounts(JSContext *ctx)
+std::int64_t unix_epoch_milliseconds(std::filesystem::file_time_type time)
 {
-    bridge::Array a{ctx};
-    for(auto const &[k, m]: mount)
-    {
-        bridge::Object o{ctx};
-        o.set("path", bridge::String(ctx, k));
-        o.set("flag", bridge::String(ctx, std::string_view{m.flag == Mount::RW ? "rw" : "ro"}));
-        a.append(o);
-    }
-    return a;
+    auto const system_time =
+        time - std::filesystem::file_time_type::clock::now() +
+        std::chrono::system_clock::now();
+
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        system_time.time_since_epoch()
+    ).count();
 }
 
-class FileSystemException : public bridge::Exception<FileSystemException>
+class FileSystemError : public bridge::Exception<FileSystemError>
 {
     std::error_code ec;
 public:
-    FileSystemException(std::error_code &&ec): ec{ec} {}
+    FileSystemError(std::error_code &&ec): ec{ec} {}
     void populate(JSContext *ctx, bridge::Object &obj) const
     {
         obj.set("code", bridge::Number(ctx, ec.value()));
@@ -112,6 +111,65 @@ protected:
 private:
     std::ifstream stream;
     std::string const mime;
+    std::vector<std::uint8_t> data;
+};
+
+template<>
+class Read<std::tuple<std::vector<std::uint8_t>, std::string, std::int64_t>> : public notojs::Task
+{
+public:
+    Read(std::ifstream &&stream, std::string &&name, std::int64_t &&time)
+    : stream{std::move(stream)}, name{std::move(name)}, time{std::move(time)} {}
+
+protected:
+    Step step() override
+    {
+        stream.read(&buffer[0], sizeof(buffer));
+        data.insert(data.end(),
+            reinterpret_cast<std::uint8_t const *>(&buffer[0]),
+            reinterpret_cast<std::uint8_t const *>(&buffer[stream.gcount()]));
+        return stream ? Again : (stream.close(), Finish);
+    }
+
+    Then then(JSContext *ctx, JSValue &v) override
+    {
+        return (v = facade::File::make(ctx, std::move(data), name, time)), Resolve;
+    }
+
+private:
+    std::ifstream stream;
+    std::string const name;
+    std::int64_t const time;
+    std::vector<std::uint8_t> data;
+};
+
+template<>
+class Read<std::tuple<std::vector<std::uint8_t>, std::string, std::int64_t, std::string>> : public notojs::Task
+{
+public:
+    Read(std::ifstream &&stream, std::string &&name, std::int64_t &&time, std::string &&type)
+    : stream{std::move(stream)}, name{std::move(name)}, time{std::move(time)}, type{std::move(type)} {}
+
+protected:
+    Step step() override
+    {
+        stream.read(&buffer[0], sizeof(buffer));
+        data.insert(data.end(),
+            reinterpret_cast<std::uint8_t const *>(&buffer[0]),
+            reinterpret_cast<std::uint8_t const *>(&buffer[stream.gcount()]));
+        return stream ? Again : (stream.close(), Finish);
+    }
+
+    Then then(JSContext *ctx, JSValue &v) override
+    {
+        return (v = facade::File::make(ctx, std::move(data), name, time, type)), Resolve;
+    }
+
+private:
+    std::ifstream stream;
+    std::string const name;
+    std::int64_t const time;
+    std::string const type;
     std::vector<std::uint8_t> data;
 };
 
@@ -255,9 +313,9 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         if(std::filesystem::is_regular_file(path, ec))
             return std::make_shared<Read<std::vector<std::uint8_t>>>(std::ifstream(path, std::ios_base::in | std::ios_base::binary))->run(ctx);
         else if(ec)
-            return FileSystemException::throw_(ctx, std::move(ec));
+            return FileSystemError::throw_(ctx, std::move(ec));
         else
-            return FileSystemException::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+            return FileSystemError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
     }
 
     JSValue blob_1(JSContext *ctx, bridge::String mime)
@@ -268,12 +326,48 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         if(std::filesystem::is_regular_file(path, ec))
             return std::make_shared<Read<std::pair<std::vector<std::uint8_t>, std::string>>>(std::ifstream(path, std::ios_base::in | std::ios_base::binary), mime)->run(ctx);
         else if(ec)
-            return FileSystemException::throw_(ctx, std::move(ec));
+            return FileSystemError::throw_(ctx, std::move(ec));
         else
-            return FileSystemException::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+            return FileSystemError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
     }
 
     using blob = bridge::Function<&Path::blob_0, &Path::blob_1>;
+
+    JSValue file_0(JSContext *ctx)
+    {
+        auto [path, _] = Absolute::normalize<Mount>(ref());
+
+        std::error_code ec;
+        std::filesystem::file_time_type time;
+        if(std::filesystem::is_regular_file(path, ec) && (time = std::filesystem::last_write_time(path, ec), !ec))
+            return std::make_shared<Read<std::tuple<std::vector<std::uint8_t>, std::string, std::int64_t>>>(
+                std::ifstream(path, std::ios_base::in | std::ios_base::binary), path.filename().string(),
+                unix_epoch_milliseconds(time)
+            )->run(ctx);
+        else if(ec)
+            return FileSystemError::throw_(ctx, std::move(ec));
+        else
+            return FileSystemError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+    }
+
+    JSValue file_1(JSContext *ctx, bridge::String mime)
+    {
+        auto [path, _] = Absolute::normalize<Mount>(ref());
+
+        std::error_code ec;
+        std::filesystem::file_time_type time;
+        if(std::filesystem::is_regular_file(path, ec) && (time = std::filesystem::last_write_time(path, ec), !ec))
+            return std::make_shared<Read<std::tuple<std::vector<std::uint8_t>, std::string, std::int64_t, std::string>>>(
+                std::ifstream(path, std::ios_base::in | std::ios_base::binary), path.filename().string(),
+                unix_epoch_milliseconds(time), mime
+            )->run(ctx);
+        else if(ec)
+            return FileSystemError::throw_(ctx, std::move(ec));
+        else
+            return FileSystemError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+    }
+
+    using file = bridge::Function<&Path::file_0, &Path::file_1>;
 
     using Check = bool(std::filesystem::path const &, std::error_code&) noexcept;
 
@@ -283,7 +377,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         std::error_code ec;
         auto [path, _] = Absolute::normalize<Mount>(ref());
         if (bool b = fn(path, ec); ec)
-            return FileSystemException::throw_(ctx, std::move(ec));
+            return FileSystemError::throw_(ctx, std::move(ec));
         else return b ? JS_TRUE : JS_FALSE;
     }
 
@@ -302,8 +396,8 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         auto [path, _] = Absolute::normalize<Mount>(ref());
         auto [that, g] = Absolute::normalize<Mount>(other.ref());
 
-        if (!(g & Mount::RW)) return FileSystemException::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
-        if (std::filesystem::copy(path, that, opts, ec); ec) return FileSystemException::throw_(ctx, std::move(ec));
+        if (!(g & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if (std::filesystem::copy(path, that, opts, ec); ec) return FileSystemError::throw_(ctx, std::move(ec));
 
         return JS_UNDEFINED;
     }
@@ -339,9 +433,9 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         if(std::filesystem::is_regular_file(path, ec))
             return std::make_shared<Read<bridge::Object>>(std::ifstream(path, std::ios_base::in | std::ios_base::binary))->run(ctx);
         else if(ec)
-            return FileSystemException::throw_(ctx, std::move(ec));
+            return FileSystemError::throw_(ctx, std::move(ec));
         else
-            return FileSystemException::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+            return FileSystemError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
     }
 
     JSValue move(JSContext *ctx, Path other) const
@@ -350,9 +444,9 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         auto [path, f] = Absolute::normalize<Mount>(ref());
         auto [that, g] = Absolute::normalize<Mount>(other.ref());
 
-        if (!(g & Mount::RW)) return FileSystemException::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
-        if (!(f & Mount::RW)) return FileSystemException::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
-        if (std::filesystem::rename(path, that, ec); ec) return FileSystemException::throw_(ctx, std::move(ec));
+        if (!(g & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if (!(f & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if (std::filesystem::rename(path, that, ec); ec) return FileSystemError::throw_(ctx, std::move(ec));
 
         return JS_UNDEFINED;
     }
@@ -369,10 +463,10 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
     {
         std::error_code ec;
         auto [path, flag] = Absolute::normalize<Mount>(ref());
-        if (!(flag & Mount::RW)) return FileSystemException::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if (!(flag & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
         if (auto result = std::filesystem::create_directory(path, ec); ec)
-            return FileSystemException::throw_(ctx, std::move(ec));
+            return FileSystemError::throw_(ctx, std::move(ec));
         else return result ? JS_TRUE : JS_FALSE;
     }
 
@@ -382,10 +476,10 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         {
             std::error_code ec;
             auto [path, flag] = Absolute::normalize<Mount>(ref());
-            if (!(flag & Mount::RW)) return FileSystemException::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+            if (!(flag & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
             if (auto result = std::filesystem::create_directories(path, ec); ec)
-                return FileSystemException::throw_(ctx, std::move(ec));
+                return FileSystemError::throw_(ctx, std::move(ec));
             else return result ? JS_TRUE : JS_FALSE;
         }
         return mkdir_0(ctx);
@@ -418,16 +512,16 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         if(std::filesystem::is_regular_file(path, ec))
             return std::make_shared<Read<std::string>>(std::ifstream(path, std::ios_base::in | std::ios_base::binary))->run(ctx);
         else if(ec)
-            return FileSystemException::throw_(ctx, std::move(ec));
+            return FileSystemError::throw_(ctx, std::move(ec));
         else
-            return FileSystemException::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+            return FileSystemError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
     }
 
     JSValue relative(JSContext *ctx, Path path)
     {
         std::error_code ec;
         if(auto const p = std::filesystem::relative(ref(), path.ref(), ec); ec)
-            return FileSystemException::throw_(ctx, std::move(ec));
+            return FileSystemError::throw_(ctx, std::move(ec));
         else return bridge::String(ctx, p.u8string());
     }
 
@@ -436,10 +530,10 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         std::error_code ec;
         auto [path, flag] = Absolute::normalize<Mount>(ref());
 
-        if (!(flag & Mount::RW)) return FileSystemException::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if (!(flag & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
         if (std::filesystem::remove(path, ec); ec)
-            return FileSystemException::throw_(ctx, std::move(ec));
+            return FileSystemError::throw_(ctx, std::move(ec));
         else return JS_UNDEFINED;
     }
 
@@ -450,10 +544,10 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
             std::error_code ec;
             auto [path, flag] = Absolute::normalize<Mount>(ref());
 
-            if (!(flag & Mount::RW)) return FileSystemException::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+            if (!(flag & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
             if (auto count = std::filesystem::remove_all(path, ec); ec)
-                return FileSystemException::throw_(ctx, std::move(ec));
+                return FileSystemError::throw_(ctx, std::move(ec));
             else return bridge::Number{ctx, static_cast<std::int64_t>(count)};
         }
         return remove_0(ctx);
@@ -470,7 +564,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         std::error_code ec;
         auto [path, _] = Absolute::normalize<Mount>(ref());
         if (auto s = std::filesystem::file_size(path, ec); ec)
-            return FileSystemException::throw_(ctx, std::move(ec));
+            return FileSystemError::throw_(ctx, std::move(ec));
         else return bridge::Number(ctx, static_cast<std::int64_t>(s));
     }
 
@@ -479,7 +573,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         std::error_code ec;
         auto [path, _] = Absolute::normalize<Mount>(ref());
         if(auto it = std::filesystem::directory_iterator(path, ec); ec)
-            return FileSystemException::throw_(ctx, std::move(ec));
+            return FileSystemError::throw_(ctx, std::move(ec));
         else return bridge::Iterator<Iterator>::make(ctx, self, Iterator(std::move(it), ref()), Iterator());
     }
 
@@ -498,14 +592,14 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         auto [path, flag] = Absolute::normalize<Mount>(ref());
 
         if(!(flag & Mount::RW))
-            return FileSystemException::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+            return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
         if(!std::filesystem::exists(path) || std::filesystem::is_regular_file(path, ec))
             return writer(ctx, std::ofstream(path, mode), std::move(data));
         else if(ec)
-            return FileSystemException::throw_(ctx, std::move(ec));
+            return FileSystemError::throw_(ctx, std::move(ec));
         else
-            return FileSystemException::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+            return FileSystemError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
     }
 
     struct WriteOptions : bridge::Struct<WriteOptions>
@@ -554,14 +648,14 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
 template<>
 JSValue Path::writer<bridge::String>(JSContext *ctx, std::ofstream &&stream, bridge::String &&data)
 {
-    if(!stream.is_open()) return FileSystemException::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+    if(!stream.is_open()) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
     return std::make_shared<Write<std::string>>(std::move(stream), std::move(data))->run(ctx);
 }
 
 template<>
 JSValue Path::writer<notojs::IBlob::Impl>(JSContext *ctx, std::ofstream &&stream, notojs::IBlob::Impl &&data)
 {
-    if(!stream.is_open()) return FileSystemException::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+    if(!stream.is_open()) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
     return std::make_shared<Write<std::shared_ptr<std::vector<uint8_t>>>>(std::move(stream), data->copy())->run(ctx);
 }
 
@@ -583,6 +677,7 @@ JSCFunctionListEntry const Path::funcs[] = {
     JS_CFUNC_DEF("[Symbol.iterator]", 0, &bridge::Function<&Path::sym>::invoke),
     JS_CFUNC_DEF("append", 1, &bridge::Function<&Path::append>::invoke),
     JS_CFUNC_DEF("blob", 0, &Path::blob::invoke),
+    JS_CFUNC_DEF("file", 0, &Path::file::invoke),
     JS_CFUNC_DEF("copy", 0, &Path::copy::invoke),
     JS_CFUNC_DEF("json", 0, &bridge::Function<&Path::json>::invoke),
     JS_CFUNC_DEF("mkdir", 1, &Path::mkdir::invoke),
@@ -600,13 +695,23 @@ JSValue path(JSContext *ctx, Path::Absolute p)
 }
 
 JSCFunctionListEntry func[] = {
-    JS_CFUNC_DEF("mounts", 1, bridge::Function<mounts>::invoke),
     JS_CFUNC_DEF("path", 0, bridge::Function<path>::invoke),
 };
 
 int init(JSContext *ctx, JSModuleDef *m)
 {
-    fs::init(ctx);
+    FileSystemError::init(ctx, m);
+    Path::init(ctx, m);
+
+    bridge::Array mounts{ctx};
+    for(auto const &[k, m]: mount)
+    {
+        bridge::Object o{ctx};
+        o.set("path", bridge::String(ctx, k));
+        o.set("flag", bridge::String(ctx, std::string_view{m.flag == Mount::RW ? "rw" : "ro"}));
+        mounts.append(o);
+    }
+    JS_SetModuleExport(ctx, m, "mounts", mounts);
     return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
 }
 
@@ -614,17 +719,19 @@ int init(JSContext *ctx, JSModuleDef *m)
 
 void notojs_init_fs()
 {
+    FileSystemError::init();
     Path::init();
 }
 
 void notojs_init_fs(JSRuntime *rt)
 {
+    FileSystemError::init(rt);
     Path::init(rt);
 }
 
-void notojs_init_fs(boost::property_tree::ptree const &pt)
+void notojs_init_fs(detail::Config const &cfg)
 {
-    if(auto config = pt.get_child_optional("module:fs"))
+    if(auto config = cfg.get_child_optional("module:fs"))
     {
         for(auto const &[k, v]: *config) if(!k.empty() && k[0] == '/')
         {
@@ -647,15 +754,10 @@ JSModuleDef *notojs_init_fs(JSContext *ctx, const char *name)
     JSModuleDef *mod = JS_NewCModule(ctx, name, init);
     if(!mod) return NULL;
 
+    JS_AddModuleExport(ctx, mod, FileSystemError::name());
     JS_AddModuleExportList(ctx, mod, func, sizeof(func)/sizeof(func[0]));
+    JS_AddModuleExport(ctx, mod, "mounts");
     return mod;
-}
-
-void fs::init(JSContext *ctx)
-{
-    auto p = JS_GetClassProto(ctx, Path::cid);
-    if(JS_IsNull(p)) Path::init(ctx);
-    JS_FreeValue(ctx, p);
 }
 
 JSValue fs::IPath::Static::make(JSContext *ctx, std::filesystem::path &&p)

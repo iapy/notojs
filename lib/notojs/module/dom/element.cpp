@@ -20,8 +20,13 @@ std::uint64_t Element::attributesCount() const
 
 void Element::clear()
 {
+    auto *backend = dynamic_cast<XMLBackend *>(doc.get());
     pugi::xml_node nn{*this};
-    while(nn.first_child()) nn.root().append_move(nn.first_child());
+    while(nn.first_child())
+    {
+        auto detached = backend->doc.append_move(nn.first_child());
+        backend->mark_detached(detached);
+    }
 }
 
 std::optional<std::string_view> Element::lookupNS(uintptr_t) const
@@ -50,8 +55,12 @@ bool Element::toggleAttribute(Attr::Name::View const &a)
 
 bool Element::toggleAttribute(Attr::Name::View const &a, bool force)
 {
-    if(force) return setAttribute(a, ""), true;
-    else return removeAttribute(a), false;
+    if(force)
+    {
+        if(!hasAttribute(a)) setAttribute(a, "");
+        return true;
+    }
+    return removeAttribute(a), false;
 }
 
 std::optional<std::string_view> Element::getAttribute(Attr::Name::View const &a) const

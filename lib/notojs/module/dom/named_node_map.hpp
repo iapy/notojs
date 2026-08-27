@@ -19,6 +19,11 @@ struct NamedNodeMap : protected Element
     using Element::removeAttribute;
     using Element::setAttribute;
 
+    BOOST_FORCEINLINE Element &base()
+    {
+        return *this;
+    }
+
     virtual JSValue ownerElement()
     {
         return dynamic_cast<XMLBackend*>(doc.get())->make(static_cast<pugi::xml_node_struct *>(node));

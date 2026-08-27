@@ -1,7 +1,7 @@
 #pragma once
-#include <boost/property_tree/ptree.hpp>
-
+#include <notojs/detail/config.hpp>
 #include <notojs/detail/jscode.hpp>
+
 #include <boost/beast.hpp>
 #include <boost/asio.hpp>
 #include <nanodi.hpp>
@@ -69,8 +69,9 @@ public:
     };
 
     BOOST_FORCEINLINE MDB_env *env() { return env_; }
+    BOOST_FORCEINLINE std::filesystem::path env(std::filesystem::path const &p) { return path / ".db" / p; };
 private:
-    void configure(boost::property_tree::ptree const &);
+    void configure(detail::Config const &);
     friend class Config;
     friend class DB;
 

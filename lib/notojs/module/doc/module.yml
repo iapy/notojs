@@ -1,16 +1,12 @@
 interface: noto::fs::Path
 docs: noto::fs::Path
 text: |-
-  Represents a *pointer* to JavaScript `Path` object owned by the host runtime.
+  Pointer-like facade for a host-owned JavaScript `Path`.
 
   ```c++
-  JSValue copy(JSContext *ctx, noto::fs::Path path) {
-    auto [path, writable] = path->native();
-    try {
-      return noto::fs::Path::make(ctx, noto::fs::Path::n2v(path));
-    } catch(std:::runtime_error const &) {
-      return NULL;
-    }
+  JSValue copy(JSContext *ctx, noto::fs::Path source) {
+    auto [native, writable] = source->native();
+    return noto::fs::Path::make(ctx, noto::fs::Path::n2v(native));
   }
   ```
 also:
@@ -23,7 +19,7 @@ methods:
           []
     docs: noto::fs::Path.native
     text: |-
-      Returns a pair representing the native filesystem path and a boolean indicating whether the path is writable.
+      Returns the native path and whether it is writable.
 statics:
   make:
     sign:
@@ -33,8 +29,7 @@ statics:
           - "std::filesystem::path &&"
     docs: noto::fs::Path.make
     text: |-
-      Creates an returns an instance of `noto::fs.Path` from an absolute *virtual* filesystem path.
-      Returns a thrown JavaScript exception if the path is not mounted.
+      Creates a JavaScript `Path` from an absolute virtual path, or returns a JavaScript exception if it is invalid or unmounted.
   n2v:
     sign:
       - type: std::filesystem::path
@@ -42,8 +37,7 @@ statics:
           - "const std::filesystem::path &"
     docs: noto::fs::Path.n2v
     text: |-
-      Converts a native filesystem path to the corresponding mounted virtual **NotoJS** path.
-      Throws `std::runtime_error` if `path` is not absolute or cannot be mapped.
+      Converts an absolute native path to its mounted virtual path. Throws `std::runtime_error` if it cannot be mapped.
   v2n:
     sign:
       - type: std::filesystem::path
@@ -51,8 +45,7 @@ statics:
           - "const std::filesystem::path &"
     docs: noto::fs::Path.v2n
     text: |-
-      Converts a mounted virtual **NotoJS** path to a native filesystem path.
-      Throws `std::runtime_error` if `path` is not absolute or cannot be mapped.
+      Converts an absolute virtual path to its native path. Throws `std::runtime_error` if it cannot be mapped.
 ---
 function: noto::core::html
 sign:
@@ -62,13 +55,7 @@ sign:
       - "const std::string &"
 docs: noto::core::html
 text: |-
-  Creates a printable `HTML` object from string source.
-
-  ```c++
-  JSValue hello(JSContext *ctx) {
-    return noto::core::html(ctx, "<h1>Hello</h1>");
-  }
-  ```
+  Creates a printable `HTML` object from source text.
 also:
   - HTML
 ---
@@ -86,17 +73,7 @@ sign:
       - "const std::string &"
 docs: noto::core::image
 text: |-
-  Creates a printable `Image` object from url or binary data.
-
-  ```c++
-  JSValue logo(JSContext *ctx) {
-    if(auto url = noto::URL::parse(
-        'https://github.com/iapy/notojs/blob/main/lib/notojs/bundle/logo.png?raw=true'
-    ))
-        return noto::core::image(ctx, *url);
-    return JS_NULL;
-  }
-  ```
+  Creates a printable `Image` object from a URL or binary data.
 also:
   - Image
 ---
@@ -108,13 +85,7 @@ sign:
       - "const std::string &"
 docs: noto::core::markdown
 text: |-
-  Creates a printable `Markdown` object from string source.
-
-  ```c++
-  JSValue hello(JSContext *ctx) {
-    return noto::core::markdown(ctx, "# Hello");
-  }
-  ```
+  Creates a printable `Markdown` object from source text.
 also:
   - Markdown
 ---
@@ -126,13 +97,7 @@ sign:
       - "const std::string &"
 docs: noto::core::svg
 text: |-
-  Creates a printable `SVG` object from string source.
-
-  ```c++
-  JSValue svg(JSContext *ctx) {
-    return noto::core::svg(ctx, "<svg></svg>");
-  }
-  ```
+  Creates a printable `SVG` object from source text.
 also:
   - SVG
 ---
@@ -144,22 +109,6 @@ sign:
       - "const std::string &"
 docs: noto::core::xml
 text: |-
-  Creates a printable `XML` object from string source.
-
-  ```c++
-  JSValue data(JSContext *ctx) {
-    return noto::core::xml(ctx, "<root/>");
-  }
-  ```
+  Creates a printable `XML` object from source text.
 also:
   - XML
----
-function: noto::fs::init
-sign:
-  - type: void
-    args:
-      - JSContext *
-text: |-
-  Initializes the current native module with access to the `noto:fs` module.
-
-  > Call this from the native module's `int init(JSContext *, JSModuleDef *)` function before using functions or interfaces declared in the `noto::fs` namespace.{.warning}

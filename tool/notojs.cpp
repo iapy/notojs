@@ -420,6 +420,23 @@ void Module::dump(std::optional<std::filesystem::path> &&file)
     }
 }
 
+static clang::TemplateSpecializationType const *tail_base(clang::CXXRecordDecl const *type)
+{
+    if(auto const *definition = type->getDefinition()) type = definition;
+
+    for(auto const &base: type->bases())
+    {
+        if(auto const *tail = base.getType()->getAs<clang::TemplateSpecializationType>())
+            if(auto const *decl = base.getType()->getAsCXXRecordDecl(); decl
+                && "bridge::Tail" == decl->getQualifiedNameAsString())
+                return tail;
+
+        if(auto const *decl = base.getType()->getAsCXXRecordDecl())
+            if(auto const *tail = tail_base(decl)) return tail;
+    }
+    return nullptr;
+}
+
 std::shared_ptr<Type> Module::make(clang::QualType const &type, clang::ASTContext &ctx)
 {
     if(auto const *d = type->getAsCXXRecordDecl())
@@ -448,6 +465,30 @@ std::shared_ptr<Type> Module::make(clang::QualType const &type, clang::ASTContex
             ptr->name = Type::canonical_name(d->getQualifiedNameAsString());
             if(std::end(args) - it != det->args.size())
                 for(;it != std::end(args); ++it)
+                    det->args.push_back(make(it->getAsType(), ctx));
+            return ptr;
+        }
+        else if(auto const *base = tail_base(d))
+        {
+            auto [ptr, det] = make<Tail>(type.getAsString());
+            ptr->name = "Tail";
+
+            auto args = base->template_arguments();
+            auto it = std::begin(args);
+            if(it != std::end(args))
+            {
+                if(clang::TemplateArgument::Integral == it->getKind())
+                    det->min = (it++)->getAsIntegral().getSExtValue();
+                else if(clang::TemplateArgument::Expression == it->getKind())
+                {
+                    if(clang::Expr::EvalResult result; it->getAsExpr()->EvaluateAsInt(result, ctx))
+                        det->min = result.Val.getInt().getSExtValue();
+                    ++it;
+                }
+            }
+
+            if(std::end(args) - it != det->args.size())
+                for(; it != std::end(args); ++it)
                     det->args.push_back(make(it->getAsType(), ctx));
             return ptr;
         }

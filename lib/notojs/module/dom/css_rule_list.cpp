@@ -1,41 +1,36 @@
 #include <notojs/module/dom/css_rule_list.hpp>
-#include <iostream>
 
 namespace notojs::dom {
 
 std::int64_t CSSRuleList::length(CSSStyleSheet &sheet) const
 {
-    sheet.update();
-    std::int64_t result{0};
-    for(auto *list = sheet.sst->root; list; list = list->next)
-    {
-        if(LXB_CSS_RULE_LIST != list->type) continue;
-        for(auto *rule = lxb_css_rule_list(list)->first; rule; rule = rule->next)
-            ++result;
-    }
-    return result;
+    if(!sheet.update()) return 0;
+    return sheet.state->ruleCount();
 }
 
-std::optional<std::pair<std::string, std::uint16_t>> CSSRuleList::item(CSSStyleSheet &sheet, std::int64_t index) const
+std::optional<CSSRule> CSSRuleList::item(CSSStyleSheet &sheet, std::int64_t index) const
 {
-    sheet.update();
-    std::optional<std::pair<std::string, std::uint16_t>> result;
-    for(auto *list = sheet.sst->root; list; list = list->next)
-    {
-        if(LXB_CSS_RULE_LIST != list->type) continue;
+    if(index < 0 || !sheet.update()) return std::nullopt;
 
-        for(auto *rule = lxb_css_rule_list(list)->first; rule; rule = rule->next)
-        if(!index--)
-        {
-            lxb_css_rule_serialize(rule, [](lxb_char_t const *data, size_t len, void *ctx) -> lxb_status_t {
-                static_cast<std::string*>(ctx)->append(reinterpret_cast<const char*>(data), len);
-                return LXB_STATUS_OK;
-            }, &result.emplace().first);
-            result->second = rule->type;
-            break;
-        }
-    }
-    return result;
+    auto id = sheet.state->ruleId(index);
+    auto *rule = sheet.state->rule(index);
+    if(!id || !rule) return std::nullopt;
+
+    std::string text;
+    if(LXB_STATUS_OK != lxb_css_rule_serialize(rule,
+        [](lxb_char_t const *data, size_t len, void *ctx) -> lxb_status_t {
+            static_cast<std::string*>(ctx)->append(reinterpret_cast<const char*>(data), len);
+            return LXB_STATUS_OK;
+        }, &text))
+        return std::nullopt;
+
+    return CSSRule{sheet, *id, std::move(text), *rule};
+}
+
+void CSSRuleList::free()
+{
+    auto *doc = dynamic_cast<dom::HTMLBackend *>(this->doc.get());
+    doc->cssrules.erase(*this);
 }
 
 } // namespace notojs::dom

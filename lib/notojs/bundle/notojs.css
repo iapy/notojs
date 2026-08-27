@@ -267,11 +267,10 @@ div.nj-block code {
 td.nj-stacked {
     min-width: unset;
 }
-
-div.nj-block li:not(.nj-see-also) {
+div.nj-block li:not(.nj-doc-reference) {
     margin: 0.2rem 0 0.2rem;
 }
-div.nj-block li.nj-see-also::after {
+div.nj-block li.nj-doc-reference::after {
     content: "play_circle";
     font-family: "Material Symbols Outlined";
     vertical-align: middle;
@@ -282,17 +281,26 @@ div.nj-block li.nj-see-also::after {
 div.nj-block pre code.hljs :where(.hljs-comment, .hljs-quote) {
     color: #a50;
 }
-div.nj-block pre code.hljs :where(.class_, .constant_, .language_) {
+div.nj-block pre code.hljs :where(.hljs-title, .hljs-attr, .hljs-attribute, .class_, .constant_, .language_) {
     color: #00f;
 }
-div.nj-block pre code.hljs :where(.hljs-keyword) {
+div.nj-block pre code.hljs :where(.hljs-type, .hljs-built_in) {
+    color: #30a;
+}
+div.nj-block pre code.hljs :where(.hljs-keyword, .hljs-section) {
     color: #708;
 }
-div.nj-block pre code.hljs .hljs-number {
+div.nj-block pre code.hljs :where(.hljs-number, .hljs-literal, .hljs-symbol, .hljs-name) {
     color: #164;
 }
-div.nj-block pre code.hljs .hljs-string {
+div.nj-block pre code.hljs :where(.hljs-string, .hljs-regexp) {
     color: #a11;
+}
+div.nj-block pre code.hljs :where(.hljs-variable, .hljs-template-variable) {
+    color: #05a;
+}
+div.nj-block pre code.hljs .hljs-meta {
+    color: #555;
 }
 
 div.nj-block pre + div.nj-run-code {

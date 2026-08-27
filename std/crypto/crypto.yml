@@ -1,0 +1,230 @@
+text: |-
+  `noto:crypto` provides cryptographic hashing, HMAC, secure random generation,
+  UUID generation, hexadecimal conversion, and encrypted persistent storage.
+
+  The implementation uses **OpenSSL** for cryptographic operations.
+
+  ###### Exports
+  - `class Storage`
+  - `function hash`
+  - `function hex`
+  - `function hmac`
+  - `function md5`
+  - `function random`
+  - `function sha1`
+  - `function sha224`
+  - `function sha256`
+  - `function sha384`
+  - `function sha512`
+  - `function unhex`
+  - `function uuid`
+also:
+  - topic:lmdb
+---
+class: Storage
+docs: Storage
+text: |-
+  Encrypted string key–value storage backed by **LMDB**.
+
+  Values are encrypted using AES-256-GCM before they are written. The storage namespace
+  and item key are authenticated with each value, preventing encrypted values from being
+  moved between namespaces or keys without detection.
+
+  This class stores strings. Use `JSON.stringify` and `JSON.parse` when storing structured values.
+ctor:
+  args:
+    -
+      - String
+  docs: Storage.constructor
+  text: |-
+    Constructs a `Storage` instance using `arg0` as its namespace.
+
+    Each namespace uses a separate **LMDB** database and is isolated from other `Storage` instances.
+properties:
+  length:
+    getter: true
+    docs: Storage.length
+    text: |-
+      Returns the number of items in this storage namespace.
+methods:
+  clear:
+    args:
+      -
+        []
+    docs: Storage.clear
+    text: |-
+      Removes every item from this storage namespace by dropping its underlying **LMDB** database.
+  getItem:
+    args:
+      -
+        - String
+    docs: Storage.getItem
+    text: |-
+      Returns the decrypted string stored under key `arg0`, or `null` if the key does not exist.
+
+      Throws an error if the encryption key cannot be loaded or the stored value cannot be authenticated.
+  key:
+    args:
+      -
+        - Number
+    docs: Storage.key
+    text: |-
+      Returns the key at zero-based index `arg0`, or `null` if the index is negative or outside the storage range.
+
+      Keys follow the underlying **LMDB** database order and should not be treated as insertion order.
+  removeItem:
+    args:
+      -
+        - String
+    docs: Storage.removeItem
+    text: |-
+      Removes the item stored under key `arg0`. Does nothing if the key does not exist.
+  setItem:
+    args:
+      -
+        - String
+        - String
+    docs: Storage.setItem
+    text: |-
+      Encrypts `arg1` and stores it under key `arg0`, replacing any existing value for that key.
+
+      Throws an error if the encryption key cannot be loaded or the value cannot be encrypted.
+---
+function: hash
+args:
+  -
+    - Function
+    - ArrayBuffer
+  -
+    - String
+    - ArrayBuffer
+docs: hash
+text: |-
+  Computes a cryptographic digest of the bytes in `arg1` and returns it as a new `ArrayBuffer`.
+
+  `arg0` may be an exported digest function, such as `sha256`, or one of these lowercase
+  algorithm names: `md5`, `sha1`, `sha224`, `sha256`, `sha384`, or `sha512`.
+
+  Throws an error if the algorithm is unsupported or hashing fails.
+---
+function: hex
+args:
+  -
+    - ArrayBuffer
+docs: hex
+text: |-
+  Encodes the bytes in `arg0` as a lowercase hexadecimal `String`.
+
+  Each input byte produces exactly two hexadecimal characters.
+---
+function: hmac
+args:
+  -
+    - Function
+    - ArrayBuffer
+    - ArrayBuffer
+  -
+    - String
+    - ArrayBuffer
+    - ArrayBuffer
+docs: hmac
+text: |-
+  Computes an HMAC and returns it as a new `ArrayBuffer`.
+
+  - `arg0` — an exported digest function, such as `sha256`, or a lowercase algorithm name
+  - `arg1` — key bytes
+  - `arg2` — message bytes
+
+  Supported names are `md5`, `sha1`, `sha224`, `sha256`, `sha384`, and `sha512`.
+  Throws an error if the algorithm is unsupported or HMAC generation fails.
+---
+function: md5
+args:
+  -
+    - ArrayBuffer
+docs: md5
+text: |-
+  Returns the 16-byte MD5 digest of `arg0` as a new `ArrayBuffer`.
+
+  > MD5 is cryptographically broken and must not be used for security-sensitive purposes.{.warning}
+---
+function: random
+args:
+  -
+    - Number
+  -
+    - Any
+docs: random
+text: |-
+  Generates cryptographically secure random bytes using **OpenSSL**.
+
+  When `arg0` is a `Number`, returns a new `ArrayBuffer` containing that many random bytes.
+  The byte count must be non-negative and no greater than the platform `INT_MAX` value.
+
+  When `arg0` is a typed array, fills its byte range in place and returns the same typed array.
+  Throws an error if random generation fails or the argument is invalid.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues
+---
+function: sha1
+args:
+  -
+    - ArrayBuffer
+docs: sha1
+text: |-
+  Returns the 20-byte SHA-1 digest of `arg0` as a new `ArrayBuffer`.
+
+  > SHA-1 is not collision-resistant and should not be used for new security-sensitive applications.{.warning}
+---
+function: sha224
+args:
+  -
+    - ArrayBuffer
+docs: sha224
+text: |-
+  Returns the 28-byte SHA-224 digest of `arg0` as a new `ArrayBuffer`.
+---
+function: sha256
+args:
+  -
+    - ArrayBuffer
+docs: sha256
+text: |-
+  Returns the 32-byte SHA-256 digest of `arg0` as a new `ArrayBuffer`.
+---
+function: sha384
+args:
+  -
+    - ArrayBuffer
+docs: sha384
+text: |-
+  Returns the 48-byte SHA-384 digest of `arg0` as a new `ArrayBuffer`.
+---
+function: sha512
+args:
+  -
+    - ArrayBuffer
+docs: sha512
+text: |-
+  Returns the 64-byte SHA-512 digest of `arg0` as a new `ArrayBuffer`.
+---
+function: unhex
+args:
+  -
+    - String
+docs: unhex
+text: |-
+  Decodes hexadecimal string `arg0` and returns its bytes as a new `ArrayBuffer`.
+
+  Both uppercase and lowercase hexadecimal characters are accepted. Throws `RangeError`
+  if the string has an odd length or contains a non-hexadecimal character.
+---
+function: uuid
+args:
+  -
+    []
+docs: uuid
+text: |-
+  Returns a cryptographically random RFC 4122 version 4 UUID string.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID

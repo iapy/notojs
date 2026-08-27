@@ -1,5 +1,66 @@
 struct Attr : bridge::Interface<Attr, dom::Attr, Node>
 {
+    struct Name : bridge::String
+    {
+        using bridge::String::String;
+
+        struct String
+        {
+            BOOST_FORCEINLINE String(std::string &&value)
+            : value{std::move(value)} {}
+
+            BOOST_FORCEINLINE String(std::string_view const &value)
+            : value{std::move(value)} {}
+
+            BOOST_FORCEINLINE operator std::string_view () const
+            {
+                if(std::holds_alternative<std::string>(value))
+                {
+                    auto const &s = std::get<std::string>(value);
+                    return std::string_view{s.c_str(), s.size()};
+                }
+                return std::get<std::string_view>(value);
+            }
+
+            BOOST_FORCEINLINE operator std::string() const
+            {
+                if(std::holds_alternative<std::string_view>(value))
+                {
+                    auto const &s = std::get<std::string_view>(value);
+                    return std::string{s.data(), s.size()};
+                }
+                return std::get<std::string>(value);
+            }
+
+        private:
+            std::variant<std::string, std::string_view> value;
+        };
+
+        String const &get(dom::Element const &e)
+        {
+            if(!name)
+            {
+                auto const &sv =  static_cast<std::string_view const &>(*this);
+                if(dynamic_cast<dom::HTMLBackend*>(e.doc.get()))
+                {
+                    if(auto node = static_cast<lxb_dom_node_t *>(static_cast<dom::HTMLElement const &>(e));
+                        LXB_NS_HTML == node->ns)
+                    {
+                        std::string n{sv};
+                        std::transform(std::begin(n), std::end(n), std::begin(n), [](char c){
+                            return std::tolower(c);
+                        });
+                        name = std::move(n);
+                    }
+                }
+                if(!name) name = sv;
+            }
+            return *name;
+        }
+    private:
+        std::optional<String> name;
+    };
+
     Attr(JSContext *ctx, JSValue self) : Base{ctx, self} {}
     Attr(std::reference_wrapper<dom::Node> &&rw) : Base(std::move(rw)) {}
 
@@ -14,17 +75,17 @@ struct Attr : bridge::Interface<Attr, dom::Attr, Node>
     {
         if(!ref().node || !a.ref().node) return bridge::Number{ctx, 1};
         if(ref().node == a.ref().node) return ref().name < a.ref().name
-            ? bridge::Number{ctx, 2} // PRECEEDING
+            ? bridge::Number{ctx, 4} // FOLLOWING
             : a.ref().name < ref().name
-                ? bridge::Number{ctx, 4} // FOLLOWING
+                ? bridge::Number{ctx, 2} // PRECEDING
                 : bridge::Number{ctx, 0};
         return ref().doc->compareDocumentPosition(ref(), a.ref());
     }
 
     JSValue compareDocumentPosition_1(JSContext *ctx, Node n)
     {
-        if(!ref().node || !ref().node) return bridge::Number{ctx, 1};
-        if(ref().node == n.ref().node) return bridge::Number{ctx, 16 | 4}; // CONTAINED_BY
+        if(!ref().node || !n.ref().node) return bridge::Number{ctx, 1};
+        if(ref().node == n.ref().node) return bridge::Number{ctx, 8 | 2}; // CONTAINS | PRECEDING
         return ref().doc->compareDocumentPosition(ref(), n.ref());
     }
 
@@ -108,7 +169,10 @@ struct Attr : bridge::Interface<Attr, dom::Attr, Node>
 
     JSValue isSameNode_1(JSContext *, Attr n) const
     {
-        return ref().node == n.ref().node && ref().name == n.ref().name ? JS_TRUE : JS_FALSE;
+        if(!ref().node || !n.ref().node)
+            return &ref() == &n.ref() ? JS_TRUE : JS_FALSE;
+        return ref().doc == n.ref().doc && ref().node == n.ref().node
+            && ref().name == n.ref().name ? JS_TRUE : JS_FALSE;
     }
 
     JSValue isSameNode_2(JSContext *, Node n) const
@@ -148,11 +212,6 @@ struct Attr : bridge::Interface<Attr, dom::Attr, Node>
 
     JSValue ownerElement(JSContext *) const;
 
-    JSValue throwHierarchyRequestError(JSContext *ctx)
-    {
-        return DOMException::throwHierarchyRequestError(ctx);
-    }
-
     static void free(dom::Attr &self);
 
     using ctor = bridge::Unconstructable<Attr>;
@@ -171,6 +230,7 @@ JSCFunctionListEntry const Attr::funcs[] = {
     JS_CGETSET_DEF("lastChild", &bridge::Getter<&Attr::getNull>, NULL),
     JS_CGETSET_DEF("namespaceURI", &bridge::Getter<&Attr::namespaceURI>, NULL),
     JS_CGETSET_DEF("nextSibling", &bridge::Getter<&Attr::getNull>, NULL),
+    JS_CGETSET_DEF("name", &bridge::Getter<&Attr::nodeName>, NULL),
     JS_CGETSET_DEF("nodeName", &bridge::Getter<&Attr::nodeName>, NULL),
     JS_CGETSET_DEF("nodeType", &bridge::Getter<&Attr::nodeType>, NULL),
     JS_CGETSET_DEF("nodeValue", &bridge::Getter<&Attr::nodeValue>, &bridge::Setter<&Attr::set_nodeValue>),
@@ -182,22 +242,22 @@ JSCFunctionListEntry const Attr::funcs[] = {
     JS_CGETSET_DEF("textContent", &bridge::Getter<&Attr::nodeValue>, &bridge::Setter<&Attr::set_nodeValue>),
     JS_CGETSET_DEF("value", &bridge::Getter<&Attr::nodeValue>, &bridge::Setter<&Attr::set_nodeValue>),
 
-    JS_CFUNC_DEF("appendChild", 1, &bridge::Function<&Attr::throwHierarchyRequestError>::invoke),
+    JS_CFUNC_DEF("appendChild", 1, &Node::throwHierarchyRequestError),
     JS_CFUNC_DEF("cloneNode", 1, &bridge::Function<&Attr::cloneNode>::invoke),
     JS_CFUNC_DEF("contains", 1, &Attr::contains::invoke),
     JS_CFUNC_DEF("compareDocumentPosition", 1, &Attr::compareDocumentPosition::invoke),
     JS_CFUNC_DEF("dispatchEvent", 1, &bridge::Function<&Attr::dispatchEvent>::invoke),
     JS_CFUNC_DEF("getRootNode", 0, &bridge::Function<&Attr::getRootNode>::invoke),
     JS_CFUNC_DEF("hasChildNodes", 0, &bridge::Function<&Attr::hasChildNodes>::invoke),
-    JS_CFUNC_DEF("removeChild", 1, &bridge::Function<&Attr::throwHierarchyRequestError>::invoke),
-    JS_CFUNC_DEF("insertBefore", 2, &bridge::Function<&Attr::throwHierarchyRequestError>::invoke),
+    JS_CFUNC_DEF("removeChild", 1, &Node::throwHierarchyRequestError),
+    JS_CFUNC_DEF("insertBefore", 2, &Node::throwHierarchyRequestError),
     JS_CFUNC_DEF("isDefaultNamespace", 1, &bridge::Function<&Attr::isDefaultNamespace>::invoke),
     JS_CFUNC_DEF("isEqualNode", 1, &Attr::isEqualNode::invoke),
     JS_CFUNC_DEF("isSameNode", 1, &Attr::isSameNode::invoke),
     JS_CFUNC_DEF("lookupNamespaceURI", 1, &bridge::Function<&Node::lookupNamespaceURI>::invoke),
     JS_CFUNC_DEF("lookupPrefix", 1, &bridge::Function<&Node::lookupPrefix>::invoke),
     JS_CFUNC_DEF("normalize", 0, &bridge::Function<&Attr::noop>::invoke),
-    JS_CFUNC_DEF("replaceChild", 1, &bridge::Function<&Attr::throwHierarchyRequestError>::invoke),
+    JS_CFUNC_DEF("replaceChild", 1, &Node::throwHierarchyRequestError),
 
     // Integration interface
     JS_CGETSET_DEF("_document", &bridge::Getter<&Node::_document>, NULL)

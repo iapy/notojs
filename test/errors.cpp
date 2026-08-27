@@ -1,5 +1,4 @@
 #include <bridge.hpp>
-#include <map>
 
 namespace {
 

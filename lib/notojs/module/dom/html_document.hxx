@@ -13,9 +13,68 @@ struct HTMLDocument : bridge::Interface<HTMLDocument, dom::HTMLDocument, Documen
         return ref().body();
     }
 
+    template<bool lower>
+    JSValue createAttribute(JSContext *ctx, bridge::String name)
+    {
+        auto n = static_cast<std::string>(name);
+        if(n == "*" || !dom::Element::isTagName(n))
+            return DOMException::throwInvalidCharacterError(ctx);
+        if constexpr (lower) std::transform(std::begin(n), std::end(n), std::begin(n),
+            [](char c) { return std::tolower(static_cast<unsigned char>(c)); });
+        return Attr::from(ctx, dom::Attr{ref().doc->shared_from_this(), dom::Attr::Name{std::move(n)}, std::string{}});
+    }
+
+    JSValue createAttributeNS_0(JSContext *ctx, bridge::Null, bridge::String name)
+    {
+        return createAttribute<false>(ctx, name);
+    }
+
+    JSValue createAttributeNS_1(JSContext *ctx, bridge::String ns, bridge::String name)
+    {
+        auto const &nsv = static_cast<std::string_view const &>(ns);
+        if(auto nsid = ref().lookupNS(nsv); LXB_NS__UNDEF != nsid)
+        {
+            auto n = static_cast<std::string>(name);
+            if(n == "*" || !dom::Element::isTagName(n))
+                return DOMException::throwInvalidCharacterError(ctx);
+            return Attr::from(ctx, dom::Attr{ref().doc->shared_from_this(), dom::Attr::Name{std::move(n), nsid}, std::string{}});
+        }
+        return DOMException::throwNamespaceError(ctx, "Unsupported namespace: " + std::string(nsv.data(), nsv.size()));
+    }
+
+    using createAttributeNS = bridge::Function
+    <
+        &HTMLDocument::createAttributeNS_0,
+        &HTMLDocument::createAttributeNS_1
+    >;
+
+    JSValue createCDATASection(JSContext *ctx, bridge::String)
+    {
+        return DOMException::throwNotSupportedError(ctx);
+    }
+
+    JSValue createComment(JSContext *, bridge::String text)
+    {
+        return ref().createComment(text);
+    }
+
+    JSValue createProcessingInstruction(JSContext *ctx, bridge::String target, bridge::String data)
+    {
+        auto const &t = static_cast<std::string_view const &>(target);
+        auto const &d = static_cast<std::string_view const &>(data);
+        if(!dom::Element::isTagName(t) || d.find("?>") != std::string_view::npos)
+            return DOMException::throwInvalidCharacterError(ctx);
+        return ref().createProcessingInstruction(t, d);
+    }
+
     JSValue createElement(JSContext *ctx, bridge::String name)
     {
         return ref().createElement(name);
+    }
+
+    JSValue createDocumentFragment(JSContext *)
+    {
+        return ref().createDocumentFragment();
     }
 
     JSValue createElementNS_0(JSContext *ctx, bridge::Null, bridge::String name)
@@ -95,16 +154,28 @@ struct HTMLDocument : bridge::Interface<HTMLDocument, dom::HTMLDocument, Documen
         });
     }
 
+    JSValue forms(JSContext *ctx) const
+    {
+        return HTMLCollection::from(ctx, dom::HTMLCollection{
+            dom::Node{ref().doc, ref().node}, "form"
+        });
+    }
+
     JSValue head(JSContext *) const
     {
         return ref().head();
+    }
+
+    JSValue namespaceURI(JSContext *) const
+    {
+        return JS_NULL;
     }
 
     JSValue title(JSContext *ctx) const
     {
         if(auto title = ref().title())
             return bridge::String{ctx, std::move(*title)};
-        return JS_NULL;
+        return bridge::String{ctx, std::string_view{""}};
     }
 
     void set_title_0(JSContext *ctx, bridge::Null)
@@ -162,10 +233,18 @@ JSCFunctionListEntry const HTMLDocument::funcs[] = {
     JS_CGETSET_DEF("body", &bridge::Getter<&HTMLDocument::body>, NULL),
     JS_CGETSET_DEF("documentElement", &bridge::Getter<&HTMLDocument::documentElement>, NULL),
     JS_CGETSET_DEF("head", &bridge::Getter<&HTMLDocument::head>, NULL),
+    JS_CGETSET_DEF("forms", &bridge::Getter<&HTMLDocument::forms>, NULL),
+    JS_CGETSET_DEF("namespaceURI", &bridge::Getter<&HTMLDocument::namespaceURI>, NULL),
     JS_CGETSET_DEF("title", &bridge::Getter<&HTMLDocument::title>, &HTMLDocument::set_title::invoke),
 
+    JS_CFUNC_DEF("createAttribute", 1, &bridge::Function<&HTMLDocument::createAttribute<true>>::invoke),
+    JS_CFUNC_DEF("createAttributeNS", 2, &HTMLDocument::createAttributeNS::invoke),
+    JS_CFUNC_DEF("createCDATASection", 1, &bridge::Function<&HTMLDocument::createCDATASection>::invoke),
+    JS_CFUNC_DEF("createComment", 1, &bridge::Function<&HTMLDocument::createComment>::invoke),
+    JS_CFUNC_DEF("createProcessingInstruction", 2, &bridge::Function<&HTMLDocument::createProcessingInstruction>::invoke),
     JS_CFUNC_DEF("createElement", 1, &bridge::Function<&HTMLDocument::createElement>::invoke),
-    JS_CFUNC_DEF("createElementNS", 1, &HTMLDocument::createElementNS::invoke),
+    JS_CFUNC_DEF("createElementNS", 2, &HTMLDocument::createElementNS::invoke),
+    JS_CFUNC_DEF("createDocumentFragment", 0, &bridge::Function<&HTMLDocument::createDocumentFragment>::invoke),
     JS_CFUNC_DEF("createTextNode", 1, &bridge::Function<&HTMLDocument::createTextNode>::invoke),
     JS_CFUNC_DEF("getElementById", 1, &bridge::Function<&HTMLDocument::getElementById>::invoke),
     JS_CFUNC_DEF("getElementsByClassName", 1, &bridge::Function<&HTMLDocument::getElementsByClassName>::invoke),

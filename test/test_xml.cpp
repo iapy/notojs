@@ -3,6 +3,27 @@
 
 BOOST_FIXTURE_TEST_SUITE(XML, notojs::testing::Fixture)
 
+BOOST_AUTO_TEST_CASE(DOMException)
+{
+    eval(R"JS(
+import { assert } from 'noto:assert';
+import { DOMException, Document } from 'noto:dom';
+
+const document = Document.xml('<root/>');
+let exception;
+try {
+    document.appendChild(document.createElement('extra'));
+} catch(error) {
+    exception = error;
+}
+
+assert(() => exception instanceof DOMException);
+assert(() => exception instanceof Error);
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
 BOOST_AUTO_TEST_CASE(Memory)
 {
     eval(R"JS(
@@ -87,6 +108,339 @@ assert(() => 'notojs.XML' === j2.type);
     BOOST_TEST(get_error() == std::nullopt);
 }
 
+BOOST_AUTO_TEST_CASE(DocumentType)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+import { window, Document } from 'noto:dom';
+
+const d  = Document.xml('<!DOCTYPE root><root/>');
+assert(() => d.firstChild instanceof window.Node);
+assert(() => d.firstChild instanceof window.DocumentType);
+assert(() => d.doctype === d.firstChild);
+assert(() => d.doctype instanceof window.DocumentType);
+assert(() => 10 === d.firstChild.nodeType);
+assert(() => 'root' === d.firstChild.nodeName);
+assert(() => null === d.firstChild.nodeValue);
+assert(() => 'root' === d.firstChild.name);
+assert(() => null === d.firstChild.namespaceURI);
+assert(() => '' === d.firstChild.publicId);
+assert(() => '' === d.firstChild.systemId);
+
+const leafParents = [d.doctype, d.createTextNode('text'), d.createComment('comment')];
+for(const parent of leafParents)
+{
+    assert(() => throws(() => parent.appendChild(d.createElement('div')), 'HierarchyRequestError'));
+    assert(() => throws(() => parent.insertBefore(d.createElement('div'), null), 'HierarchyRequestError'));
+    assert(() => throws(() => parent.insertBefore(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
+    assert(() => throws(() => parent.replaceChild(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
+    assert(() => !parent.hasChildNodes());
+}
+
+const root = d.documentElement;
+const text = d.createTextNode('document text');
+assert(() => throws(() => d.appendChild(text), 'HierarchyRequestError'));
+assert(() => throws(() => d.insertBefore(text, root), 'HierarchyRequestError'));
+assert(() => throws(() => d.replaceChild(text, root), 'HierarchyRequestError'));
+assert(() => null === text.parentNode);
+assert(() => root === d.documentElement);
+
+const holder = d.createElement('holder');
+const held = holder.appendChild(d.createElement('held'));
+assert(() => throws(() => holder.appendChild(d.doctype), 'HierarchyRequestError'));
+assert(() => throws(() => holder.insertBefore(d.doctype, held), 'HierarchyRequestError'));
+assert(() => throws(() => holder.replaceChild(d.doctype, held), 'HierarchyRequestError'));
+assert(() => held === holder.firstChild);
+assert(() => d === d.doctype.parentNode);
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(documentHierarchy)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+import { Document } from 'noto:dom';
+
+const d = Document.xml('<!DOCTYPE root><root/>');
+const root = d.documentElement;
+const doctype = d.doctype;
+const extra = d.createElement('extra');
+assert(() => throws(() => d.appendChild(extra), 'HierarchyRequestError'));
+assert(() => throws(() => d.insertBefore(extra, root), 'HierarchyRequestError'));
+assert(() => null === extra.parentNode);
+assert(() => root === d.documentElement);
+assert(() => doctype === d.doctype);
+
+const secondDoctype = doctype.cloneNode();
+assert(() => throws(() => d.appendChild(secondDoctype), 'HierarchyRequestError'));
+assert(() => null === secondDoctype.parentNode);
+assert(() => doctype === d.doctype);
+
+assert(() => throws(() => d.insertBefore(root, doctype), 'HierarchyRequestError'));
+assert(() => throws(() => d.appendChild(doctype), 'HierarchyRequestError'));
+assert(() => doctype === d.doctype);
+assert(() => root === d.documentElement);
+
+const replacementDocument = Document.xml('<!DOCTYPE root><root/>');
+const oldRoot = replacementDocument.documentElement;
+const newRoot = replacementDocument.createElement('replacement');
+assert(() => oldRoot === replacementDocument.replaceChild(newRoot, oldRoot));
+assert(() => newRoot === replacementDocument.documentElement);
+assert(() => null === oldRoot.parentNode);
+
+const oldDoctype = replacementDocument.doctype;
+const newDoctype = oldDoctype.cloneNode();
+assert(() => oldDoctype === replacementDocument.replaceChild(newDoctype, oldDoctype));
+assert(() => newDoctype === replacementDocument.doctype);
+assert(() => null === oldDoctype.parentNode);
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(documentBatchHierarchy)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+import { Document } from 'noto:dom';
+
+{
+    const d = Document.xml('<!DOCTYPE root><root/>');
+    const children = [...d.childNodes];
+    const comment = d.createComment('comment');
+    const secondRoot = d.createElement('second-root');
+
+    assert(() => throws(() => d.append(comment, secondRoot), 'HierarchyRequestError'));
+    assert(() => null === comment.parentNode);
+    assert(() => null === secondRoot.parentNode);
+    assert(() => children.length === d.childNodes.length);
+    for(let i = 0; i < children.length; ++i)
+        assert(() => children[i] === d.childNodes[i]);
+}
+
+{
+    const d = Document.xml('<!DOCTYPE root><root/>');
+    const root = d.documentElement;
+    const doctype = d.doctype;
+    d.removeChild(root);
+
+    assert(() => throws(() => d.prepend(root), 'HierarchyRequestError'));
+    assert(() => null === root.parentNode);
+    assert(() => doctype === d.firstChild);
+    assert(() => 1 === d.childNodes.length);
+}
+
+{
+    const d = Document.xml('<!DOCTYPE root><root/>');
+    const root = d.documentElement;
+    const doctype = d.doctype;
+    d.removeChild(root);
+
+    assert(() => throws(() => doctype.before(root), 'HierarchyRequestError'));
+    assert(() => null === root.parentNode);
+    assert(() => doctype === d.firstChild);
+    assert(() => 1 === d.childNodes.length);
+}
+
+{
+    const d = Document.xml('<root/>');
+    const oldRoot = d.documentElement;
+    const newRoot = d.createElement('new-root');
+
+    d.replaceChildren(newRoot);
+    assert(() => null === oldRoot.parentNode);
+    assert(() => newRoot === d.documentElement);
+    assert(() => newRoot === d.firstChild);
+    assert(() => 1 === d.childNodes.length);
+}
+
+{
+    const d = Document.xml('<root/>');
+    const root = d.documentElement;
+
+    d.replaceChildren(root);
+    assert(() => root === d.documentElement);
+    assert(() => root === d.firstChild);
+    assert(() => 1 === d.childNodes.length);
+}
+
+{
+    const d = Document.xml('<root/>');
+    const children = [...d.childNodes];
+    const firstRoot = d.createElement('first-root');
+    const secondRoot = d.createElement('second-root');
+
+    assert(() => throws(() => d.replaceChildren(firstRoot, secondRoot), 'HierarchyRequestError'));
+    assert(() => null === firstRoot.parentNode);
+    assert(() => null === secondRoot.parentNode);
+    assert(() => children.length === d.childNodes.length);
+    for(let i = 0; i < children.length; ++i)
+        assert(() => children[i] === d.childNodes[i]);
+}
+
+{
+    const d = Document.xml('<root/>');
+    const children = [...d.childNodes];
+
+    assert(() => throws(() => d.replaceChildren('text'), 'HierarchyRequestError'));
+    assert(() => children.length === d.childNodes.length);
+    for(let i = 0; i < children.length; ++i)
+        assert(() => children[i] === d.childNodes[i]);
+}
+
+{
+    const d = Document.xml('<!DOCTYPE root><root/>');
+    const oldRoot = d.documentElement;
+    const newRoot = d.createElement('new-root');
+
+    oldRoot.replaceWith(newRoot);
+    assert(() => null === oldRoot.parentNode);
+    assert(() => newRoot === d.documentElement);
+    assert(() => d.doctype === d.firstChild);
+    assert(() => newRoot === d.lastChild);
+
+    const oldDoctype = d.doctype;
+    const newDoctype = oldDoctype.cloneNode();
+    oldDoctype.replaceWith(newDoctype);
+    assert(() => null === oldDoctype.parentNode);
+    assert(() => newDoctype === d.doctype);
+    assert(() => newDoctype === d.firstChild);
+    assert(() => newRoot === d.lastChild);
+}
+
+{
+    const d = Document.xml('<!DOCTYPE root><root/>');
+    const children = [...d.childNodes];
+    const root = d.documentElement;
+    const comment = d.createComment('comment');
+    const firstRoot = d.createElement('first-root');
+    const secondRoot = d.createElement('second-root');
+
+    assert(() => throws(
+        () => root.replaceWith(comment, firstRoot, secondRoot),
+        'HierarchyRequestError'
+    ));
+    assert(() => null === comment.parentNode);
+    assert(() => null === firstRoot.parentNode);
+    assert(() => null === secondRoot.parentNode);
+    assert(() => children.length === d.childNodes.length);
+    for(let i = 0; i < children.length; ++i)
+        assert(() => children[i] === d.childNodes[i]);
+}
+
+{
+    const d = Document.xml('<!DOCTYPE root><root/>');
+    const doctype = d.doctype;
+    const root = d.documentElement;
+    const comment = d.createComment('after doctype');
+
+    doctype.after(comment, root);
+    assert(() => doctype === d.childNodes[0]);
+    assert(() => comment === d.childNodes[1]);
+    assert(() => root === d.childNodes[2]);
+
+    const beforeRoot = d.createComment('before root');
+    root.before(beforeRoot);
+    assert(() => beforeRoot === root.previousSibling);
+
+    const children = [...d.childNodes];
+    assert(() => throws(() => root.before('text'), 'HierarchyRequestError'));
+    assert(() => children.length === d.childNodes.length);
+    for(let i = 0; i < children.length; ++i)
+        assert(() => children[i] === d.childNodes[i]);
+}
+
+{
+    const d = Document.xml('<root/>');
+    const parent = d.createElement('parent');
+    const existing = parent.appendChild(d.createElement('existing'));
+
+    parent.replaceChildren(existing);
+    assert(() => existing === parent.firstChild);
+    assert(() => 1 === parent.childNodes.length);
+
+    parent.append(existing, existing);
+    assert(() => existing === parent.firstChild);
+    assert(() => 1 === parent.childNodes.length);
+}
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(detachedNodes)
+{
+    eval(R"JS(
+import { assert } from 'noto:assert';
+import { Document } from 'noto:dom';
+
+const d = Document.xml('<!DOCTYPE root><root><connected/></root>');
+const root = d.documentElement;
+const doctype = d.doctype;
+const serialized = d.toJSON().data;
+assert(() => d === root.parentNode);
+assert(() => root.isConnected);
+assert(() => 2 === d.childNodes.length);
+assert(() => doctype === d.firstChild);
+assert(() => root === d.lastChild);
+
+const equal = Document.xml('<!DOCTYPE root><root><connected/></root>');
+const detached = d.createElement('detached');
+const child = detached.appendChild(d.createElement('child'));
+assert(() => d.isEqualNode(equal));
+assert(() => null === detached.parentNode);
+assert(() => detached === detached.getRootNode());
+assert(() => !detached.isConnected);
+assert(() => child.parentNode === detached);
+assert(() => detached === child.getRootNode());
+assert(() => !child.isConnected);
+assert(() => child === detached.querySelector('child'));
+assert(() => null === d.querySelector('detached'));
+assert(() => 2 === d.childNodes.length);
+assert(() => root === d.documentElement);
+assert(() => serialized === d.toJSON().data);
+
+root.appendChild(detached);
+assert(() => detached.parentNode === root);
+assert(() => detached.isConnected);
+assert(() => child.isConnected);
+assert(() => d === child.getRootNode());
+assert(() => detached === d.querySelector('detached'));
+
+root.removeChild(detached);
+assert(() => null === detached.parentNode);
+assert(() => !detached.isConnected);
+assert(() => detached === detached.getRootNode());
+assert(() => null === d.querySelector('detached'));
+assert(() => serialized === d.toJSON().data);
+
+const comment = d.createComment('detached comment');
+assert(() => null === comment.parentNode);
+assert(() => !comment.isConnected);
+assert(() => 2 === d.childNodes.length);
+
+assert(() => root === d.removeChild(root));
+assert(() => null === d.documentElement);
+assert(() => null === root.parentNode);
+assert(() => !root.isConnected);
+assert(() => detached === child.getRootNode());
+assert(() => null === d.querySelector('connected'));
+assert(() => 1 === d.childNodes.length);
+assert(() => doctype === d.firstChild);
+
+assert(() => root === d.appendChild(root));
+assert(() => root === d.documentElement);
+assert(() => d === root.parentNode);
+assert(() => root.isConnected);
+assert(() => d.querySelector('connected') !== null);
+assert(() => 2 === d.childNodes.length);
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
 BOOST_AUTO_TEST_CASE(Serialize)
 {
     eval(R"JS(
@@ -163,6 +517,39 @@ import { assert, throws } from 'noto:assert';
 import { window, Document } from 'noto:dom';
 
 const d = Document.xml('<root/>');
+const created = d.createAttribute('Data-ID');
+assert(() => created instanceof window.Attr);
+assert(() => created instanceof window.Node);
+assert(() => 'Data-ID' == created.name);
+assert(() => 'Data-ID' == created.nodeName);
+assert(() => 2 == created.nodeType);
+assert(() => '' == created.value);
+assert(() => '' == created.nodeValue);
+assert(() => !created.isConnected);
+assert(() => null === created.ownerElement);
+assert(() => d === created.ownerDocument);
+
+const sameName = d.createAttribute('Data-ID');
+const differentName = d.createAttribute('other');
+assert(() => created.isSameNode(created));
+assert(() => !created.isSameNode(sameName));
+assert(() => created.isEqualNode(sameName));
+assert(() => !created.isEqualNode(differentName));
+sameName.value = 'different';
+assert(() => !created.isEqualNode(sameName));
+assert(() => throws(() => d.createAttribute(''), 'InvalidCharacterError'));
+assert(() => throws(() => d.createAttribute('*'), 'InvalidCharacterError'));
+assert(() => throws(() => d.createAttribute('bad name'), 'InvalidCharacterError'));
+
+const detachedOwner = d.createElement('div');
+detachedOwner.setAttribute('owned', 'value');
+const owned = detachedOwner.getAttributeNode('owned');
+assert(() => !owned.isConnected);
+d.documentElement.appendChild(detachedOwner);
+assert(() => owned.isConnected);
+detachedOwner.remove();
+assert(() => !owned.isConnected);
+assert(() => detachedOwner === owned.ownerElement);
 
 const a = d.createElement('a');
 const n = a.attributes;
@@ -174,12 +561,30 @@ assert(() => !a.hasAttribute('href'));
 assert(() => null === a.getAttribute('href'));
 assert(() => null === n.getNamedItem('href'));
 
+a.setAttribute('HREF', 'http://apple.com');
+assert(() => !a.hasAttribute('href'));
+assert(() => a.hasAttribute('HREF'));
+assert(() => null === a.getAttribute('href'));
+assert(() => 'http://apple.com' == a.getAttribute('HREF'));
+assert(() => null === a.getAttributeNode('href'));
+assert(() => null !== a.getAttributeNode('HREF'));
+assert(() => null === n.getNamedItem('href'));
+assert(() => null !== n.getNamedItem('HREF'));
+assert(() => 'HREF' == n.getNamedItem('HREF').name);
+
+a.removeAttribute('href');
+assert(() => a.hasAttribute('HREF'));
+a.removeAttribute('HREF');
+assert(() => !a.hasAttribute('HREF'));
+assert(() => null === a.getAttribute('HREF'));
+assert(() => null === n.getNamedItem('HREF'));
+
 a.setAttribute('href', 'http://apple.com');
 assert(() => a.hasAttribute('href'));
 assert(() => 'http://apple.com' == a.getAttribute('href'));
 
 let href = n.getNamedItem('href');
-assert(() => href.isConnected);
+assert(() => !href.isConnected);
 assert(() => href === n.getNamedItem('href'));
 assert(() => href instanceof window.Attr);
 assert(() => href instanceof window.Node);
@@ -189,7 +594,7 @@ assert(() => 'http://apple.com' == href.nodeValue);
 assert(() => 'http://apple.com' == href.textContent);
 
 a.removeAttribute('alt');
-n.removeNamedItem('alt');
+assert(() => throws(() => n.removeNamedItem('alt'), 'NotFoundError'));
 assert(() => a.hasAttribute('href'));
 
 a.removeAttribute('href');
@@ -274,6 +679,11 @@ assert(() => d.documentElement.children[0] === bar.ownerElement);
 assert(() => d.documentElement.children[1] === baz.ownerElement);
 assert(() => null === bar.namespaceURI);
 assert(() => null === baz.namespaceURI);
+assert(() => throws(() => b.setNamedItem(bar), 'InUseAttributeError'));
+assert(() => throws(() => d.documentElement.children[1].setAttributeNode(bar), 'InUseAttributeError'));
+assert(() => d.documentElement.children[0] === bar.ownerElement);
+assert(() => d.documentElement.children[1] === baz.ownerElement);
+assert(() => bar === a.removeNamedItem('foo'));
 assert(() => baz === b.setNamedItem(bar));
 assert(() => !baz.isConnected);
 assert(() => null === baz.ownerElement);
@@ -281,6 +691,10 @@ assert(() => null === a.setNamedItem(baz));
 assert(() => baz.isConnected);
 assert(() => d.documentElement.children[1] === bar.ownerElement);
 assert(() => d.documentElement.children[0] === baz.ownerElement);
+assert(() => 20 === d.documentElement.children[1].compareDocumentPosition(bar));
+assert(() => 10 === bar.compareDocumentPosition(d.documentElement.children[1]));
+assert(() => 20 === d.documentElement.children[0].compareDocumentPosition(baz));
+assert(() => 10 === baz.compareDocumentPosition(d.documentElement.children[0]));
 assert(() => d === bar.getRootNode());
 assert(() => d === baz.getRootNode());
 assert(() => !bar.contains(baz));
@@ -318,8 +732,8 @@ assert(() => baz.compareDocumentPosition(bar) === d.documentElement.children[0].
 d.documentElement.children[0].setAttribute('bar', 'foo');
 const foo = a.getNamedItem('bar');
 
-assert(() => 2 === foo.compareDocumentPosition(baz));
-assert(() => 4 === baz.compareDocumentPosition(foo));
+assert(() => 4 === foo.compareDocumentPosition(baz));
+assert(() => 2 === baz.compareDocumentPosition(foo));
 
 foo.normalize();
 assert(() => 'foo' === foo.value);
@@ -352,6 +766,7 @@ import { window, Document } from 'noto:dom';
 const d = Document.xml('<root/>');
 
 const t = d.createTextNode('Some text');
+assert(() => t instanceof window.CharacterData);
 assert(() => t instanceof window.Text);
 assert(() => 'about:blank' === t.baseURI);
 assert(() => !t.isConnected);
@@ -360,6 +775,19 @@ assert(() => null === t.lastChild);
 assert(() => null === t.nextSibling);
 assert(() => '#text' == t.nodeName);
 assert(() => 3 == t.nodeType);
+assert(() => 'Some text' == t.nodeValue);
+assert(() => 'Some text' == t.data);
+assert(() => 9 == t.length);
+assert(() => 'text' == t.substringData(5, 4));
+t.appendData(' data');
+assert(() => 'Some text data' == t.data);
+t.insertData(5, 'nice ');
+assert(() => 'Some nice text data' == t.data);
+t.deleteData(5, 5);
+assert(() => 'Some text data' == t.data);
+t.replaceData(5, 4, 'TEXT');
+assert(() => 'Some TEXT data' == t.data);
+t.data = 'Some text';
 assert(() => 'Some text' == t.nodeValue);
 assert(() => d === t.ownerDocument);
 assert(() => null === t.parentElement);
@@ -370,6 +798,149 @@ assert(() => null === d.documentElement.nextElementSibling);
 const j1 = d.toJSON();
 assert(() => '<?xml version=\"1.0\"?>\n<root/>' === j1.data.trim());
 assert(() => 'notojs.XML' === j1.type);
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(CDATASection)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+import { window, Document } from 'noto:dom';
+
+const d = Document.xml('<root><![CDATA[Some cdata]]></root>');
+const c = d.documentElement.firstChild;
+const n = d.createCDATASection('Created cdata');
+
+assert(() => n instanceof window.CDATASection);
+assert(() => 'Created cdata' == n.data);
+
+assert(() => c instanceof window.Node);
+assert(() => c instanceof window.CharacterData);
+assert(() => c instanceof window.Text);
+assert(() => c instanceof window.CDATASection);
+assert(() => !(c instanceof window.Comment));
+assert(() => 'about:blank' === c.baseURI);
+assert(() => c.isConnected);
+assert(() => null === c.firstChild);
+assert(() => null === c.lastChild);
+assert(() => null === c.nextSibling);
+assert(() => '#cdata-section' == c.nodeName);
+assert(() => 4 == c.nodeType);
+assert(() => 'Some cdata' == c.nodeValue);
+assert(() => 'Some cdata' == c.data);
+assert(() => 10 == c.length);
+assert(() => 'cdata' == c.substringData(5, 5));
+
+c.appendData(' data');
+assert(() => 'Some cdata data' == c.data);
+c.insertData(5, 'nice ');
+assert(() => 'Some nice cdata data' == c.data);
+c.deleteData(5, 5);
+assert(() => 'Some cdata data' == c.data);
+c.replaceData(5, 5, 'CDATA');
+assert(() => 'Some CDATA data' == c.data);
+c.data = 'Some cdata';
+assert(() => 'Some cdata' == c.nodeValue);
+assert(() => d === c.ownerDocument);
+assert(() => d.documentElement === c.parentElement);
+assert(() => d.documentElement === c.parentNode);
+assert(() => d.toString().includes('<![CDATA[Some cdata]]>'));
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(ProcessingInstruction)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+import { window, Document } from 'noto:dom';
+
+const d = Document.xml('<root><?target data?></root>');
+const p = d.documentElement.firstChild;
+
+assert(() => p instanceof window.Node);
+assert(() => p instanceof window.CharacterData);
+assert(() => p instanceof window.ProcessingInstruction);
+assert(() => !(p instanceof window.Text));
+assert(() => !(p instanceof window.CDATASection));
+assert(() => !(p instanceof window.Comment));
+assert(() => 'target' == p.nodeName);
+assert(() => 7 == p.nodeType);
+assert(() => 'target' == p.target);
+assert(() => null === p.sheet);
+
+const n = d.createProcessingInstruction('created', 'value');
+assert(() => n instanceof window.Node);
+assert(() => n instanceof window.CharacterData);
+assert(() => n instanceof window.ProcessingInstruction);
+assert(() => 'created' == n.nodeName);
+assert(() => 7 == n.nodeType);
+assert(() => 'created' == n.target);
+assert(() => 'value' == n.nodeValue);
+assert(() => 'value' == n.data);
+assert(() => !n.isConnected);
+assert(() => null === n.sheet);
+assert(() => throws(() => d.createProcessingInstruction('', 'value'), 'InvalidCharacterError'));
+assert(() => throws(() => d.createProcessingInstruction('bad name', 'value'), 'InvalidCharacterError'));
+assert(() => throws(() => d.createProcessingInstruction('created', 'bad ?> value'), 'InvalidCharacterError'));
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(Comment)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+import { window, Document } from 'noto:dom';
+
+const d = Document.xml('<root/>');
+
+const c = d.createComment('Some comment');
+assert(() => c instanceof window.Node);
+assert(() => c instanceof window.CharacterData);
+assert(() => c instanceof window.Comment);
+assert(() => 'about:blank' === c.baseURI);
+assert(() => !c.isConnected);
+assert(() => null === c.firstChild);
+assert(() => null === c.lastChild);
+assert(() => null === c.nextSibling);
+assert(() => '#comment' == c.nodeName);
+assert(() => 8 == c.nodeType);
+assert(() => 'Some comment' == c.nodeValue);
+assert(() => 'Some comment' == c.data);
+assert(() => 12 == c.length);
+assert(() => 'comment' == c.substringData(5, 7));
+c.appendData(' data');
+assert(() => 'Some comment data' == c.data);
+c.insertData(5, 'nice ');
+assert(() => 'Some nice comment data' == c.data);
+c.deleteData(5, 5);
+assert(() => 'Some comment data' == c.data);
+c.replaceData(5, 7, 'COMMENT');
+assert(() => 'Some COMMENT data' == c.data);
+c.data = 'Some comment';
+assert(() => 'Some comment' == c.nodeValue);
+assert(() => d === c.ownerDocument);
+assert(() => null === c.parentElement);
+assert(() => null === c.parentNode);
+assert(() => null === d.documentElement.nextSibling);
+assert(() => null === d.documentElement.nextElementSibling);
+
+c.nodeValue = 'Other comment';
+assert(() => 'Other comment' == c.nodeValue);
+
+d.documentElement.appendChild(c);
+assert(() => c.isConnected);
+assert(() => c === d.documentElement.firstChild);
+assert(() => d.toString().includes('<!--Other comment-->'));
+
+const p = Document.xml('<root><!--parsed--></root>');
+assert(() => p.documentElement.firstChild instanceof window.Comment);
+assert(() => 'parsed' == p.documentElement.firstChild.nodeValue);
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -575,23 +1146,23 @@ assert(() => throws(() => a.appendChild(div), 'HierarchyRequestError'));
 
 assert(() => 1 === a.compareDocumentPosition(b));
 assert(() => 1 === b.compareDocumentPosition(a));
-assert(() => 10 === div.compareDocumentPosition(a));
-assert(() => 20 === a.compareDocumentPosition(div));
+assert(() => 20 === div.compareDocumentPosition(a));
+assert(() => 10 === a.compareDocumentPosition(div));
 
 div.appendChild(b);
 
-assert(() => 2 === a.compareDocumentPosition(b));
-assert(() => 4 === b.compareDocumentPosition(a));
-assert(() => 10 === div.compareDocumentPosition(b));
-assert(() => 20 === b.compareDocumentPosition(div));
+assert(() => 4 === a.compareDocumentPosition(b));
+assert(() => 2 === b.compareDocumentPosition(a));
+assert(() => 20 === div.compareDocumentPosition(b));
+assert(() => 10 === b.compareDocumentPosition(div));
 
 const d = d1.createElement('d');
 a.appendChild(d);
 
-assert(() => 4 === b.compareDocumentPosition(d));
-assert(() => 2 === d.compareDocumentPosition(b));
-assert(() => 10 === a.compareDocumentPosition(d));
-assert(() => 20 === d.compareDocumentPosition(a));
+assert(() => 2 === b.compareDocumentPosition(d));
+assert(() => 4 === d.compareDocumentPosition(b));
+assert(() => 20 === a.compareDocumentPosition(d));
+assert(() => 10 === d.compareDocumentPosition(a));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -888,28 +1459,23 @@ p1.textContent = 'first paragraph';
 const p2 = d.documentElement.appendChild(d.createElement('p'));
 p2.textContent = 'second paragraph';
 
-assert(() => 'first paragraph' === p1.innerText);
 assert(() => 'first paragraph' === p1.textContent);
-assert(() => 'second paragraph' === p2.innerText);
 assert(() => 'second paragraph' === p2.textContent);
-assert(() => 'first paragraphsecond paragraph' === d.documentElement.innerText);
 assert(() => 'first paragraphsecond paragraph' === d.documentElement.textContent);
 
 p1.firstChild.textContent = 'changed';
 assert(() => 'changed' === p1.textContent);
 assert(() => 'changedsecond paragraph' === d.documentElement.textContent);
 
-p1.innerText = 'again';
-assert(() => 'again' === p1.innerText);
+p1.textContent = 'again';
 assert(() => 'again' === p1.textContent);
-assert(() => 'againsecond paragraph' === d.documentElement.innerText);
 assert(() => 'againsecond paragraph' === d.documentElement.textContent);
 
 p2.firstChild.textContent = null;
 assert(() => '' === p2.textContent);
 assert(() => 'again' === d.documentElement.textContent);
 
-p1.innerText = null;
+p1.textContent = null;
 assert(() => '' === p1.textContent);
 assert(() => '' === d.documentElement.textContent);
 
@@ -1258,6 +1824,90 @@ assert(() => throws(() => div.prepend(d.documentElement), 'HierarchyRequestError
     BOOST_TEST(get_error() == std::nullopt);
 }
 
+BOOST_AUTO_TEST_CASE(atomicNodeMutations)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+import { Document } from 'noto:dom';
+
+const d = Document.xml('<root/>');
+const other = Document.xml('<root/>');
+
+for(const method of ['append', 'prepend']) {
+    const target = d.createElement('target');
+    const valid = d.createElement('valid');
+    const foreign = other.createElement('foreign');
+
+    assert(() => throws(() => target[method](valid, foreign), 'WrongDocumentError'));
+    assert(() => null === valid.parentNode);
+    assert(() => !target.hasChildNodes());
+
+    const cycleValid = d.createElement('cycle-valid');
+    assert(() => throws(() => target[method](cycleValid, target), 'HierarchyRequestError'));
+    assert(() => null === cycleValid.parentNode);
+    assert(() => !target.hasChildNodes());
+}
+
+for(const method of ['before', 'after']) {
+    const parent = d.createElement('parent');
+    const target = parent.appendChild(d.createElement('target'));
+    const valid = d.createElement('valid');
+    const foreign = other.createElement('foreign');
+
+    assert(() => throws(() => target[method](valid, foreign), 'WrongDocumentError'));
+    assert(() => null === valid.parentNode);
+    assert(() => 1 === parent.childNodes.length);
+    assert(() => target === parent.firstChild);
+
+    const cycleValid = d.createElement('cycle-valid');
+    assert(() => throws(() => target[method](cycleValid, parent), 'HierarchyRequestError'));
+    assert(() => null === cycleValid.parentNode);
+    assert(() => 1 === parent.childNodes.length);
+    assert(() => target === parent.firstChild);
+}
+
+{
+    const parent = d.createElement('parent');
+    const a = parent.appendChild(d.createElement('a'));
+    const b = parent.appendChild(d.createElement('b'));
+    const c = parent.appendChild(d.createElement('c'));
+
+    parent.prepend(a, b);
+    assert(() => a === parent.childNodes[0]);
+    assert(() => b === parent.childNodes[1]);
+    assert(() => c === parent.childNodes[2]);
+
+    a.after(c);
+    assert(() => a === parent.childNodes[0]);
+    assert(() => c === parent.childNodes[1]);
+    assert(() => b === parent.childNodes[2]);
+
+    const x = d.createElement('x');
+    c.before(c, x);
+    assert(() => a === parent.childNodes[0]);
+    assert(() => c === parent.childNodes[1]);
+    assert(() => x === parent.childNodes[2]);
+    assert(() => b === parent.childNodes[3]);
+
+    parent.append(a, b, a);
+    assert(() => c === parent.childNodes[0]);
+    assert(() => x === parent.childNodes[1]);
+    assert(() => b === parent.childNodes[2]);
+    assert(() => a === parent.childNodes[3]);
+
+    b.replaceWith('left', b, 'right');
+    assert(() => 'left' === b.previousSibling.nodeValue);
+    assert(() => 'right' === b.nextSibling.nodeValue);
+
+    parent.replaceChildren(a, a);
+    assert(() => a === parent.firstChild);
+    assert(() => 1 === parent.childNodes.length);
+}
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
 BOOST_AUTO_TEST_CASE(querySelector)
 {
     eval(R"JS(
@@ -1302,8 +1952,23 @@ assert(() => d.documentElement.firstElementChild === d.querySelector('parent'));
 const g = d.querySelector('parent[id="p2"]');
 assert(() => d.documentElement.lastElementChild === g);
 
+assert(() => d.documentElement.matches('root'));
+assert(() => f.matches('parent'));
+assert(() => f.matches('parent[id="p1"]'));
+assert(() => f.matches('root parent:first-child'));
+assert(() => !f.matches('root > child'));
+
+const child = f.firstElementChild;
+assert(() => child === child.closest('child'));
+assert(() => f === child.closest('parent[id="p1"]'));
+assert(() => d.documentElement === child.closest('root'));
+assert(() => null === child.closest('missing'));
+
 assert(() => 4 === d.querySelectorAll('root child').length);
 assert(() => 2 === d.querySelectorAll('*[id="p2"] > child').length);
+
+assert(() => throws(() => f.closest('['), 'SyntaxError'));
+assert(() => throws(() => f.matches('['), 'SyntaxError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -1374,6 +2039,13 @@ assert(() => !d.documentElement.hasAttribute('a'));
 
 assert(() => d.documentElement.toggleAttribute('a', true));
 assert(() => '' === d.documentElement.getAttribute('a'));
+
+d.documentElement.setAttribute('a', 'value');
+const attribute = d.documentElement.getAttributeNode('a');
+assert(() => d.documentElement.toggleAttribute('a', true));
+assert(() => 'value' === d.documentElement.getAttribute('a'));
+assert(() => 'value' === attribute.value);
+assert(() => attribute === d.documentElement.getAttributeNode('a'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -1397,6 +2069,20 @@ for(const n of c) assert(() => !n.isConnected);
 assert(() => 2 === d.documentElement.childNodes.length);
 assert(() => 'c' === d.documentElement.childNodes[0].tagName);
 assert(() => 'bar' === d.documentElement.childNodes[1].nodeValue);
+
+const first = d.documentElement.firstChild;
+const valid = d.createElement('valid');
+const foreign = Document.xml('<root/>').createElement('foreign');
+assert(() => throws(() => d.documentElement.replaceChildren(valid, foreign), 'WrongDocumentError'));
+assert(() => null === valid.parentNode);
+assert(() => 2 === d.documentElement.childNodes.length);
+assert(() => first === d.documentElement.firstChild);
+
+const cycleValid = d.createElement('cycle-valid');
+assert(() => throws(() => d.documentElement.replaceChildren(cycleValid, d.documentElement), 'HierarchyRequestError'));
+assert(() => null === cycleValid.parentNode);
+assert(() => 2 === d.documentElement.childNodes.length);
+assert(() => first === d.documentElement.firstChild);
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);

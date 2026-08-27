@@ -33,6 +33,26 @@ assert(() => 1 == 2);
     BOOST_TEST(get_error() == "1 == 2");
 }
 
+BOOST_AUTO_TEST_CASE(Exception)
+{
+    eval(R"JS(
+import { assert, AssertionError } from 'noto:assert';
+
+let exception;
+try {
+    assert(() => false);
+} catch(error) {
+    exception = error;
+}
+
+assert(() => exception instanceof AssertionError);
+assert(() => exception instanceof Error);
+assert(() => exception.message === 'false');
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
 BOOST_AUTO_TEST_CASE(ThrowsFailure)
 {
     eval(R"JS(

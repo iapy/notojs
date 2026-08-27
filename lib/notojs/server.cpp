@@ -96,9 +96,9 @@ std::unique_ptr<detail::Logger> logger;
 
 } // namespace
 
-void Server::configure(boost::property_tree::ptree const &pt)
+void Server::configure(detail::Config const &cfg)
 {
-    auto bind = pt.get<std::string>("server.bind");
+    auto bind = cfg.get<std::string>("server.bind");
     if (auto const pos = bind.find(':'); pos == std::string::npos)
     {
         throw std::invalid_argument("Expected host:port format");
@@ -110,7 +110,7 @@ void Server::configure(boost::property_tree::ptree const &pt)
         endpoint = *std::begin(resolver.resolve(host, port));
     }
 
-    std::string threads = pt.get<std::string>("server.threads", "1,1");
+    std::string threads = cfg.get<std::string>("server.threads", "1,1");
     this->threads.first = std::max(1, std::atoi(threads.c_str()));
 
     if(auto const pos = threads.find(','); pos != std::string::npos)
@@ -118,14 +118,14 @@ void Server::configure(boost::property_tree::ptree const &pt)
         this->threads.second = std::max(1, std::atoi(threads.c_str() + pos + 1));
     }
 
-    WINDOW_HTML.replace(WINDOW_HTML.find("<base/>"), 7, "<base href=\"" + pt.get<std::string>("server.base", "/") + "\"/>");
-    if(auto script = pt.get_optional<std::string>("server.script"); script)
+    WINDOW_HTML.replace(WINDOW_HTML.find("<base/>"), 7, "<base href=\"" + cfg.get<std::string>("server.base", "/") + "\"/>");
+    if(auto script = cfg.get_optional<std::string>("server.script"); script)
     {
         WINDOW_HTML.replace(WINDOW_HTML.find("</head>"), 7, "<script src=\"" + *script + "\"></script></head>");
     }
     get<Router>().window(std::string_view(WINDOW_HTML.c_str(), WINDOW_HTML.size()));
 
-    if (auto log = pt.get_optional<std::string>("server.log"); log)
+    if (auto log = cfg.get_optional<std::string>("server.log"); log)
     {
         std::filesystem::path path = std::filesystem::path(*log);
         std::clog.rdbuf(logf.emplace(path, std::ios_base::app).rdbuf());

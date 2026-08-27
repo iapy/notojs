@@ -1,0 +1,54 @@
+text: |-
+  `globalThis` extender that defines the `crypto` object.
+
+  ```js!noplay
+  require('crypto');
+  ```
+
+  > This extender requires the `crypto.so` module to be installed and available to the **NotoJS** runtime.{.warning}
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Crypto
+---
+function: crypto.getRandomValues
+args:
+  -
+    - Number
+  -
+    - Any
+text: |-
+  Generates cryptographically secure random values.
+
+  When `arg0` is a number, returns a new `ArrayBuffer` containing that many random bytes.
+  This numeric overload is specific to **NotoJS** and differs from the standard Web Crypto API.
+
+  When `arg0` is an integer typed array, fills it in place and returns the same array.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues
+---
+function: crypto.randomUUID
+args:
+  -
+    []
+text: |-
+  Returns a cryptographically random RFC 4122 version 4 UUID string.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID
+---
+function: crypto.subtle.digest
+args:
+  -
+    - String
+    - ArrayBuffer
+text: |-
+  Returns a `Promise` that resolves to an `ArrayBuffer` containing the digest of `arg1`.
+
+  Supported algorithm names are:
+
+  - `SHA-1`
+  - `SHA-256`
+  - `SHA-384`
+  - `SHA-512`
+
+  The promise is rejected when the algorithm is unsupported or hashing fails.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/digest

@@ -8,11 +8,10 @@
 #include <global.hpp>
 #include <notodb.hpp>
 
-#include <notojs/detail/config.hpp>
+#include <notojs/detail/module.hpp>
 #include <quickjs/quickjs-libc.h>
 #include <rapidjson/rapidjson.h>
 #include <dlfcn.h>
-#include <iostream>
 
 namespace notojs {
 namespace {
@@ -67,6 +66,39 @@ void error(JSContext *ctx, JSValue exc, W &writer)
 }
 
 template<typename W>
+void thrown(JSContext *ctx, JSValue exc, W &writer)
+{
+    if(JS_IsError(ctx, exc))
+    {
+        error(ctx, exc, writer);
+        return;
+    }
+
+    writer.startObject("Error", 5);
+    writer.startObject();
+    std::size_t len{0};
+    if(char const *str = JS_ToCStringLen(ctx, &len, exc))
+    {
+        writer.string("message", str, len);
+        JS_FreeCString(ctx, str);
+    }
+    else
+    {
+        writer.string("message", "JavaScript exception", 20);
+    }
+    writer.endObject();
+    writer.endObject();
+}
+
+template<typename W>
+void exception(JSContext *ctx, W &writer)
+{
+    JSValue exc = JS_GetException(ctx);
+    thrown(ctx, exc, writer);
+    JS_FreeValue(ctx, exc);
+}
+
+template<typename W>
 void json(JSContext *ctx, JSValue glob, JSValue value, W &writer)
 {
     rapidjson::Type type;
@@ -105,22 +137,40 @@ BOOST_FORCEINLINE bool jschar(char ch, std::size_t idx)
     return ch == '_' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9' && idx > 0) || ((ch == ':' || ch == '!') && idx == 0);
 }
 
+const char *MODULE_NOT_FOUND = "Module %s not found";
+const char *MODULE_NOT_LOADED = "Module %s not loaded";
+const char *MODULE_DUPLICATE_FOUND = "Duplicate module mapping found for [%s]";
+
 } // namespace
 
-void Engine::configure(boost::property_tree::ptree const &pt)
+void Engine::configure(detail::Config const &cfg)
 {
     constexpr auto convert = [](std::string &&value) -> std::filesystem::path {
         return std::move(value);
     };
 
-    jspath = pt.get_optional<std::string>("engine.jspath").map(convert);
-    sopath = pt.get_optional<std::string>("engine.sopath").map(convert);
+    jspath = cfg.get_optional<std::string>("engine.jspath").map(convert);
+    sopath = cfg.get_optional<std::string>("engine.sopath").map(convert);
+    if(auto c = cfg.get_optional<std::string>("engine.cdn"))
+    {
+        for(auto it = std::begin(*c), end = std::end(*c); it != end;)
+        {
+            while(it != end && std::isspace(*it)) ++it;
+            if(it == end) continue;
+
+            auto jt = it; while(jt != end && !std::isspace(*jt)) ++jt;
+            cdn.emplace(it, jt);
+            it = jt;
+        }
+    }
 }
 
 JSModuleDef *Engine::loader(JSContext *ctx, const char *name, void *data)
 {
     Engine *engine = reinterpret_cast<Engine *>(data);
-    if(auto s = ::strlen(name); s > 3 && !::strcmp(name + s - 3, ".so"))
+
+    auto const s = ::strlen(name);
+    if(s > 3 && !::strcmp(name + s - 3, ".so"))
     {
         if(engine->sopath)
         {
@@ -131,10 +181,10 @@ JSModuleDef *Engine::loader(JSContext *ctx, const char *name, void *data)
                 {
                     return init(ctx, name);
                 }
-                JS_ThrowReferenceError(ctx, "Module %s not loaded", name);
+                JS_ThrowReferenceError(ctx, MODULE_NOT_LOADED, name);
                 return NULL;
             }
-            JS_ThrowReferenceError(ctx, "Module %s not found", name);
+            JS_ThrowReferenceError(ctx, MODULE_NOT_FOUND, name);
             return NULL;
         }
     }
@@ -152,7 +202,7 @@ JSModuleDef *Engine::loader(JSContext *ctx, const char *name, void *data)
             }
         }
     }
-    if(auto s = ::strlen(name); s > 3 && !::strcmp(name + s - 3, ".js"))
+    if(s > 3 && !::strcmp(name + s - 3, ".js"))
     {
         if(auto const path = engine->get<Folder>().lib(name); path)
         {
@@ -167,16 +217,42 @@ JSModuleDef *Engine::loader(JSContext *ctx, const char *name, void *data)
         }
     }
 
+    const char *error = MODULE_NOT_FOUND;
     try {
         std::optional<boost::urls::url> url;
-        lmdb::val k{name, std::strlen(name)};
-
         auto [tx, db] = DB(ctx).pkgs();
-        if(lmdb::val v; db.get(tx, k, v) && detail::INI::is_module(v))
+
+        if('[' == *name && ']' == *(name + s - 1))
         {
-            url = facade::URL::parse(v.data());
+            lmdb::val k, v;
+            auto cr = lmdb::cursor::open(tx, db);
+            if(cr.get(k, v, MDB_FIRST)) do {
+                if(!detail::Module::is_module(v)) continue;
+                if(auto u = facade::URL::parse(v.data()); u && engine->cdn.count(u->host()))
+                {
+                    for(auto const &seg: u->segments())
+                    {
+                        if(seg.size() == s - 2 && !std::strncmp(seg.c_str(), name + 1, s - 2))
+                        {
+                            if(std::exchange(url, u))
+                            {
+                                error = MODULE_DUPLICATE_FOUND;
+                                url.reset();
+                            }
+                            break;
+                        }
+                    }
+                }
+            } while(cr.get(k, v, MDB_NEXT));
         }
-        tx.abort();
+        else
+        {
+            lmdb::val k{name, std::strlen(name)};
+            if(lmdb::val v; db.get(tx, k, v) && detail::Module::is_module(v))
+            {
+                url = facade::URL::parse(v.data());
+            }
+        }
 
         if(url)
         {
@@ -188,15 +264,33 @@ JSModuleDef *Engine::loader(JSContext *ctx, const char *name, void *data)
         return NULL;
     }
 
-    JS_ThrowReferenceError(ctx, "Module %s not found", name);
+    JS_ThrowReferenceError(ctx, error, name);
     return NULL;
 }
 
-void Engine::tracker(JSContext *ctx, JSValue, JSValue result, int handled, void*)
+void Engine::tracker(JSContext *ctx, JSValue promise, JSValue reason, int handled, void*)
 {
-    auto *ptr = Global::Context::ptr(ctx);
-    if(!handled && ptr && (JS_IsError(ctx, result) || JS_IsException(result)) && !ptr->perror)
-        ptr->perror = JS_DupValue(ctx, result);
+    auto *context = Global::Context::ptr(ctx);
+    if(!context) return;
+
+    auto &rejections = context->rejections;
+    auto it = std::find_if(std::begin(rejections), std::end(rejections), [ctx, promise](auto const &entry) {
+        return JS_StrictEq(ctx, entry.promise, promise);
+    });
+
+    if(handled)
+    {
+        if(it != std::end(rejections))
+        {
+            JS_FreeValue(ctx, it->promise);
+            JS_FreeValue(ctx, it->reason);
+            rejections.erase(it);
+        }
+    }
+    else if(it == std::end(rejections))
+    {
+        rejections.push_back({JS_DupValue(ctx, promise), JS_DupValue(ctx, reason)});
+    }
 }
 
 JSRuntime *Engine::get_runtime() const
@@ -225,87 +319,107 @@ boost::beast::http::status Engine::eval(JSValue &mod, W &writer, JSContext *ctx,
 
     if(JS_IsException(mod))
     {
-        JSValue exc = JS_GetException(ctx);
-        if(JS_IsError(ctx, exc))
-        {
-            error(ctx, exc, writer);
-        }
-        JS_FreeValue(ctx, exc);
+        exception(ctx, writer);
         result = boost::beast::http::status::bad_request;
     }
     else
     {
         JSValue prs = JS_EvalFunction(ctx, mod);
-        context.wait(ctx);
-        JSValue res = JS_PromiseResult(ctx, prs);
-
-        bool error_{false};
-        if(!JS_IsUndefined(res))
+        if(JS_IsException(prs))
         {
-            if(JS_IsError(ctx, res))
-            {
-                error_ = (error(ctx, res, writer), true);
-            }
-            else
-            {
-                writer.startObject("Error", 5);
-                json(ctx, glob, res, writer);
-                writer.endObject();
-            }
-        }
-        else if(name)
-        {
-            JSValue ns = JS_GetModuleNamespace(ctx, (JSModuleDef*)JS_VALUE_GET_PTR(mod));
-
-            std::uint32_t count;
-            JSPropertyEnum *props;
-
-            if(JS_GetOwnPropertyNames(ctx, &props, &count, ns, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) >= 0)
-            {
-                for(std::uint32_t i = 0; i < count; ++i)
-                {
-                    JSAtom atom = props[i].atom;
-                    JS_SetProperty(ctx, glob, atom, JS_GetProperty(ctx, ns, atom));
-                    JS_FreeAtom(ctx, atom);
-                }
-                js_free(ctx, props);
-            }
-
-            JS_FreeValue(ctx, ns);
-        }
-
-        if(!error_ && context.perror)
-        {
-            error(ctx, *context.perror, writer);
-            error_ = true;
-        }
-
-        JSValue out = JS_JSONStringify(ctx, context.output, JS_UNDEFINED, JS_UNDEFINED);
-        if(JS_IsException(out))
-        {
-            if(!error_)
-            {
-                JSValue exc = JS_GetException(ctx);
-                writer.startObject("Error", 5);
-                json(ctx, glob, exc, writer);
-                writer.endObject();
-                JS_FreeValue(ctx, exc);
-            }
+            exception(ctx, writer);
+            result = boost::beast::http::status::bad_request;
         }
         else
         {
-            std::size_t len;
-            char const *str = JS_ToCStringLen(ctx, &len, out);
+            context.wait(ctx);
 
-            writer.startObject("notojs.Output", 13);
-            writer.json(str, len, rapidjson::kArrayType);
-            writer.endObject();
-            writer.renderers(context.renderers);
+            bool error_{false};
+            JSValue res = JS_UNDEFINED;
+            auto const state = JS_PromiseState(ctx, prs);
+            if(JS_PROMISE_REJECTED == state)
+            {
+                res = JS_PromiseResult(ctx, prs);
+                thrown(ctx, res, writer);
+                error_ = true;
+                result = boost::beast::http::status::bad_request;
+            }
+            else if(JS_PROMISE_FULFILLED != state)
+            {
+                JS_ThrowInternalError(ctx, JS_PROMISE_PENDING == state
+                    ? "Module evaluation promise did not settle"
+                    : "Module evaluation did not return a promise");
+                exception(ctx, writer);
+                error_ = true;
+                result = boost::beast::http::status::bad_request;
+            }
+            else
+            {
+                res = JS_PromiseResult(ctx, prs);
+                if(name)
+                {
+                    JSValue ns = JS_GetModuleNamespace(ctx, (JSModuleDef*)JS_VALUE_GET_PTR(mod));
 
-            JS_FreeCString(ctx, str);
+                    std::uint32_t count;
+                    JSPropertyEnum *props;
+
+                    if(JS_GetOwnPropertyNames(ctx, &props, &count, ns, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) >= 0)
+                    {
+                        for(std::uint32_t i = 0; i < count; ++i)
+                        {
+                            JSAtom atom = props[i].atom;
+                            JS_SetProperty(ctx, glob, atom, JS_GetProperty(ctx, ns, atom));
+                            JS_FreeAtom(ctx, atom);
+                        }
+                        js_free(ctx, props);
+                    }
+
+                    JS_FreeValue(ctx, ns);
+                }
+            }
+
+            if(!error_ && context.perror)
+            {
+                thrown(ctx, *context.perror, writer);
+                error_ = true;
+                result = boost::beast::http::status::bad_request;
+            }
+            if(!error_ && !context.rejections.empty())
+            {
+                thrown(ctx, context.rejections.front().reason, writer);
+                error_ = true;
+                result = boost::beast::http::status::bad_request;
+            }
+
+            JSValue out = JS_JSONStringify(ctx, context.output, JS_UNDEFINED, JS_UNDEFINED);
+            if(JS_IsException(out))
+            {
+                if(!error_)
+                    exception(ctx, writer);
+                else
+                    JS_FreeValue(ctx, JS_GetException(ctx));
+            }
+            else
+            {
+                std::size_t len;
+                char const *str = JS_ToCStringLen(ctx, &len, out);
+                if(str)
+                {
+                    writer.startObject("notojs.Output", 13);
+                    writer.json(str, len, rapidjson::kArrayType);
+                    writer.endObject();
+                    writer.renderers(context.renderers);
+                    JS_FreeCString(ctx, str);
+                }
+                else if(!error_)
+                {
+                    exception(ctx, writer);
+                    result = boost::beast::http::status::bad_request;
+                }
+            }
+            JS_FreeValue(ctx, out);
+            JS_FreeValue(ctx, res);
         }
-        JS_FreeValue(ctx, out);
-        JS_FreeValue(ctx, res);
         JS_FreeValue(ctx, prs);
     }
 
@@ -344,12 +458,7 @@ void Engine::eval(std::string const &code, detail::Bytecode &byte, W &writer, JS
 
     if(JS_IsException(mod))
     {
-        JSValue exc = JS_GetException(ctx);
-        if(JS_IsError(ctx, exc))
-        {
-            error(ctx, exc, writer);
-        }
-        JS_FreeValue(ctx, exc);
+        exception(ctx, writer);
     }
     else
     {
@@ -389,9 +498,7 @@ boost::beast::http::status Engine::eval(detail::Bytecode const &code, W &writer,
     if(!JS_IsException(mod) && 0 != JS_ResolveModule(ctx, mod))
     {
         writer.start();
-        writer.startObject("Error", 5);
-        writer.string("Resolving module");
-        writer.endObject();
+        exception(ctx, writer);
         writer.end();
 
         JS_FreeValue(ctx, glob);

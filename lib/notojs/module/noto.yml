@@ -1,0 +1,179 @@
+|-
+  `noto:noto` provides access to the **NotoJS** runtime configuration, notebook
+  execution, application URLs, and package resolver configuration.
+
+  ###### Exports
+  - `config`
+  - `class Config`
+  - `class Cell`
+  - `class Output`
+  - `class Notebook`
+  - `function application`
+  - `function notebook`
+  - `function packages`
+---
+class: Config
+docs: Config
+text: |-
+  Provides read-only access to the **NotoJS** runtime configuration.
+
+  Reading a nested section returns another `Config` object. Reading a leaf value
+  returns a `String`, and reading a property that does not exist returns
+  `undefined`.
+
+  The top-level configuration is exported as `config`. `Config` objects cannot
+  be constructed directly.
+methods:
+  toJSON:
+    args:
+      -
+        []
+    docs: Config.toJSON
+    text: |-
+      Returns the current configuration section as a JSON-compatible object.
+
+      Returns `null` if the configuration section does not exist.
+  toString:
+    args:
+      -
+        []
+    docs: Config.toString
+    text: |-
+      Returns the original configuration file contents as a `String`.
+
+      This method is available only on the top-level `config` object. Throws
+      `TypeError` when called on a nested configuration section.
+---
+class: Cell
+docs: Cell
+text: |-
+  Represents the recorded output of one notebook cell.
+
+  A `Cell` is obtained by reading a numeric property from an `Output` object.
+  When printed, it replays the cell's recorded output.
+impl:
+  - IPrint
+---
+class: Output
+docs: Output
+text: |-
+  Represents a collection of notebook cell results.
+
+  Reading a numeric property returns the corresponding `Cell`, or `undefined`
+  if no cell exists at that index. When printed, an `Output` object renders all
+  of its cells in order.
+impl:
+  - IPrint
+properties:
+  length:
+    getter: true
+    docs: Output.length
+    text: |-
+      Contains the number of cells in this `Output` object.
+---
+class: Notebook
+docs: Notebook
+text: |-
+  Represents a notebook that can be executed or whose saved results can be
+  loaded.
+
+  `Notebook` objects are created with `notebook()`. When printed, a `Notebook`
+  loads and renders its saved output.
+impl:
+  - IPrint
+methods:
+  execute:
+    args:
+      -
+        []
+      -
+        - String
+      -
+        - Any
+    docs: Notebook.execute
+    text: |-
+      Executes the notebook without saving the generated results.
+
+      Returns a `Promise` that resolves to an `Output` object.
+
+      - Without arguments, executes the notebook without input.
+      - With a `String`, sends the string as the input body.
+      - With any other value, serializes the value as JSON and sends it with
+        `Content-Type: application/json`.
+
+      The request body is exposed to the notebook as the global `input` value.
+  saved:
+    args:
+      -
+        []
+    docs: Notebook.saved
+    text: |-
+      Loads the notebook's saved cell results without executing it.
+
+      Returns a `Promise` that resolves to an `Output` object.
+  update:
+    args:
+      -
+        []
+      -
+        - String
+      -
+        - Any
+    docs: Notebook.update
+    text: |-
+      Executes the notebook and saves the generated results.
+
+      Returns a `Promise` that resolves to an `Output` object.
+
+      - Without arguments, executes the notebook without input.
+      - With a `String`, sends the string as the input body.
+      - With any other value, serializes the value as JSON and sends it with
+        `Content-Type: application/json`.
+
+      The request body is exposed to the notebook as the global `input` value.
+---
+function: application
+args:
+  -
+    - String
+  -
+    - String
+    - String
+docs: application
+text: |-
+  Returns a `noto:` URL for a **NotoJS** application.
+
+  - With only `arg0`, returns `noto:/a/{arg0}/`.
+  - With `arg1`, returns `noto:/a/{arg0}{arg1}`.
+
+  `arg1` must be an absolute path beginning with `/`. Throws `SyntaxError` if
+  it is empty or does not begin with `/`.
+---
+function: notebook
+args:
+  -
+    - String
+docs: notebook
+text: |-
+  Returns a `Notebook` object for the notebook path in `arg0`.
+
+  The path must omit the `.notojs` suffix.
+---
+function: packages
+args:
+  -
+    []
+  -
+    - String
+docs: packages
+text: |-
+  Gets or sets the module and script resolver configuration.
+
+  - Without arguments, returns the current configuration.
+  - With `arg0`, sets the configuration. The value must be a string in INI format.
+
+  Throws `SyntaxError` if the configuration cannot be parsed.
+
+  > The configuration format is a restricted subset of INI as described in `doc('topic:packages')`.{.warning}
+also:
+  - topic:packages

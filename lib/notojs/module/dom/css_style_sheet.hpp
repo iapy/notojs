@@ -1,23 +1,31 @@
 #pragma once
+#include <notojs/module/dom/css_style_sheet_state.hpp>
 #include <notojs/module/dom/html_element.hpp>
 
 namespace notojs::dom {
 
 struct CSSStyleSheet : HTMLElement
 {
+    enum class MutationError
+    {
+        none,
+        index_size,
+        syntax
+    };
+
     CSSStyleSheet(HTMLElement const &el);
-    void deleteRule(std::int64_t);
-    std::int64_t insertRule(std::int64_t, std::string_view const &);
+    MutationError deleteRule(std::int64_t);
+    std::pair<MutationError, std::int64_t> insertRule(std::int64_t, std::string_view const &);
+    void replace(std::string_view const &);
     void free();
+
+    static CSSStyleSheetState *getState(HTMLElement const &);
 
 private:
     bool update();
 
 private:
-    std::optional<std::string> data;
-    std::unique_ptr<lxb_css_parser_t, HTMLBackend::Deleter> parser;
-    std::unique_ptr<lxb_css_stylesheet_t, HTMLBackend::Deleter> sst;
-    mutable std::uint32_t gen{std::numeric_limits<std::uint32_t>::max()};
+    CSSStyleSheetState *state;
     friend class CSSRuleList;
 };
 

@@ -1,5 +1,5 @@
 #pragma once
-#include <boost/property_tree/ptree.hpp>
+#include <notojs/detail/config.hpp>
 #include <boost/url.hpp>
 
 #include <quickjs/quickjs.h>
@@ -7,8 +7,8 @@
 
 #include <unordered_set>
 #include <optional>
-#include <utility>
 #include <string>
+#include <vector>
 
 namespace notojs {
 
@@ -26,13 +26,21 @@ public:
         BOOST_FORCEINLINE Context(JSValue output)
         : output{output} {}
 
+        struct Rejection
+        {
+            JSValue promise;
+            JSValue reason;
+        };
+
         JSValue output;
         std::optional<JSValue> perror;
+        std::vector<Rejection> rejections;
         std::unordered_set<std::string> cleanup;
         std::unordered_set<std::string> renderers;
 
         void wait(JSContext *);
         void free(JSContext *);
+        JSValue load(JSContext *, char const *name);
 
         BOOST_FORCEINLINE static Context *ptr(JSContext *ctx)
         {
@@ -55,7 +63,7 @@ public:
 
     static void set_handle(JSContext *ctx, SocketBase &socket);
 private:
-    void configure(boost::property_tree::ptree const &);
+    void configure(detail::Config const &);
     friend class Config;
 };
 

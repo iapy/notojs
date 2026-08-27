@@ -116,9 +116,7 @@ JSCFunctionListEntry const func[] = {
     JS_CFUNC_DEF("get_name", 1, &bridge::Function<&get_name>::invoke)
 };
 
-} // namespace
-
-static int init(JSContext *ctx, JSModuleDef *m)
+int init(JSContext *ctx, JSModuleDef *m)
 {
     A::init(ctx, m);
     B::init(ctx, m);
@@ -126,6 +124,8 @@ static int init(JSContext *ctx, JSModuleDef *m)
     D::init(ctx, m);
     return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
 }
+
+} // namespace
 
 extern "C" {
 
@@ -143,4 +143,3 @@ JSModuleDef *js_init_module(JSContext *ctx, const char *module_name)
 }
 
 } // extern "C"
-

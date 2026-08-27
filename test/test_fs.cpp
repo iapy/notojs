@@ -9,12 +9,11 @@ BOOST_AUTO_TEST_CASE(Mount)
 import { assert, throws } from 'noto:assert';
 import * as fs from 'noto:fs';
 
-const m = fs.mounts();
-assert(() => 2 == m.length);
-assert(() => 'rw' == m[0].flag);
-assert(() => '/rw' == m[0].path);
-assert(() => 'ro' == m[1].flag);
-assert(() => '/ro' == m[1].path);
+assert(() => 2 == fs.mounts.length);
+assert(() => 'rw' == fs.mounts[0].flag);
+assert(() => '/rw' == fs.mounts[0].path);
+assert(() => 'ro' == fs.mounts[1].flag);
+assert(() => '/ro' == fs.mounts[1].path);
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -25,6 +24,15 @@ BOOST_AUTO_TEST_CASE(Errors)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 import * as fs from 'noto:fs';
+
+let error;
+try {
+    fs.path('/ro').remove();
+} catch(e) {
+    error = e;
+}
+assert(() => error instanceof fs.FileSystemError);
+assert(() => error instanceof Error);
 
 assert(() => throws(() => fs.path('ab'), 'Expecting absolute path'));
 assert(() => throws(() => fs.path('/ab'), 'Not mounted'));

@@ -1,5 +1,7 @@
 #pragma once
+#include <notojs/module/dom/css_style_sheet_state.hpp>
 #include <notojs/module/dom/live.hpp>
+
 #include <lexbor/style/style.h>
 #include <lexbor/html/html.h>
 #include <lexbor/css/css.h>
@@ -11,10 +13,11 @@
 #include <pugixml.hpp>
 
 #include <unordered_map>
-#include <functional>
+#include <unordered_set>
 #include <optional>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace notojs::dom {
 
@@ -42,6 +45,7 @@ struct Backend : std::enable_shared_from_this<Backend>
     virtual JSValue hasChildNodes(Node const &) = 0;
     virtual JSValue insertBefore(Node const &, Node const &, Node const &) = 0;
     virtual void insertBeforeVoid(Node const &, Node const &, Node const &) = 0;
+    virtual JSValue replaceChild(Node const &, Node const &, Node const &) = 0;
     virtual bool isChild(Node const &, Node const &) = 0;
     virtual JSValue isConnected(Node const &) = 0;
     virtual JSValue isDefaultNamespace(Node const &, std::string_view const &) = 0;
@@ -50,7 +54,7 @@ struct Backend : std::enable_shared_from_this<Backend>
     virtual JSValue namespaceURI(Node const &) = 0;
     virtual JSValue nextSibling(Node const &) = 0;
     virtual JSValue nodeName(Node const &) = 0;
-    virtual JSValue nodeType(Node const &) = 0;
+    virtual std::uint16_t nodeType(Node const &) = 0;
     virtual JSValue nodeValue(Node const &) = 0;
     virtual void nodeValue(Node const &, std::string_view const &) = 0;
     virtual void normalize(Node const &) = 0;
@@ -75,20 +79,32 @@ struct Backend : std::enable_shared_from_this<Backend>
     // NodeList interface
     virtual JSValue collection(std::vector<void*> const &) = 0;
     virtual JSValue collection_item(std::vector<void*> const &, std::int64_t, JSValue) = 0;
+    virtual JSValue collection_item(std::vector<void*> const &, std::string_view const &, JSValue) = 0;
 
     // Element interface
     virtual void appendChildVoid(Node const &, Node const &) = 0;
     virtual std::uint64_t childElementCount(Node const &) = 0;
+    virtual JSValue closest(Node const &, std::string_view const &, std::optional<std::string> &) = 0;
     virtual Node createTextNode(std::string_view const &) = 0;
+    virtual JSValue doctype() = 0;
     virtual std::optional<Node> first(Node const &) = 0;
     virtual JSValue firstElementChild(Node const &) = 0;
     virtual JSValue lastElementChild(Node const &) = 0;
     virtual JSValue *lookup(Node const &) = 0;
+    virtual bool matches(Node const &, std::string_view const &, std::optional<std::string> &) = 0;
     virtual JSValue nextElementSibling(Node const &) = 0;
     virtual std::optional<Node> next(Node const &) = 0;
     virtual std::optional<Node> parent(Node const &) = 0;
     virtual JSValue previousElementSibling(Node const &) = 0;
     virtual void removeVoid(Node const &) = 0;
+
+    // DocumentType interface
+    virtual JSValue documentTypeName(Node const &) = 0;
+    virtual JSValue documentTypePublicId(Node const &) = 0;
+    virtual JSValue documentTypeSystemId(Node const &) = 0;
+
+    // CharacterData interface
+    virtual std::string_view characterData(Node const &) = 0;
 
     virtual JSValue querySelector(Node const &, std::string_view const &, std::optional<std::string> &) = 0;
     virtual std::vector<void*> querySelectorAll(Node const &, std::string_view const &, std::optional<std::string> &) = 0;
@@ -103,6 +119,7 @@ struct XMLBackend: Backend
 
     pugi::xml_document doc;
     std::unordered_map<pugi::xml_node_struct *, JSValue> nodes;
+    std::unordered_set<pugi::xml_node_struct *> detached;
 
     // Node interface
     JSValue appendChild(Node const &, Node const &) override;
@@ -114,6 +131,7 @@ struct XMLBackend: Backend
     JSValue hasChildNodes(Node const &) override;
     JSValue insertBefore(Node const &, Node const &, Node const &) override;
     void insertBeforeVoid(Node const &, Node const &, Node const &) override;
+    JSValue replaceChild(Node const &, Node const &, Node const &) override;
     bool isChild(Node const &, Node const &) override;
     JSValue isConnected(Node const &) override;
     JSValue isDefaultNamespace(Node const &, std::string_view const &) override;
@@ -122,7 +140,7 @@ struct XMLBackend: Backend
     JSValue namespaceURI(Node const &) override;
     JSValue nextSibling(Node const &) override;
     JSValue nodeName(Node const &) override;
-    JSValue nodeType(Node const &) override;
+    std::uint16_t nodeType(Node const &) override;
     JSValue nodeValue(Node const &) override;
     void nodeValue(Node const &, std::string_view const &) override;
     void normalize(Node const &) override;
@@ -147,50 +165,64 @@ struct XMLBackend: Backend
     // NodeList interface
     JSValue collection(std::vector<void*> const &) override;
     JSValue collection_item(std::vector<void*> const &, std::int64_t, JSValue) override;
+    JSValue collection_item(std::vector<void*> const &, std::string_view const &, JSValue) override;
 
     // Element interface
     void appendChildVoid(Node const &, Node const &) override;
     std::uint64_t childElementCount(Node const &) override;
     Node createTextNode(std::string_view const &) override;
+    JSValue closest(Node const &n, std::string_view const &, std::optional<std::string> &) override;
+    JSValue doctype() override;
     std::optional<Node> first(Node const &) override;
     JSValue firstElementChild(Node const &) override;
     JSValue lastElementChild(Node const &) override;
     JSValue *lookup(Node const &) override;
+    bool matches(Node const &, std::string_view const &, std::optional<std::string> &) override;
     JSValue nextElementSibling(Node const &) override;
     std::optional<Node> next(Node const &) override;
     std::optional<Node> parent(Node const &) override;
     JSValue previousElementSibling(Node const &) override;
     void removeVoid(Node const &) override;
 
+    // CharacterData interface
+    std::string_view characterData(Node const &) override;
+
+    // DocumentType interface
+    JSValue documentTypeName(Node const &) override;
+    JSValue documentTypePublicId(Node const &) override;
+    JSValue documentTypeSystemId(Node const &) override;
+
     void free(Node const &) override;
     JSValue make(pugi::xml_node_struct *);
 
+    // Detached nodes support
+    bool is_detached(pugi::xml_node const &) const;
+    bool is_connected(pugi::xml_node const &) const;
+
+    pugi::xml_node logical_root(pugi::xml_node const &) const;
+
+    void mark_detached(pugi::xml_node const &);
+    void mark_attached(pugi::xml_node const &);
+
+    pugi::xml_node first_child(pugi::xml_node const &) const;
+    pugi::xml_node last_child(pugi::xml_node const &) const;
+    pugi::xml_node next_sibling(pugi::xml_node const &) const;
+    pugi::xml_node previous_sibling(pugi::xml_node const &) const;
+
     JSValue querySelector(Node const &, std::string_view const &, std::optional<std::string> &) override;
     std::vector<void*> querySelectorAll(Node const &, std::string_view const &, std::optional<std::string> &) override;
-private:
-    BOOST_FORCEINLINE bool is_connected(pugi::xml_node const &nn) const
-    {
-        return nn == doc || nn.parent() != doc || nn == doc.first_child();
-    }
 };
 
 struct HTMLBackend: Backend
 {
     HTMLBackend(JSContext *ctx, JSValue val, lxb_html_document_t *doc);
-    struct Deleter
+
+    struct Deleter : CSSStyleSheetState::Deleter
     {
         BOOST_FORCEINLINE void operator () (lxb_html_document_t *obj)
         {
             lxb_style_destroy(lxb_html_interface_document(obj));
             lxb_html_document_destroy(obj);
-        }
-        BOOST_FORCEINLINE void operator () (lxb_css_parser_t *parser) const
-        {
-            lxb_css_parser_destroy(parser, true);
-        }
-        BOOST_FORCEINLINE void operator () (lxb_css_stylesheet_t *sheet) const
-        {
-            lxb_css_stylesheet_destroy(sheet, true);
         }
         BOOST_FORCEINLINE void operator () (lxb_selectors_t *sel) const
         {
@@ -201,12 +233,16 @@ struct HTMLBackend: Backend
     std::unique_ptr<lxb_html_document_t, Deleter> doc;
     std::unordered_map<lxb_dom_node_t *, JSValue> nodes;
     std::unordered_map<lxb_html_element_t *, JSValue>
+        cssrules,
         datasets,
         classes,
         styles,
         sheets,
         rels;
 
+    std::unordered_map<lxb_html_element_t *, CSSStyleSheetState> states;
+    std::unordered_map<std::uint64_t, JSValue> rules;
+    std::uint64_t next_rule_id{1};
     LiveStyle::Map csss, comp;
     LiveCollection::Map live;
 
@@ -220,6 +256,7 @@ struct HTMLBackend: Backend
     JSValue hasChildNodes(Node const &) override;
     JSValue insertBefore(Node const &, Node const &, Node const &) override;
     void insertBeforeVoid(Node const &, Node const &, Node const &) override;
+    JSValue replaceChild(Node const &, Node const &, Node const &) override;
     bool isChild(Node const &, Node const &) override;
     JSValue isConnected(Node const &) override;
     JSValue isDefaultNamespace(Node const &, std::string_view const &) override;
@@ -228,7 +265,7 @@ struct HTMLBackend: Backend
     JSValue namespaceURI(Node const &) override;
     JSValue nextSibling(Node const &) override;
     JSValue nodeName(Node const &) override;
-    JSValue nodeType(Node const &) override;
+    std::uint16_t nodeType(Node const &) override;
     JSValue nodeValue(Node const &) override;
     void nodeValue(Node const &, std::string_view const &) override;
     void normalize(Node const &) override;
@@ -253,26 +290,40 @@ struct HTMLBackend: Backend
     // NodeList interface
     JSValue collection(std::vector<void*> const &) override;
     JSValue collection_item(std::vector<void*> const &, std::int64_t, JSValue) override;
+    JSValue collection_item(std::vector<void*> const &, std::string_view const &, JSValue) override;
 
     // Element interface
     void appendChildVoid(Node const &, Node const &) override;
     std::uint64_t childElementCount(Node const &) override;
+    JSValue closest(Node const &n, std::string_view const &, std::optional<std::string> &) override;
     Node createTextNode(std::string_view const &) override;
+    JSValue doctype() override;
     std::optional<Node> first(Node const &) override;
     JSValue firstElementChild(Node const &) override;
     JSValue lastElementChild(Node const &) override;
     JSValue *lookup(Node const &) override;
+    bool matches(Node const &, std::string_view const &, std::optional<std::string> &) override;
     JSValue nextElementSibling(Node const &) override;
     std::optional<Node> next(Node const &) override;
     std::optional<Node> parent(Node const &) override;
     JSValue previousElementSibling(Node const &) override;
     void removeVoid(Node const &) override;
 
+    // DocumentType interface
+    JSValue documentTypeName(Node const &) override;
+    JSValue documentTypePublicId(Node const &) override;
+    JSValue documentTypeSystemId(Node const &) override;
+
+    // CharacterData interface
+    std::string_view characterData(Node const &) override;
+
     std::uintptr_t lookupNS(std::string_view const &) const;
     std::optional<std::string_view> lookupNS(std::uintptr_t) const;
 
     void free(Node const &) override;
     JSValue make(lxb_dom_node_t *);
+
+    lxb_dom_node_t *createElement(char const *name, std::size_t size) const;
 
     JSValue querySelector(Node const &, std::string_view const &, std::optional<std::string> &) override;
     std::vector<void*> querySelectorAll(Node const &, std::string_view const &, std::optional<std::string> &) override;

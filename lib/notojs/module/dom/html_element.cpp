@@ -1,16 +1,9 @@
 #include <notojs/module/dom/html_element.hpp>
 #include <notojs/module/dom/lexbor.hpp>
 #include <notojs/notojs.hpp>
-#include <iostream>
 
 namespace notojs::dom {
 namespace {
-
-lxb_status_t match(lxb_dom_node_t*, lxb_css_selector_specificity_t, void *ctx)
-{
-    *reinterpret_cast<bool*>(ctx) = true;
-    return LXB_STATUS_STOP;
-}
 
 void append(lxb_dom_node_t *node, std::string &text)
 {
@@ -79,38 +72,30 @@ void insert_ns(std::string &data, std::string_view const &ns)
 
 } // namespace
 
-lxb_dom_node_t *HTMLElement::closest(std::string_view const &s, std::optional<std::string> &err) const
+lxb_dom_node_t *HTMLElement::root() const
 {
-    bool matched{false};
-    lxb_dom_node_t *result{nullptr};
-    HTMLBackend *bke = dynamic_cast<dom::HTMLBackend *>(this->doc.get());
-
-    auto *css = lxb_dom_interface_document(bke->doc.get())->css;
-    if(auto *lst = lxb_css_selectors_parse(css->parser, (const lxb_char_t *) s.data(), s.size()))
+    auto *root = static_cast<lxb_dom_node_t *>(*this);
+    while(root->parent != nullptr)
     {
-        for(lxb_dom_node_t *n = *this; n && !result; n = n->parent)
-        {
-            if(LXB_DOM_NODE_TYPE_ELEMENT == n->type && lxb_selectors_match_node(
-                css->selectors, n, lst, match, &matched
-            ); matched) { result = n; break; }
-        }
-        lxb_css_selector_list_destroy(lst);
+        if(LXB_DOM_NODE_TYPE_ELEMENT != root->parent->type) break;
+        root = root->parent;
     }
+    return root;
+}
+
+lxb_dom_node_t *HTMLElement::closest(lxb_tag_id_t tag) const
+{
+    lxb_dom_node_t *result{nullptr};
+    for(lxb_dom_node_t *n = *this; n && !result; n = n->parent)
+        if(tag == lxb_dom_node_tag_id(n)) result = n;
     return result;
 }
 
-bool HTMLElement::matches(std::string_view const &s, std::optional<std::string> &err) const
+lxb_dom_node_t *HTMLElement::directChild(lxb_tag_id_t tag) const
 {
-    bool matched{false};
-    HTMLBackend *bke = dynamic_cast<dom::HTMLBackend *>(this->doc.get());
-
-    auto *css = lxb_dom_interface_document(bke->doc.get())->css;
-    if(auto *lst = lxb_css_selectors_parse(css->parser, (const lxb_char_t *) s.data(), s.size()))
-    {
-        lxb_selectors_match_node(css->selectors, *this, lst, match, &matched);
-        lxb_css_selector_list_destroy(lst);
-    }
-    return matched;
+    for(lxb_dom_node_t *node = static_cast<lxb_dom_node_t *>(*this)->first_child; node; node = node->next)
+        if(tag == lxb_dom_node_tag_id(node)) return node;
+    return nullptr;
 }
 
 std::vector<Attr::Name> HTMLElement::attrs() const
@@ -162,7 +147,7 @@ std::optional<std::string_view> HTMLElement::getAttribute(Attr::Name::View const
     std::size_t nlen;
     for(auto *attr = lxb_dom_element_first_attribute(*this); attr; attr = lxb_dom_element_next_attribute(attr))
     {
-        if(attr->node.ns != name.ns) continue;
+        if(!Attr::eq_ns(*this, attr->node.ns, name.ns)) continue;
         if(char const *nstr = reinterpret_cast<char const *>(lxb_dom_attr_qualified_name(attr, &nlen));
             std::string_view{nstr, nlen} == name.name)
         {
@@ -178,7 +163,7 @@ bool HTMLElement::hasAttribute(Attr::Name::View const &name) const
     std::size_t nlen = 0;
     for(auto *attr = lxb_dom_element_first_attribute(*this); attr; attr = lxb_dom_element_next_attribute(attr))
     {
-        if(attr->node.ns != name.ns) continue;
+        if(!Attr::eq_ns(*this, attr->node.ns, name.ns)) continue;
         if(char const *nstr = reinterpret_cast<char const *>(lxb_dom_attr_qualified_name(attr, &nlen));
             std::string_view{nstr, nlen} == name.name) return true;
     }
@@ -206,8 +191,8 @@ std::string HTMLElement::innerText() const
 template<> void HTMLElement::innerHTML<std::string_view>(std::string_view const &src)
 {
     if(lxb_dom_node_t *fragment = lxb_html_document_parse_fragment(
-        dynamic_cast<dom::HTMLBackend *>(doc.get())->doc.get(),
-        *this, reinterpret_cast<const lxb_char_t *>(src.data()), src.size()))
+        dynamic_cast<dom::HTMLBackend *>(doc.get())->doc.get(), *this,
+        reinterpret_cast<const lxb_char_t *>(src.data()), src.size()))
     {
         lxb_dom_node_t *node = *this;
         while(node->first_child)
@@ -232,13 +217,19 @@ void HTMLElement::innerText(std::string_view const &text)
 
 template<> void HTMLElement::outerHTML<std::string_view>(std::string_view const &src)
 {
+    lxb_dom_node_t *node = *this;
+    lxb_dom_node_t *parent = node->parent;
+    auto *backend = dynamic_cast<dom::HTMLBackend *>(doc.get());
+    lxb_dom_element_t *context = LXB_DOM_NODE_TYPE_ELEMENT == parent->type
+        ? lxb_dom_interface_element(parent)
+        : lxb_dom_interface_element(backend->doc->body);
+
     if(lxb_dom_node_t *fragment = lxb_html_document_parse_fragment(
-        dynamic_cast<dom::HTMLBackend *>(doc.get())->doc.get(),
-        *this, reinterpret_cast<const lxb_char_t *>(src.data()), src.size()))
+        backend->doc.get(), context,
+        reinterpret_cast<const lxb_char_t *>(src.data()), src.size()))
     {
-        lxb_dom_node_t *node = *this;
         while(fragment->first_child)
-            lxb_dom_node_insert_before_spec(node->parent, fragment->first_child, node);
+            lxb_dom_node_insert_before_spec(parent, fragment->first_child, node);
         lxb_dom_node_remove(node);
     }
 }
@@ -260,7 +251,7 @@ void HTMLElement::removeAttribute(Attr::Name::View const &name)
     std::size_t nlen = 0;
     for(auto *attr = lxb_dom_element_first_attribute(*this); attr; attr = lxb_dom_element_next_attribute(attr))
     {
-        if(attr->node.ns != name.ns) continue;
+        if(!Attr::eq_ns(*this, attr->node.ns, name.ns)) continue;
         if(char const *nstr = reinterpret_cast<char const *>(lxb_dom_attr_qualified_name(attr, &nlen));
             std::string_view{nstr, nlen} == name.name)
         {
@@ -278,8 +269,12 @@ bool HTMLElement::toggleAttribute(Attr::Name::View const &a)
 
 bool HTMLElement::toggleAttribute(Attr::Name::View const &a, bool force)
 {
-    if(force) return setAttribute(a, ""), true;
-    else return removeAttribute(a), false;
+    if(force)
+    {
+        if(!hasAttribute(a)) setAttribute(a, "");
+        return true;
+    }
+    return removeAttribute(a), false;
 }
 
 void HTMLElement::setAttribute(Attr::Name::View const &a, std::string_view const &v)
@@ -292,9 +287,11 @@ void HTMLElement::setAttribute(Attr::Name::View const &a, std::string_view const
         nlen -= (pos + 1);
     }
 
-    lxb_dom_element_set_attribute(*this,
+    auto *attr = lxb_dom_element_set_attribute(*this,
         reinterpret_cast<lxb_char_t const *>(nstr), nlen,
-        reinterpret_cast<lxb_char_t const *>(v.data()), v.size())->node.ns = a.ns;
+        reinterpret_cast<lxb_char_t const *>(v.data()), v.size());
+    lxb_dom_attr_set_name(attr, reinterpret_cast<lxb_char_t const *>(nstr), nlen, false);
+    attr->node.ns = a.ns;
 }
 
 std::string HTMLElement::toString() const
@@ -310,161 +307,6 @@ std::string HTMLElement::toString() const
             insert_ns(data, *ns);
     }
     return data;
-}
-
-template<> lxb_dom_node_t *HTMLElement::appendChild<HTML>(HTML const &h, std::optional<std::string> &error)
-{
-    lxb_dom_node_t *child = nullptr;
-    if(auto data = h.get<bridge::String>("data"); data)
-    {
-        auto const &src = static_cast<std::string_view const &>(*data);
-        if(lxb_dom_node_t *fragment = lxb_html_document_parse_fragment(
-            dynamic_cast<dom::HTMLBackend *>(doc.get())->doc.get(),
-            *this, reinterpret_cast<const lxb_char_t *>(src.data()), src.size()))
-        {
-            while(fragment->first_child != nullptr)
-                lxb_dom_node_append_child(*this, child = fragment->first_child);
-        }
-    }
-    if(!child) error.emplace("Invalid HTML fragment");
-    return child;
-}
-
-template<> lxb_dom_node_t *HTMLElement::appendChild<Image>(Image const &i, std::optional<std::string> &)
-{
-    auto *img = lxb_dom_document_create_element(lxb_dom_interface_document(dynamic_cast<dom::HTMLBackend *>(doc.get())->doc.get()),
-        (lxb_char_t const *)"img", 3, NULL);
-
-    if(auto data = i.get<bridge::String>("data"); data)
-    {
-        auto const &src = static_cast<std::string_view const &>(*data);
-        lxb_dom_element_set_attribute(img,
-            reinterpret_cast<lxb_char_t const *>("src"), 3,
-            reinterpret_cast<lxb_char_t const *>(src.data()), src.size()
-        )->node.ns = LXB_NS_HTML;
-    }
-
-    lxb_dom_node_append_child(*this, lxb_dom_interface_node(img));
-    return lxb_dom_interface_node(img);
-}
-
-template<> lxb_dom_node_t *HTMLElement::appendChild<SVG>(SVG const &s, std::optional<std::string> &error)
-{
-    lxb_dom_node_t *child = nullptr;
-    if(auto data = s.get<bridge::String>("data"); data)
-    {
-        auto const &src = static_cast<std::string_view const &>(*data);
-        if(lxb_dom_node_t *fragment = lxb_html_document_parse_fragment(
-            dynamic_cast<dom::HTMLBackend *>(doc.get())->doc.get(),
-            *this, reinterpret_cast<const lxb_char_t *>(src.data()), src.size()))
-        {
-            if(!static_cast<lxb_dom_node_t *>(*this)->first_child
-                && fragment->first_child
-                && fragment->first_child == fragment->last_child
-                && LXB_DOM_NODE_TYPE_ELEMENT == fragment->first_child->type
-                && LXB_TAG_SVG == lxb_dom_node_tag_id(fragment->first_child)
-                && std::invoke([](std::string_view &&name) {
-                    return "symbol" == name
-                        || "pattern" == name
-                        || "marker" == name;
-                }, lexbor::get_name(*this)))
-            {
-                while(fragment->first_child->first_child)
-                    lxb_dom_node_append_child(*this, child = fragment->first_child->first_child);
-
-                std::size_t nlen;
-                lxb_dom_element_t *svg = lxb_dom_interface_element(fragment->first_child);
-                for(auto *attr = lxb_dom_element_first_attribute(svg); attr; attr = lxb_dom_element_next_attribute(attr))
-                {
-                    auto const *name = lxb_dom_attr_qualified_name(attr, &nlen);
-                    lxb_dom_element_set_attribute(*this, name, nlen, attr->value->data, attr->value->length)->node.ns = attr->node.ns;
-                }
-            }
-            else while(fragment->first_child != nullptr)
-                lxb_dom_node_append_child(*this, child = fragment->first_child);
-        }
-    }
-    if(!child) error.emplace("Invalid SVG fragment");
-    return child;
-}
-
-template<> lxb_dom_node_t *HTMLElement::appendChild<bridge::String>(bridge::String const &s, std::optional<std::string> &error)
-{
-    lxb_dom_node_t *child = nullptr;
-    auto const &src = static_cast<std::string_view const &>(s);
-    if(lxb_dom_node_t *fragment = lxb_html_document_parse_fragment(
-        dynamic_cast<dom::HTMLBackend *>(doc.get())->doc.get(),
-        *this, reinterpret_cast<const lxb_char_t *>(src.data()), src.size()))
-    {
-        while(fragment->first_child != nullptr)
-            lxb_dom_node_append_child(*this, child = fragment->first_child);
-    }
-    return child;
-}
-
-template<typename T>
-lxb_dom_node_t *HTMLElement::insertBefore(T const &h, Node const &r, std::optional<std::string> &error)
-{
-    lxb_dom_node_t *child = nullptr;
-    lxb_dom_node_t *rn = static_cast<lxb_dom_node_t *>(r.node);
-
-    if(auto data = h.template get<bridge::String>("data"); data)
-    {
-        auto const &src = static_cast<std::string_view const &>(*data);
-        if(lxb_dom_node_t *fragment = lxb_html_document_parse_fragment(
-            dynamic_cast<dom::HTMLBackend *>(doc.get())->doc.get(),
-            *this, reinterpret_cast<const lxb_char_t *>(src.data()), src.size()))
-        {
-            while(fragment->first_child != nullptr)
-                lxb_dom_node_insert_before_spec(*this, child = fragment->first_child, rn);
-        }
-    }
-    if(!child)
-    {
-        if constexpr (std::is_same_v<T, SVG>) error.emplace("Invalid SVG fragment");
-        else error.emplace("Invalid HTML fragment");
-    }
-    return child;
-}
-
-template lxb_dom_node_t *HTMLElement::insertBefore<SVG>(SVG const &, Node const &, std::optional<std::string> &);
-template lxb_dom_node_t *HTMLElement::insertBefore<HTML>(HTML const &, Node const &, std::optional<std::string> &);
-
-template<> lxb_dom_node_t *HTMLElement::insertBefore<Image>(Image const &i, Node const &r, std::optional<std::string> &error)
-{
-    auto *img = lxb_dom_document_create_element(lxb_dom_interface_document(dynamic_cast<dom::HTMLBackend *>(doc.get())->doc.get()),
-        (lxb_char_t const *)"img", 3, NULL);
-
-    lxb_dom_node_t *rn = static_cast<lxb_dom_node_t *>(r.node);
-    if(auto data = i.get<bridge::String>("data"); data)
-    {
-        auto const &src = static_cast<std::string_view const &>(*data);
-        lxb_dom_element_set_attribute(img,
-            reinterpret_cast<lxb_char_t const *>("src"), 3,
-            reinterpret_cast<lxb_char_t const *>(src.data()), src.size()
-        )->node.ns = LXB_NS_HTML;
-    }
-
-    lxb_dom_node_insert_before_spec(*this, lxb_dom_interface_node(img), rn);
-    return lxb_dom_interface_node(img);
-}
-
-template<> lxb_dom_node_t *HTMLElement::insertBefore<bridge::String>(bridge::String const &h, Node const &r, std::optional<std::string> &error)
-{
-    lxb_dom_node_t *child = nullptr;
-    lxb_dom_node_t *rn = static_cast<lxb_dom_node_t *>(r.node);
-
-    auto const &src = static_cast<std::string_view const &>(h);
-    if(lxb_dom_node_t *fragment = lxb_html_document_parse_fragment(
-        dynamic_cast<dom::HTMLBackend *>(doc.get())->doc.get(),
-        *this, reinterpret_cast<const lxb_char_t *>(src.data()), src.size()))
-    {
-        while(fragment->first_child != nullptr)
-            lxb_dom_node_insert_before_spec(*this, child = fragment->first_child, rn);
-    }
-
-    error.emplace("Invalid HTML fragment");
-    return child;
 }
 
 std::string HTMLElement::className(std::string_view const &str)

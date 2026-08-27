@@ -8,7 +8,16 @@ BOOST_AUTO_TEST_CASE(GZip)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 import * as fs from 'noto:fs';
-import { gzip } from 'noto:gzip';
+import { gzip, GZipError } from 'gzip.so';
+
+let error;
+try {
+    gzip(fs.path('/ro/file.z')).write('');
+} catch(e) {
+    error = e;
+}
+assert(() => error instanceof GZipError);
+assert(() => error instanceof Error);
 
 assert(() => throws(() => gzip(fs.path('/ro/file.z')).write(''), 'Read-only file system'));
 

@@ -227,6 +227,67 @@ assert(() => 'foo' == json.bar);
     BOOST_TEST(get_error() == std::nullopt);
 }
 
+BOOST_AUTO_TEST_CASE(FetchMultipart)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+
+const data = new FormData();
+data.append('name', 'notojs');
+data.append('upload', new Blob(['payload'], {type: 'text/plain'}), 'report.txt');
+
+const response = await fetch('/multipart', {
+    method: 'POST',
+    body: data
+});
+
+assert(() => response.ok);
+const type = response.headers.get('Content-Type');
+assert(() => type.startsWith('multipart/form-data; boundary='));
+
+const boundary = type.substring(type.indexOf('boundary=') + 9);
+const body = await response.text();
+const expected =
+    '--' + boundary + '\r\n' +
+    'Content-Disposition: form-data; name="name"\r\n\r\n' +
+    'notojs\r\n' +
+    '--' + boundary + '\r\n' +
+    'Content-Disposition: form-data; name="upload"; filename="report.txt"\r\n' +
+    'Content-Type: text/plain\r\n\r\n' +
+    'payload\r\n' +
+    '--' + boundary + '--\r\n';
+assert(() => expected == body);
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(FetchMultipartResponse)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+
+const response = await fetch('/multipart');
+assert(() => response.ok);
+assert(() => 'multipart/form-data; boundary="notojs-test-boundary"' == response.headers.get('Content-Type'));
+
+const data = await response.formData();
+assert(() => data instanceof FormData);
+assert(() => 'multipart response' == data.get('title'));
+assert(() => 'first,second' == data.getAll('tag').join(','));
+
+const upload = data.get('upload');
+assert(() => upload instanceof File);
+assert(() => upload instanceof Blob);
+assert(() => 'response.txt' == upload.name);
+assert(() => 'text/plain' == upload.type);
+const contents = await upload.text();
+assert(() => 'response payload' == contents);
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
 BOOST_AUTO_TEST_CASE(FetchMethodNotAllowed)
 {
     eval(R"JS(
@@ -301,12 +362,13 @@ assert(() => response.url.endsWith('/json'));
 response = await fetch('/redirect/https');
 assert(() => response.ok);
 assert(() => response.redirected);
-assert(() => 'https://api.myip.com/' == response.url);
+assert(() => 'https://jsonplaceholder.typicode.com/todos/1' == response.url);
 assert(() => 200 == response.status);
 
 const json = await response.json();
-assert(() => typeof(json['cc']) != 'undefined');
-assert(() => typeof(json['ip']) != 'undefined');
+assert(() => 1 === json.id);
+assert(() => 1 === json.userId);
+assert(() => !json.completed);
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -338,21 +400,23 @@ BOOST_AUTO_TEST_CASE(Https)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 
-const r1 = await fetch('https://api.myip.com/');
+const r1 = await fetch('https://jsonplaceholder.typicode.com/todos/1');
 assert(() => r1.ok);
 assert(() => !r1.redirected);
 
 const j1 = await r1.json();
-assert(() => typeof(j1['cc']) != 'undefined');
-assert(() => typeof(j1['ip']) != 'undefined');
+assert(() => 1 === j1.id);
+assert(() => 1 === j1.userId);
+assert(() => !j1.completed);
 
-const r2 = await fetch(new URL('https://api.myip.com/'));
+const r2 = await fetch(new URL('https://jsonplaceholder.typicode.com/todos/1'));
 assert(() => r2.ok);
 assert(() => !r2.redirected);
 
 const j2 = await r2.json();
-assert(() => typeof(j2['cc']) != 'undefined');
-assert(() => typeof(j2['ip']) != 'undefined');
+assert(() => 1 === j2.id);
+assert(() => 1 === j2.userId);
+assert(() => !j2.completed);
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);

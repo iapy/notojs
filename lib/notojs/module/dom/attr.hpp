@@ -3,17 +3,17 @@
 
 namespace notojs::dom {
 
-struct Attr : Node 
+struct Attr : Node
 {
     struct Name
     {
         std::string name;
-        std::uintptr_t ns{LXB_NS_HTML};
+        std::uintptr_t ns{LXB_NS__UNDEF};
 
         struct View
         {
             std::string_view name;
-            std::uintptr_t ns{LXB_NS_HTML};
+            std::uintptr_t ns{LXB_NS__UNDEF};
         };
 
         BOOST_FORCEINLINE operator View() const
@@ -24,6 +24,11 @@ struct Attr : Node
         BOOST_FORCEINLINE bool operator < (Name const &other) const
         {
             return ns == other.ns ? name < other.name : ns < other.ns;
+        }
+
+        BOOST_FORCEINLINE bool operator != (Name const &other) const
+        {
+            return ns != other.ns || name != other.name;
         }
 
         BOOST_FORCEINLINE bool operator == (Name const &other) const
@@ -53,6 +58,11 @@ struct Attr : Node
 
     Name name;
     std::optional<std::string> value;
+
+    BOOST_FORCEINLINE static bool eq_ns(lxb_dom_node_t *node, std::uintptr_t attr, std::uintptr_t query)
+    {
+        return (query == LXB_NS__UNDEF && node->ns == attr) || query == attr;
+    }
 };
 
 } // namespace notojs:dom

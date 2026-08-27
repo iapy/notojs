@@ -3,6 +3,7 @@
 #include <lexbor/html/html.h>
 #include <lexbor/dom/dom.h>
 
+#include <string_view>
 #include <optional>
 #include <string>
 
@@ -18,5 +19,20 @@ std::string get_text(lxb_dom_node_t *node);
 
 void del_text(lxb_dom_node_t *node);
 void set_text(lxb_dom_node_t *node, std::string_view const &);
+
+template<typename T>
+bool prepare(lxb_dom_node_t *, T &, std::optional<std::string> &);
+
+template<typename T>
+lxb_dom_node_t *appendPrepared(lxb_dom_node_t *, T &);
+
+template<typename T>
+lxb_dom_node_t *insertPrepared(lxb_dom_node_t *, T &, lxb_dom_node_t *);
+
+template<typename T>
+lxb_dom_node_t *appendChild(lxb_dom_node_t *, T const &, std::optional<std::string> &);
+
+template<typename T>
+lxb_dom_node_t *insertBefore(lxb_dom_node_t *, T const &, lxb_dom_node_t *, std::optional<std::string> &);
 
 } // namespace notojs::dom::lexbor

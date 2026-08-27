@@ -1,6 +1,5 @@
 #include <notojs/module/dom/html_document.hpp>
 #include <notojs/module/dom/lexbor.hpp>
-#include <iostream>
 
 namespace notojs::dom {
 
@@ -8,6 +7,21 @@ JSValue HTMLDocument::body() const
 {
     return dynamic_cast<HTMLBackend*>(doc.get())->make(lxb_dom_interface_node(
         static_cast<lxb_html_document_t *>(*this)->body));
+}
+
+JSValue HTMLDocument::createComment(std::string_view const &text)
+{
+    return dynamic_cast<HTMLBackend*>(doc.get())->make(lxb_dom_interface_node(lxb_dom_document_create_comment(
+        *this, (lxb_char_t const *)text.data(), text.size())));
+}
+
+JSValue HTMLDocument::createProcessingInstruction(std::string_view const &target, std::string_view const &data)
+{
+    return dynamic_cast<HTMLBackend*>(doc.get())->make(lxb_dom_interface_node(lxb_dom_document_create_processing_instruction(
+        *this,
+        (lxb_char_t const *)target.data(), target.size(),
+        (lxb_char_t const *)data.data(), data.size()
+    )));
 }
 
 JSValue HTMLDocument::createElement(std::string_view const &name)
@@ -24,6 +38,12 @@ JSValue HTMLDocument::createElement(std::string_view const &name, uintptr_t ns)
     node->node.ns = ns;
     return dynamic_cast<HTMLBackend*>(doc.get())->make(
         lxb_dom_interface_node(node));
+}
+
+JSValue HTMLDocument::createDocumentFragment()
+{
+    return dynamic_cast<HTMLBackend*>(doc.get())->make(lxb_dom_interface_node(
+        lxb_dom_document_create_document_fragment(*this)));
 }
 
 JSValue HTMLDocument::createTextNode(std::string_view const &text)

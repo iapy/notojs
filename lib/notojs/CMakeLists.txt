@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 add_subdirectory(bundle)
 add_subdirectory(module)
 add_subdirectory(script)
 
-file(GLOB SRC *.cpp)
+file(GLOB SRC *.cpp parser/*.cpp)
 add_library(-notojs STATIC ${SRC})
 
 target_link_libraries(-notojs ${QUICKJS_LIBRARY} ${LMDB_LIBRARY} Boost::url OpenSSL::SSL bundle)

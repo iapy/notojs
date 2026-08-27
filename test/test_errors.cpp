@@ -16,29 +16,30 @@ try {
 } catch(e) {
     assert(() => e instanceof Error);
     assert(() => e instanceof TestError);
+    assert(() => e.name === 'TestError');
+    assert(() => e.constructor === TestError);
+    assert(() => Object.getPrototypeOf(e) === TestError.prototype);
     assert(() => e.code === 42);
 }
 
-try {
-    throw new TestError();
-} catch(e) {
-    assert(() => e instanceof Error);
-    assert(() => e instanceof TestError);
+for(const args of [[], [1], [{code: 42}]]) {
+    try {
+        Reflect.construct(TestError, args);
+        assert(() => false);
+    } catch(e) {
+        assert(() => e instanceof TypeError);
+        assert(() => !(e instanceof TestError));
+    }
 }
 
+class DerivedError extends TestError {}
 try {
-    throw new TestError(1);
+    new DerivedError();
+    assert(() => false);
 } catch(e) {
-    assert(() => e instanceof Error);
+    assert(() => e instanceof TypeError);
     assert(() => !(e instanceof TestError));
-}
-
-try {
-    throw new TestError({code: 42});
-} catch(e) {
-    assert(() => e instanceof Error);
-    assert(() => e instanceof TestError);
-    assert(() => e.code === 42);
+    assert(() => !(e instanceof DerivedError));
 }
     )JS");
 

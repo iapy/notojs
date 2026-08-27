@@ -13,6 +13,7 @@ struct Node : bridge::Interface<Node, dom::Node>
     JSValue appendChild(JSContext *ctx, Node n)
     {
         if(ref().doc != n.ref().doc) return DOMException::throwWrongDocumentError(ctx);
+        if(!ref().canHaveChild(n.ref())) return DOMException::throwHierarchyRequestError(ctx);
         if(ref().doc->contains(n.ref(), ref())) return DOMException::throwHierarchyRequestError(ctx);
         return ref().doc->appendChild(ref(), n.ref());
     }
@@ -133,6 +134,7 @@ struct Node : bridge::Interface<Node, dom::Node>
     {
         if(ref().doc != n.ref().doc) return DOMException::throwWrongDocumentError(ctx);
         if(ref().doc != r.ref().doc) return DOMException::throwWrongDocumentError(ctx);
+        if(!ref().canHaveChild(n.ref(), &r.ref())) return DOMException::throwHierarchyRequestError(ctx);
         if(ref().doc->contains(n.ref(), ref())) return DOMException::throwHierarchyRequestError(ctx);
         if(!ref().doc->isChild(ref(), r.ref())) return DOMException::throwNotFoundError(ctx);
         return ref().doc->insertBefore(ref(), n.ref(), r.ref());
@@ -192,9 +194,9 @@ struct Node : bridge::Interface<Node, dom::Node>
         return ref().doc->nodeName(ref());
     }
 
-    JSValue nodeType(JSContext *) const
+    JSValue nodeType(JSContext *ctx) const
     {
-        return ref().doc->nodeType(ref());
+        return bridge::Number{ctx, ref().doc->nodeType(ref())};
     }
 
     JSValue normalize(JSContext *)
@@ -243,10 +245,10 @@ struct Node : bridge::Interface<Node, dom::Node>
     {
         if(ref().doc != n.ref().doc) return DOMException::throwWrongDocumentError(ctx);
         if(ref().doc != o.ref().doc) return DOMException::throwWrongDocumentError(ctx);
+        if(!ref().canHaveChild(n.ref(), &o.ref(), &o.ref())) return DOMException::throwHierarchyRequestError(ctx);
         if(!ref().doc->isChild(ref(), o.ref())) return DOMException::throwNotFoundError(ctx);
         if(ref().doc->contains(n.ref(), ref())) return DOMException::throwHierarchyRequestError(ctx);
-        ref().doc->insertBeforeVoid(ref(), n.ref(), o.ref());
-        return ref().doc->remove(o.ref());
+        return ref().doc->replaceChild(ref(), n.ref(), o.ref());
     }
 
     JSValue get_textContent(JSContext *ctx) const
@@ -275,6 +277,27 @@ struct Node : bridge::Interface<Node, dom::Node>
         self.doc->free(self);
     }
 
+    static JSValue throwHierarchyRequestError(JSContext *ctx, JSValueConst, int, JSValue*)
+    {
+        return DOMException::throwHierarchyRequestError(ctx);
+    }
+
+    static void sprop(JSContext *ctx, JSValue ctor)
+    {
+        JS_DefinePropertyValueStr(ctx, ctor, "ELEMENT_NODE", bridge::Number{ctx, 1}, JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValueStr(ctx, ctor, "ATTRIBUTE_NODE", bridge::Number{ctx, 2}, JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValueStr(ctx, ctor, "TEXT_NODE", bridge::Number{ctx, 3}, JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValueStr(ctx, ctor, "CDATA_SECTION_NODE", bridge::Number{ctx, 4}, JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValueStr(ctx, ctor, "ENTITY_REFERENCE_NODE", bridge::Number{ctx, 5}, JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValueStr(ctx, ctor, "ENTITY_NODE", bridge::Number{ctx, 6}, JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValueStr(ctx, ctor, "PROCESSING_INSTRUCTION_NODE", bridge::Number{ctx, 7}, JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValueStr(ctx, ctor, "COMMENT_NODE", bridge::Number{ctx, 8}, JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValueStr(ctx, ctor, "DOCUMENT_NODE", bridge::Number{ctx, 9}, JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValueStr(ctx, ctor, "DOCUMENT_TYPE_NODE", bridge::Number{ctx, 10}, JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValueStr(ctx, ctor, "DOCUMENT_FRAGMENT_NODE", bridge::Number{ctx, 11}, JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValueStr(ctx, ctor, "NOTATION_NODE", bridge::Number{ctx, 12}, JS_PROP_ENUMERABLE);
+    }
+
     template<typename U>
     static void register_upcast();
 
@@ -283,7 +306,9 @@ struct Node : bridge::Interface<Node, dom::Node>
 
     friend class Attr;
     friend class Element;
+    friend class NodeMixin;
     friend class HTMLElement;
+    friend class HTMLNodeMixin;
 };
 
 JSCFunctionListEntry const Node::funcs[] = {

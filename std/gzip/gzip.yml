@@ -1,0 +1,72 @@
+text: |-
+  `gzip.so` provides the `gzip` function for reading and writing **gzip** files.
+
+  ###### Exports
+  - `class GZip`
+  - `class GZipError`
+  - `function gzip`
+also:
+  - topic:gzip
+---
+exception: GZipError
+docs: GZipError
+text: |-
+  Error thrown when a **gzip** file cannot be opened or a filesystem operation fails.
+---
+class: GZip
+docs: GZip
+text: |-
+  Represents **gzip** file handle.
+methods:
+  blob:
+    args:
+      -
+        []
+    docs: GZip.blob
+    text: |-
+      Returns a `Promise` that resolves to a `Blob` containing the decompressed file data.
+
+      Throws `GZipError` if the **gzip** file does not exist or cannot be accessed.
+  json:
+    args:
+      -
+        []
+    docs: GZip.json
+    text: |-
+      Returns a `Promise` that resolves to the decompressed file content parsed as JSON.
+
+      Rejects with `SyntaxError` if the decompressed content is not valid JSON.
+      Throws `GZipError` if the **gzip** file does not exist or cannot be accessed.
+  text:
+    args:
+      -
+        []
+    docs: GZip.text
+    text: |-
+      Returns a `Promise` that resolves to a `String` containing the decompressed file content.
+
+      Throws `GZipError` if the **gzip** file does not exist or cannot be accessed.
+  write:
+    args:
+      -
+        - String
+      -
+        - IBlob
+    docs: GZip.write
+    text: |-
+      Compresses `arg0`, which may be a `String` or `Blob`, and writes it to the **gzip** file.
+
+      Returns a `Promise` that resolves to the number of uncompressed input bytes written.
+      Throws `GZipError` if the path is read-only or the output file cannot be opened.
+---
+function: gzip
+args:
+  -
+    - fs::IPath
+docs: gzip
+text: |-
+  Creates a `GZip` instance.
+
+  Returns a `GZip` instance with `arg0` as the path to the **gzip** file.
+
+  ###### Default export

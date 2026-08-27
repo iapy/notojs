@@ -185,7 +185,7 @@ int init(JSContext *ctx, JSModuleDef *m)
 
 void notojs_init_core() {}
 void notojs_init_core(JSRuntime *rt) {}
-void notojs_init_core(boost::property_tree::ptree const &) {}
+void notojs_init_core(detail::Config const &) {}
 
 JSModuleDef *notojs_init_core(JSContext *ctx, const char *name)
 {

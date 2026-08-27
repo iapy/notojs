@@ -1,11 +1,10 @@
 #pragma once
-#include <boost/property_tree/ptree.hpp>
+#include <notojs/detail/config.hpp>
 #include <notojs/detail/jscode.hpp>
 #include <nanodi.hpp>
 
 #include <condition_variable>
 #include <unordered_map>
-#include <utility>
 #include <thread>
 #include <bitset>
 #include <atomic>
@@ -31,7 +30,7 @@ public:
     void updated(std::string const &);
 
 private:
-    void configure(boost::property_tree::ptree const &);
+    void configure(detail::Config const &);
     friend class Config;
 
 private:

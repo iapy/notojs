@@ -4,8 +4,14 @@ struct CSSRuleList : bridge::Interface<CSSRuleList, dom::CSSRuleList>
     CSSRuleList(std::reference_wrapper<dom::CSSRuleList> &&rw) : Base(std::move(rw)) {}
 
     JSValue get_property(JSContext *, char const *n) const;
+    JSValue make_rule(JSContext *, dom::CSSRule &&, JSValue owner) const;
     JSValue item(JSContext *ctx, bridge::Number) const;
     JSValue length(JSContext *ctx) const;
+
+    BOOST_FORCEINLINE static void free(dom::CSSRuleList &self)
+    {
+        self.free();
+    }
 
     using Base::Base;
     using ctor = bridge::Unconstructable<CSSRuleList>;

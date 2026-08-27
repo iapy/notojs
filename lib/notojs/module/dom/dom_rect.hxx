@@ -38,7 +38,7 @@ struct DOMRect : bridge::Interface<DOMRect, dom::DOMRect>
 
     JSValue height(JSContext *ctx) const
     {
-        std::uint32_t h;
+        std::uint32_t h{0};
         if(auto p = ref().getAttribute(ref().attr))
         {
             std::istringstream iss{std::string{p->data(), p->size()}};

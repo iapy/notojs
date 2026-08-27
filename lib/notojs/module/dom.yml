@@ -429,6 +429,34 @@ methods:
       - `DOMException (HierarchyRequestError)` if `arg0` is ancestor of this `Node`.
       - `DOMException (WrongDocumentError)` if `arg0` and this `Node` belong to different documents.
 ---
+class: DOMRect
+docs: DOMRect
+text: |-
+  Represents a rectangle defined by its position and dimensions. Aliased `window.SVGRect`.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/DOMRect
+properties:
+  height:
+    getter: true
+    docs: DOMRect.height
+    text: |-
+      Contains the height of the rectangle. If `height` is `0` or not defined, contains `1` for compatibility with some libraries.
+  width:
+    getter: true
+    docs: DOMRect.width
+    text: |-
+      Contains the width of the rectangle. If `width` is `0` or not defined, contains `1` for compatibility with some libraries.
+  x:
+    getter: true
+    docs: DOMRect.x
+    text: |-
+      Contains the x-coordinate of the rectangle’s origin. Contains `0` if undefined.
+  y:
+    getter: true
+    docs: DOMRect.y
+    text: |-
+      Contains the y-coordinate of the rectangle’s origin. Contains `0` if undefined.
+---
 class: Attr
 base: Node
 docs: Attr
@@ -462,6 +490,11 @@ properties:
     docs: Attr.lastChild
     text: |-
       Contains `null`.
+  name:
+    getter: true
+    docs: Attr.name
+    text: |-
+      Returns the qualified name of this attribute.
   namespaceURI:
     getter: true
     docs: Attr.namespaceURI
@@ -529,13 +562,6 @@ properties:
     text: |-
       Gets or sets the value of this `Attr`.
 methods:
-  appendChild:
-    args:
-      -
-        []
-    docs: Attr.appendChild
-    text: |-
-      Throws `DOMException (HierarchyRequestError)`.
   cloneNode:
     args:
       -
@@ -599,13 +625,6 @@ methods:
     docs: Attr.hasChildNodes
     text: |-
       Returns `false`.
-  insertBefore:
-    args:
-      -
-        []
-    docs: Attr.insertBefore
-    text: |-
-      Throws `DOMException (HierarchyRequestError)`.
   isDefaultNamespace:
     args:
       -
@@ -656,48 +675,6 @@ methods:
     docs: Attr.normalize
     text: |-
       Noop.
-  removeChild:
-    args:
-      -
-        []
-    docs: Attr.removeChild
-    text: |-
-      Throws `DOMException` (`HierarchyRequestError`).
-  replaceChild:
-    args:
-      -
-        []
-    docs: Attr.replaceChild
-    text: |-
-      Throws `DOMException` (`HierarchyRequestError`).
----
-class: DOMRect
-docs: DOMRect
-text: |-
-  Represents a rectangle defined by its position and dimensions. Aliased `window.SVGRect`.
-also:
-  - https://developer.mozilla.org/en-US/docs/Web/API/DOMRect
-properties:
-  height:
-    getter: true
-    docs: DOMRect.height
-    text: |-
-      Contains the height of the rectangle. If `height` is `0` or not defined, contains `1` for compatibility with some libraries.
-  width:
-    getter: true
-    docs: DOMRect.width
-    text: |-
-      Contains the width of the rectangle. If `width` is `0` or not defined, contains `1` for compatibility with some libraries.
-  x:
-    getter: true
-    docs: DOMRect.x
-    text: |-
-      Contains the x-coordinate of the rectangle’s origin. Contains `0` if undefined.
-  y:
-    getter: true
-    docs: DOMRect.y
-    text: |-
-      Contains the y-coordinate of the rectangle’s origin. Contains `0` if undefined.
 ---
 class: NamedNodeMap
 docs: NamedNodeMap
@@ -724,7 +701,7 @@ methods:
   getNamedItem:
     args:
       -
-        - String
+        - (anonymous namespace)::Attr::Name
     docs: NamedNodeMap.getNamedItem
     text: |-
       Returns the `Attr` node whose name matches `arg0` or `null` if no such node exists.
@@ -738,7 +715,7 @@ methods:
   removeNamedItem:
     args:
       -
-        - String
+        - (anonymous namespace)::Attr::Name
     docs: NamedNodeMap.removeNamedItem
     text: |-
       Removes and returns the `Attr` node whose name matches `arg0`.
@@ -784,7 +761,7 @@ methods:
   getNamedItem:
     args:
       -
-        - String
+        - (anonymous namespace)::Attr::Name
     docs: HTMLNamedNodeMap.getNamedItem
     text: |-
       Returns the `Attr` node whose name matches `arg0` or `null` if no such node exists.
@@ -808,7 +785,7 @@ methods:
   removeNamedItem:
     args:
       -
-        - String
+        - (anonymous namespace)::Attr::Name
     docs: HTMLNamedNodeMap.removeNamedItem
     text: |-
       Removes and returns the `Attr` node whose name matches `arg0`.
@@ -846,17 +823,6 @@ methods:
     docs: HTMLNamedNodeMap.setNamedItemNS
     text: |-
       An alias for `HTMLNamedNodeMap.setNamedItem`.
----
-class: Text
-base: Node
-docs: Text
-text: |-
-  Represents text `Node`.
-
-  > Unlike the standard DOM API, `Text` objects cannot be instantiated directly. New text nodes must be created using `Document.createTextNode()`.
-  {.warning}
-also:
-  - https://developer.mozilla.org/en-US/docs/Web/API/Text
 ---
 class: HTMLCollection
 docs: HTMLCollection
@@ -930,6 +896,541 @@ methods:
     text: |-
       Returns an iterator over the elements in `this` `HTMLCollection`.
 ---
+class: CharacterData
+base: Node
+docs: CharacterData
+text: |-
+  Provides the shared text-data operations implemented by text, comment, and processing-instruction nodes.
+properties:
+  data:
+    getter: true
+    setter:
+      - String
+    docs: CharacterData.data
+    text: |-
+      Gets or replaces the character data stored by this node.
+  length:
+    getter: true
+    docs: CharacterData.length
+    text: |-
+      Returns the number of UTF-16 code units in the stored character data.
+methods:
+  after:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: CharacterData.after
+    text: |-
+      Inserts the supplied nodes or strings immediately after this node.
+  appendData:
+    args:
+      -
+        - String
+    docs: CharacterData.appendData
+    text: |-
+      Appends the supplied string to this node's character data.
+  before:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: CharacterData.before
+    text: |-
+      Inserts the supplied nodes or strings immediately before this node.
+  deleteData:
+    args:
+      -
+        - Number
+        - Number
+    docs: CharacterData.deleteData
+    text: |-
+      Removes a range of character data beginning at the specified offset.
+  insertData:
+    args:
+      -
+        - Number
+        - String
+    docs: CharacterData.insertData
+    text: |-
+      Inserts a string into the character data at the specified offset.
+  remove:
+    args:
+      -
+        []
+    docs: CharacterData.remove
+    text: |-
+      Removes this node from its parent.
+  replaceData:
+    args:
+      -
+        - Number
+        - Number
+        - String
+    docs: CharacterData.replaceData
+    text: |-
+      Replaces a range of character data with the supplied string.
+  replaceWith:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: CharacterData.replaceWith
+    text: |-
+      Replaces this node with the supplied nodes or strings.
+  substringData:
+    args:
+      -
+        - Number
+        - Number
+    docs: CharacterData.substringData
+    text: |-
+      Returns a substring of the character data from the specified offset and length.
+---
+class: Text
+base: CharacterData
+docs: Text
+text: |-
+  Represents text `Node`.
+
+  > Unlike the standard DOM API, `Text` objects cannot be instantiated directly. New text nodes must be created using `Document.createTextNode()`.
+  {.warning}
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/Text
+properties:
+  namespaceURI:
+    getter: true
+    docs: Text.namespaceURI
+    text: |-
+      Returns `null`; text nodes do not belong to a namespace.
+---
+class: HTMLText
+base: Text
+docs: HTMLText
+text: |-
+  Represents a text node in an HTML document.
+methods:
+  after:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLText.after
+    text: |-
+      Inserts the supplied nodes or strings immediately after this node.
+  append:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLText.append
+    text: |-
+      Appends the supplied nodes or strings after the existing children.
+  replaceWith:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLText.replaceWith
+    text: |-
+      Replaces this node with the supplied nodes or strings.
+---
+class: CDATASection
+base: Text
+docs: CDATASection
+text: |-
+  Represents a CDATA section in an XML document.
+---
+class: Comment
+base: CharacterData
+docs: Comment
+text: |-
+  Represents a DOM comment node.
+properties:
+  namespaceURI:
+    getter: true
+    docs: Comment.namespaceURI
+    text: |-
+      Returns `null`; comment nodes do not belong to a namespace.
+---
+class: HTMLComment
+base: Comment
+docs: HTMLComment
+text: |-
+  Represents a comment node in an HTML document.
+methods:
+  after:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLComment.after
+    text: |-
+      Inserts the supplied nodes or strings immediately after this node.
+  before:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLComment.before
+    text: |-
+      Inserts the supplied nodes or strings immediately before this node.
+  replaceWith:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLComment.replaceWith
+    text: |-
+      Replaces this node with the supplied nodes or strings.
+---
+class: ProcessingInstruction
+base: CharacterData
+docs: ProcessingInstruction
+text: |-
+  Represents an XML processing instruction.
+properties:
+  sheet:
+    getter: true
+    docs: ProcessingInstruction.sheet
+    text: |-
+      Returns the associated style sheet when this instruction is a style-sheet processing instruction, otherwise `null`.
+  target:
+    getter: true
+    docs: ProcessingInstruction.target
+    text: |-
+      Returns the target identifying the application for which this processing instruction is intended.
+---
+class: HTMLProcessingInstruction
+base: ProcessingInstruction
+docs: HTMLProcessingInstruction
+text: |-
+  Represents a processing-instruction node in an HTML document.
+methods:
+  after:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLProcessingInstruction.after
+    text: |-
+      Inserts the supplied nodes or strings immediately after this node.
+  append:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLProcessingInstruction.append
+    text: |-
+      Appends the supplied nodes or strings after the existing children.
+  replaceWith:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLProcessingInstruction.replaceWith
+    text: |-
+      Replaces this node with the supplied nodes or strings.
+---
+class: DocumentType
+base: Node
+docs: DocumentType
+text: |-
+  Represents a document type declaration, including its name and public and system identifiers.
+properties:
+  name:
+    getter: true
+    docs: DocumentType.name
+    text: |-
+      Returns the document type name.
+  namespaceURI:
+    getter: true
+    docs: DocumentType.namespaceURI
+    text: |-
+      Returns `null`; document type nodes do not belong to a namespace.
+  publicId:
+    getter: true
+    docs: DocumentType.publicId
+    text: |-
+      Returns the public identifier from the document type declaration.
+  systemId:
+    getter: true
+    docs: DocumentType.systemId
+    text: |-
+      Returns the system identifier from the document type declaration.
+methods:
+  after:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: DocumentType.after
+    text: |-
+      Inserts the supplied nodes or strings immediately after this node.
+  before:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: DocumentType.before
+    text: |-
+      Inserts the supplied nodes or strings immediately before this node.
+  remove:
+    args:
+      -
+        []
+    docs: DocumentType.remove
+    text: |-
+      Removes this node from its parent.
+  replaceWith:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: DocumentType.replaceWith
+    text: |-
+      Replaces this node with the supplied nodes or strings.
+---
+class: HTMLDocumentType
+base: DocumentType
+docs: HTMLDocumentType
+text: |-
+  Represents the document type declaration of an HTML document.
+methods:
+  after:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLDocumentType.after
+    text: |-
+      Inserts the supplied nodes or strings immediately after this node.
+  before:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLDocumentType.before
+    text: |-
+      Inserts the supplied nodes or strings immediately before this node.
+  replaceWith:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLDocumentType.replaceWith
+    text: |-
+      Replaces this node with the supplied nodes or strings.
+---
+class: DocumentFragment
+base: Node
+docs: DocumentFragment
+text: |-
+  Represents a lightweight node container whose children can be inserted into another document tree.
+properties:
+  childElementCount:
+    getter: true
+    docs: DocumentFragment.childElementCount
+    text: |-
+      Returns the number of child elements in this fragment.
+  children:
+    getter: true
+    docs: DocumentFragment.children
+    text: |-
+      Returns a live collection of this fragment's child elements.
+  firstElementChild:
+    getter: true
+    docs: DocumentFragment.firstElementChild
+    text: |-
+      Returns the first child element, or `null` when none exists.
+  lastElementChild:
+    getter: true
+    docs: DocumentFragment.lastElementChild
+    text: |-
+      Returns the last child element, or `null` when none exists.
+  namespaceURI:
+    getter: true
+    docs: DocumentFragment.namespaceURI
+    text: |-
+      Returns `null`; document fragments do not belong to a namespace.
+methods:
+  append:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: DocumentFragment.append
+    text: |-
+      Appends the supplied nodes or strings after the existing children.
+  appendChild:
+    args:
+      -
+        - Node
+      -
+        - Image
+      -
+        - SVG
+    docs: DocumentFragment.appendChild
+    text: |-
+      Appends the supplied node as the last child and returns it.
+  insertBefore:
+    args:
+      -
+        - Node
+        - "Null"
+      -
+        - Node
+        - Node
+      -
+        - Image
+        - Node
+      -
+        - SVG
+        - Node
+      -
+        - Image
+        - "Null"
+      -
+        - SVG
+        - "Null"
+    docs: DocumentFragment.insertBefore
+    text: |-
+      Inserts a node before the reference child, or appends it when the reference is `null`.
+  prepend:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: DocumentFragment.prepend
+    text: |-
+      Inserts the supplied nodes or strings before the existing children.
+  querySelector:
+    args:
+      -
+        - String
+    docs: DocumentFragment.querySelector
+    text: |-
+      Returns the first descendant matching the selector, or `null`.
+  querySelectorAll:
+    args:
+      -
+        - String
+    docs: DocumentFragment.querySelectorAll
+    text: |-
+      Returns a static list of descendants matching the selector.
+  replaceChild:
+    args:
+      -
+        - Node
+        - Node
+      -
+        - HTML
+        - Node
+      -
+        - Image
+        - Node
+      -
+        - SVG
+        - Node
+    docs: DocumentFragment.replaceChild
+    text: |-
+      Replaces one child with another and returns the removed child.
+  replaceChildren:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: DocumentFragment.replaceChildren
+    text: |-
+      Replaces all children with the supplied nodes or strings.
+---
 class: Element
 base: Node
 docs: Element
@@ -979,14 +1480,6 @@ properties:
     docs: Element.firstElementChild
     text: |-
       Contains the first child `Element`, or `null` if `this` `Element` has no child elements.
-  innerText:
-    getter: true
-    setter:
-      - "Null"
-      - Any
-    docs: Element.innerText
-    text: |-
-      Gets or sets the textual content of `this` `Element`. Assigning `null` clears `this` `Element`’s contents.
   lastElementChild:
     getter: true
     docs: Element.lastElementChild
@@ -1038,17 +1531,24 @@ methods:
     docs: Element.before
     text: |-
       Inserts the specified nodes or strings immediately before `this` `Element`.
-  getAttribute:
+  closest:
     args:
       -
         - String
+    docs: Element.closest
+    text: |-
+      Returns the nearest ancestor, including this element, that matches the selector, or `null`.
+  getAttribute:
+    args:
+      -
+        - (anonymous namespace)::Attr::Name
     docs: Element.getAttribute
     text: |-
       Returns the value of the specified attribute or `null` if the attribute does not exist.
   getAttributeNode:
     args:
       -
-        - String
+        - (anonymous namespace)::Attr::Name
     docs: Element.getAttributeNode
     text: |-
       Returns the specified attribute of `this` `Element`, as an `Attr` node or null if attribute does not exist.
@@ -1064,7 +1564,7 @@ methods:
   hasAttribute:
     args:
       -
-        - String
+        - (anonymous namespace)::Attr::Name
     docs: Element.hasAttribute
     text: |-
       Returns `true` if `this` `Element` has an attribute `arg0` or `false` otherwise.
@@ -1093,6 +1593,13 @@ methods:
       Inserts a text node containing `arg1` at the position specified by `arg0`.
 
       Throws `TypeError` if `arg0` is not supported `Position`.
+  matches:
+    args:
+      -
+        - String
+    docs: Element.matches
+    text: |-
+      Returns whether this element matches the supplied CSS selector.
   moveBefore:
     args:
       -
@@ -1146,7 +1653,7 @@ methods:
   removeAttribute:
     args:
       -
-        - String
+        - (anonymous namespace)::Attr::Name
     docs: Element.removeAttribute
     text: |-
       Removes the attribute named `arg0`.
@@ -1169,10 +1676,20 @@ methods:
     docs: Element.replaceChildren
     text: |-
       Replaces the children of `this` `Element` with the specified nodes or strings.
+  replaceWith:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: Element.replaceWith
+    text: |-
+      Replaces this node with the supplied nodes or strings.
   setAttribute:
     args:
       -
-        - String
+        - (anonymous namespace)::Attr::Name
         - Any
     docs: Element.setAttribute
     text: |-
@@ -1206,9 +1723,9 @@ methods:
   toggleAttribute:
     args:
       -
-        - String
+        - (anonymous namespace)::Attr::Name
       -
-        - String
+        - (anonymous namespace)::Attr::Name
         - Boolean
     docs: Element.toggleAttribute
     text: |-
@@ -1228,7 +1745,33 @@ text: |-
   `Document` is the common base class for `HTMLDocument` and `XMLDocument`.
 also:
   - https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement
+properties:
+  doctype:
+    getter: true
+    docs: Document.doctype
+    text: |-
+      Returns this document's document type declaration, or `null` when none exists.
 methods:
+  append:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: Document.append
+    text: |-
+      Appends the supplied nodes or strings after the existing children.
+  prepend:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: Document.prepend
+    text: |-
+      Inserts the supplied nodes or strings before the existing children.
   querySelector:
     args:
       -
@@ -1251,6 +1794,16 @@ methods:
       > When used with XML documents, only a subset of CSS selectors is supported. Selectors that rely on HTML-specific semantics or browser features may not be available.{.warning}
     also:
       - topic:selectors
+  replaceChildren:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+    docs: Document.replaceChildren
+    text: |-
+      Replaces all children with the supplied nodes or strings.
 statics:
   html:
     args:
@@ -1269,6 +1822,8 @@ statics:
     args:
       -
         - String
+      -
+        - XML
     docs: Document.xml
     text: |-
       Creates and returns a new `XMLDocument` by parsing arg0 as XML.
@@ -1291,6 +1846,27 @@ properties:
     text: |-
       Returns the root `Element` of `this` `XMLdocument`.
 methods:
+  createAttribute:
+    args:
+      -
+        - String
+    docs: XMLDocument.createAttribute
+    text: |-
+      Creates an attribute with the supplied qualified name.
+  createCDATASection:
+    args:
+      -
+        - String
+    docs: XMLDocument.createCDATASection
+    text: |-
+      Creates a CDATA section containing the supplied text.
+  createComment:
+    args:
+      -
+        - String
+    docs: XMLDocument.createComment
+    text: |-
+      Creates a comment node containing the supplied text.
   createElement:
     args:
       -
@@ -1300,6 +1876,14 @@ methods:
       Creates and returns a new `Element` with the specified tag name.
 
       The returned `Element` is not automatically inserted into `this` `XMLDocument`.
+  createProcessingInstruction:
+    args:
+      -
+        - String
+        - String
+    docs: XMLDocument.createProcessingInstruction
+    text: |-
+      Creates a processing instruction with the supplied target and data.
   createTextNode:
     args:
       -
@@ -1487,6 +2071,16 @@ properties:
 
       > This property is read-only. Unlike the standard DOM API, assigning a new value to `cssText` is not supported.
       {.warning}
+  parentRule:
+    getter: true
+    docs: CSSRule.parentRule
+    text: |-
+      Returns the containing CSS rule, or `null` when this rule is not nested.
+  parentStyleSheet:
+    getter: true
+    docs: CSSRule.parentStyleSheet
+    text: |-
+      Returns the style sheet containing this rule, or `null` when it is detached.
   type:
     getter: true
     docs: CSSRule.type
@@ -1798,13 +2392,6 @@ methods:
       Inserts the specified nodes, HTML fragments, images, SVG documents, or strings immediately before `this` `HTMLElement`.
 
       String arguments are converted to text nodes. Arguments are inserted in the order they are provided.
-  closest:
-    args:
-      -
-        - String
-    docs: HTMLElement.closest
-    text: |-
-      Returns the nearest ancestor `this` `HTMLElement` (or the `HTMLElement` itself) matching the specified CSS selector or `null` if no matching `HTMLElement` is found.
   getAttributeNS:
     args:
       -
@@ -1819,7 +2406,7 @@ methods:
   getAttributeNode:
     args:
       -
-        - String
+        - (anonymous namespace)::Attr::Name
     docs: HTMLElement.getAttributeNode
     text: |-
       Returns the specified attribute of `this` `HTMLElement`, as an `Attr` node or `null` if the attribute does not exist.
@@ -1951,13 +2538,6 @@ methods:
       - `DOMException (HierarchyRequestError)` if `arg0` is ancestor of this `Node`.
       - `DOMException (NotFoundError)` if `arg1` is not `null` and isn't child of this `Node`.
       - `DOMException (WrongDocumentError)` if `arg0` and this `Node` belong to different documents.
-  matches:
-    args:
-      -
-        - String
-    docs: HTMLElement.matches
-    text: |-
-      Returns `true` if `this` `Element` matches the specified CSS selector `arg0`, otherwise returns `false`.
   moveBefore:
     args:
       -
@@ -1980,7 +2560,7 @@ methods:
         - "Null"
     docs: HTMLElement.moveBefore
     text: |-
-      HTMLElement.moveBefore
+      Moves the supplied node before the reference child without resetting its state.
   prepend:
     args:
       -
@@ -2003,7 +2583,7 @@ methods:
         - String
       -
         - String
-        - String
+        - (anonymous namespace)::Attr::Name
     docs: HTMLElement.removeAttributeNS
     text: |-
       Removes the specified namespaced attribute.
@@ -2056,6 +2636,19 @@ methods:
     docs: HTMLElement.replaceChildren
     text: |-
       Replaces the children of `this` `Element` with the specified nodes, HTML fragments, images, SVG documents, or strings.
+  replaceWith:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: HTMLElement.replaceWith
+    text: |-
+      Replaces this node with the supplied nodes or strings.
   setAttributeNS:
     args:
       -
@@ -2113,6 +2706,228 @@ methods:
     text: |-
       Returns the serialized representation of `this` `HTMLElement`. Equivalent to reading the `outerHTML` property.
 ---
+class: HTMLAreaElement
+base: HTMLElement
+docs: HTMLAreaElement
+text: |-
+  Represents an HTML `<area>` element.
+---
+class: HTMLBodyElement
+base: HTMLElement
+docs: HTMLBodyElement
+text: |-
+  Represents an HTML `<body>` element.
+---
+class: HTMLBRElement
+base: HTMLElement
+docs: HTMLBRElement
+text: |-
+  Represents an HTML `<br>` element.
+---
+class: HTMLCanvasElement
+base: HTMLElement
+docs: HTMLCanvasElement
+text: |-
+  Represents an HTML `<canvas>` element.
+---
+class: HTMLDetailsElement
+base: HTMLElement
+docs: HTMLDetailsElement
+text: |-
+  Represents an HTML `<details>` element.
+---
+class: HTMLDialogElement
+base: HTMLElement
+docs: HTMLDialogElement
+text: |-
+  Represents an HTML `<dialog>` element.
+---
+class: HTMLDivElement
+base: HTMLElement
+docs: HTMLDivElement
+text: |-
+  Represents an HTML `<div>` element.
+---
+class: HTMLEmbedElement
+base: HTMLElement
+docs: HTMLEmbedElement
+text: |-
+  Represents an HTML `<embed>` element.
+---
+class: HTMLHeadElement
+base: HTMLElement
+docs: HTMLHeadElement
+text: |-
+  Represents an HTML `<head>` element.
+---
+class: HTMLHeadingElement
+base: HTMLElement
+docs: HTMLHeadingElement
+text: |-
+  Represents an HTML heading element, from `<h1>` through `<h6>`.
+---
+class: HTMLHRElement
+base: HTMLElement
+docs: HTMLHRElement
+text: |-
+  Represents an HTML `<hr>` element.
+---
+class: HTMLHtmlElement
+base: HTMLElement
+docs: HTMLHtmlElement
+text: |-
+  Represents an HTML `<html>` element.
+---
+class: HTMLIFrameElement
+base: HTMLElement
+docs: HTMLIFrameElement
+text: |-
+  Represents an HTML `<iframe>` element.
+---
+class: HTMLLegendElement
+base: HTMLElement
+docs: HTMLLegendElement
+text: |-
+  Represents an HTML `<legend>` element.
+---
+class: HTMLMapElement
+base: HTMLElement
+docs: HTMLMapElement
+text: |-
+  Represents an HTML `<map>` element.
+---
+class: HTMLMediaElement
+base: HTMLElement
+docs: HTMLMediaElement
+text: |-
+  Provides the shared interface for HTML `<audio>` and `<video>` elements.
+---
+class: HTMLAudioElement
+base: HTMLMediaElement
+docs: HTMLAudioElement
+text: |-
+  Represents an HTML `<audio>` element.
+---
+class: HTMLMenuElement
+base: HTMLElement
+docs: HTMLMenuElement
+text: |-
+  Represents an HTML `<menu>` element.
+---
+class: HTMLMeterElement
+base: HTMLElement
+docs: HTMLMeterElement
+text: |-
+  Represents an HTML `<meter>` element.
+---
+class: HTMLModElement
+base: HTMLElement
+docs: HTMLModElement
+text: |-
+  Represents an HTML `<ins>` or `<del>` modification element.
+---
+class: HTMLObjectElement
+base: HTMLElement
+docs: HTMLObjectElement
+text: |-
+  Represents an HTML `<object>` element.
+---
+class: HTMLOutputElement
+base: HTMLElement
+docs: HTMLOutputElement
+text: |-
+  Represents an HTML `<output>` element.
+---
+class: HTMLParagraphElement
+base: HTMLElement
+docs: HTMLParagraphElement
+text: |-
+  Represents an HTML `<p>` element.
+---
+class: HTMLParamElement
+base: HTMLElement
+docs: HTMLParamElement
+text: |-
+  Represents an HTML `<param>` element.
+---
+class: HTMLPictureElement
+base: HTMLElement
+docs: HTMLPictureElement
+text: |-
+  Represents an HTML `<picture>` element.
+---
+class: HTMLPreElement
+base: HTMLElement
+docs: HTMLPreElement
+text: |-
+  Represents an HTML `<pre>` element.
+---
+class: HTMLProgressElement
+base: HTMLElement
+docs: HTMLProgressElement
+text: |-
+  Represents an HTML `<progress>` element.
+---
+class: HTMLQuoteElement
+base: HTMLElement
+docs: HTMLQuoteElement
+text: |-
+  Represents an HTML `<q>` or `<blockquote>` quotation element.
+---
+class: HTMLScriptElement
+base: HTMLElement
+docs: HTMLScriptElement
+text: |-
+  Represents an HTML `<script>` element.
+---
+class: HTMLSourceElement
+base: HTMLElement
+docs: HTMLSourceElement
+text: |-
+  Represents an HTML `<source>` element.
+---
+class: HTMLSpanElement
+base: HTMLElement
+docs: HTMLSpanElement
+text: |-
+  Represents an HTML `<span>` element.
+---
+class: HTMLTableCaptionElement
+base: HTMLElement
+docs: HTMLTableCaptionElement
+text: |-
+  Represents an HTML `<caption>` element.
+---
+class: HTMLTableColElement
+base: HTMLElement
+docs: HTMLTableColElement
+text: |-
+  Represents an HTML `<col>` or `<colgroup>` table-column element.
+---
+class: HTMLTitleElement
+base: HTMLElement
+docs: HTMLTitleElement
+text: |-
+  Represents an HTML `<title>` element.
+---
+class: HTMLTrackElement
+base: HTMLElement
+docs: HTMLTrackElement
+text: |-
+  Represents an HTML `<track>` element.
+---
+class: HTMLUListElement
+base: HTMLElement
+docs: HTMLUListElement
+text: |-
+  Represents an HTML `<ul>` element.
+---
+class: HTMLVideoElement
+base: HTMLMediaElement
+docs: HTMLVideoElement
+text: |-
+  Represents an HTML `<video>` element.
+---
 class: HTMLAnchorElement
 base: HTMLElement
 docs: HTMLAnchorElement
@@ -2155,6 +2970,252 @@ properties:
     text: |-
       Gets or sets the value of the `target` attribute.
 ---
+class: HTMLBaseElement
+base: HTMLElement
+docs: HTMLBaseElement
+text: |-
+  Represents an HTML `<base>` element.
+properties:
+  href:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLBaseElement.href
+    text: |-
+      Gets or sets the document base URL declared by this `<base>` element.
+  target:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLBaseElement.target
+    text: |-
+      Gets or sets the default browsing-context target for links and forms.
+---
+class: HTMLButtonElement
+base: HTMLElement
+docs: HTMLButtonElement
+text: |-
+  Represents an HTML `<button>` element.
+properties:
+  command:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLButtonElement.command
+    text: |-
+      Gets or sets the element's `command` content attribute.
+  form:
+    getter: true
+    docs: HTMLButtonElement.form
+    text: |-
+      Returns the form owner of this button, or `null` when it has none.
+  name:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLButtonElement.name
+    text: |-
+      Gets or sets the element's `name` content attribute.
+  type:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLButtonElement.type
+    text: |-
+      Gets or sets the element's `type` content attribute.
+  value:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLButtonElement.value
+    text: |-
+      Gets or sets the element's `value` content attribute.
+---
+class: HTMLDataElement
+base: HTMLElement
+docs: HTMLDataElement
+text: |-
+  Represents an HTML `<data>` element.
+properties:
+  value:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLDataElement.value
+    text: |-
+      Gets or sets the element's `value` content attribute.
+---
+class: HTMLLabelElement
+base: HTMLElement
+docs: HTMLLabelElement
+text: |-
+  Represents an HTML `<label>` element.
+properties:
+  control:
+    getter: true
+    docs: HTMLLabelElement.control
+    text: |-
+      Returns the form control associated with this label, or `null`.
+  form:
+    getter: true
+    docs: HTMLLabelElement.form
+    text: |-
+      Returns the form owner of the labeled control, or `null`.
+  htmlFor:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLLabelElement.htmlFor
+    text: |-
+      Gets or sets the element's `for` content attribute.
+---
+class: HTMLFormElement
+base: HTMLElement
+docs: HTMLFormElement
+text: |-
+  Represents an HTML `<form>` element.
+properties:
+  action:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLFormElement.action
+    text: |-
+      Gets or sets the element's `action` content attribute.
+  autocomplete:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLFormElement.autocomplete
+    text: |-
+      Gets or sets the element's `autocomplete` content attribute.
+  elements:
+    getter: true
+    docs: HTMLFormElement.elements
+    text: |-
+      Returns the form's listed controls as an `HTMLCollection`.
+  encoding:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLFormElement.encoding
+    text: |-
+      Gets or sets the form submission encoding; this is an alias of `enctype`.
+  enctype:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLFormElement.enctype
+    text: |-
+      Gets or sets the element's `enctype` content attribute.
+  length:
+    getter: true
+    docs: HTMLFormElement.length
+    text: |-
+      Returns the number of controls in the form's `elements` collection.
+  method:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLFormElement.method
+    text: |-
+      Gets or sets the element's `method` content attribute.
+  name:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLFormElement.name
+    text: |-
+      Gets or sets the element's `name` content attribute.
+  rel:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLFormElement.rel
+    text: |-
+      Gets or sets the element's `rel` content attribute.
+  relList:
+    getter: true
+    docs: HTMLFormElement.relList
+    text: |-
+      Returns the form's `rel` tokens as a `DOMTokenList`.
+  target:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLFormElement.target
+    text: |-
+      Gets or sets the element's `target` content attribute.
+---
+class: HTMLFieldSetElement
+base: HTMLElement
+docs: HTMLFieldSetElement
+text: |-
+  Represents an HTML `<fieldset>` element.
+properties:
+  disabled:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLFieldSetElement.disabled
+    text: |-
+      Gets or sets the element's `disabled` content attribute.
+  elements:
+    getter: true
+    docs: HTMLFieldSetElement.elements
+    text: |-
+      Returns the form controls contained by this field set.
+  form:
+    getter: true
+    docs: HTMLFieldSetElement.form
+    text: |-
+      Returns the form owner of this field set, or `null`.
+  name:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLFieldSetElement.name
+    text: |-
+      Gets or sets the element's `name` content attribute.
+  type:
+    getter: true
+    docs: HTMLFieldSetElement.type
+    text: |-
+      Returns the fixed string `fieldset`.
+---
+class: HTMLInputElement
+base: HTMLElement
+docs: HTMLInputElement
+text: |-
+  Represents an HTML `<input>` element.
+properties:
+  form:
+    getter: true
+    docs: HTMLInputElement.form
+    text: |-
+      Returns the form owner of this input, or `null`.
+  name:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLInputElement.name
+    text: |-
+      Gets or sets the element's `name` content attribute.
+  type:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLInputElement.type
+    text: |-
+      Gets or sets the element's `type` content attribute.
+  value:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLInputElement.value
+    text: |-
+      Gets or sets the element's `value` content attribute.
+---
 class: HTMLImageElement
 base: HTMLElement
 docs: HTMLImageElement
@@ -2183,6 +3244,20 @@ properties:
     docs: HTMLImageElement.src
     text: |-
       Gets or sets the value of the `src` attribute.
+---
+class: HTMLLIElement
+base: HTMLElement
+docs: HTMLLIElement
+text: |-
+  Represents an HTML `<li>` element.
+properties:
+  value:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLLIElement.value
+    text: |-
+      Gets or sets the element's `value` content attribute.
 ---
 class: HTMLLinkElement
 base: HTMLElement
@@ -2219,6 +3294,41 @@ properties:
     text: |-
       Returns a `DOMTokenList` representing the tokens in the `rel` attribute.
 ---
+class: HTMLMetaElement
+base: HTMLElement
+docs: HTMLMetaElement
+text: |-
+  Represents an HTML `<meta>` element.
+properties:
+  content:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLMetaElement.content
+    text: |-
+      Gets or sets the element's `content` content attribute.
+  httpEquiv:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLMetaElement.httpEquiv
+    text: |-
+      Gets or sets the element's `http-equiv` content attribute.
+  media:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLMetaElement.media
+    text: |-
+      Gets or sets the element's `media` content attribute.
+  name:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLMetaElement.name
+    text: |-
+      Gets or sets the element's `name` content attribute.
+---
 class: HTMLStyleElement
 base: HTMLElement
 docs: HTMLStyleElement
@@ -2233,6 +3343,526 @@ properties:
     text: |-
       Contains the `CSSStyleSheet` associated with `this` `<style>` element.
 ---
+class: HTMLTimeElement
+base: HTMLElement
+docs: HTMLTimeElement
+text: |-
+  Represents an HTML `<time>` element.
+properties:
+  dateTime:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLTimeElement.dateTime
+    text: |-
+      Gets or sets the element's `datetime` content attribute.
+---
+class: HTMLTableElement
+base: HTMLElement
+docs: HTMLTableElement
+text: |-
+  Represents an HTML `<table>` element.
+properties:
+  caption:
+    getter: true
+    docs: HTMLTableElement.caption
+    text: |-
+      Returns the table's `<caption>` element, or `null`.
+  rows:
+    getter: true
+    docs: HTMLTableElement.rows
+    text: |-
+      Returns a live collection of all rows in the table.
+  tBodies:
+    getter: true
+    docs: HTMLTableElement.tBodies
+    text: |-
+      Returns a live collection of the table's `<tbody>` elements.
+  tFoot:
+    getter: true
+    docs: HTMLTableElement.tFoot
+    text: |-
+      Returns the table's `<tfoot>` element, or `null`.
+  tHead:
+    getter: true
+    docs: HTMLTableElement.tHead
+    text: |-
+      Returns the table's `<thead>` element, or `null`.
+methods:
+  createCaption:
+    args:
+      -
+        []
+    docs: HTMLTableElement.createCaption
+    text: |-
+      Returns the existing table caption or creates and returns a new one.
+  createTBody:
+    args:
+      -
+        []
+    docs: HTMLTableElement.createTBody
+    text: |-
+      Creates, appends, and returns a new `<tbody>` element.
+  createTFoot:
+    args:
+      -
+        []
+    docs: HTMLTableElement.createTFoot
+    text: |-
+      Returns the existing table footer or creates and returns a new one.
+  createTHead:
+    args:
+      -
+        []
+    docs: HTMLTableElement.createTHead
+    text: |-
+      Returns the existing table header or creates and returns a new one.
+  deleteCaption:
+    args:
+      -
+        []
+    docs: HTMLTableElement.deleteCaption
+    text: |-
+      Removes the table caption when one exists.
+  deleteRow:
+    args:
+      -
+        - Number
+    docs: HTMLTableElement.deleteRow
+    text: |-
+      Removes the row at the supplied index.
+  deleteTFoot:
+    args:
+      -
+        []
+    docs: HTMLTableElement.deleteTFoot
+    text: |-
+      Removes the table footer when one exists.
+  deleteTHead:
+    args:
+      -
+        []
+    docs: HTMLTableElement.deleteTHead
+    text: |-
+      Removes the table header when one exists.
+  insertRow:
+    args:
+      -
+        []
+      -
+        - Number
+    docs: HTMLTableElement.insertRow
+    text: |-
+      Inserts and returns a row at the supplied index.
+---
+class: HTMLTableCellElement
+base: HTMLElement
+docs: HTMLTableCellElement
+text: |-
+  Represents an HTML `<td>` or `<th>` table cell.
+properties:
+  abbr:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLTableCellElement.abbr
+    text: |-
+      Gets or sets the element's `abbr` content attribute.
+  cellIndex:
+    getter: true
+    docs: HTMLTableCellElement.cellIndex
+    text: |-
+      Returns this cell's position within its row, or `-1` when detached.
+  colSpan:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLTableCellElement.colSpan
+    text: |-
+      Gets or sets the element's `colspan` content attribute.
+  headers:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLTableCellElement.headers
+    text: |-
+      Gets or sets the element's `headers` content attribute.
+  rowSpan:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLTableCellElement.rowSpan
+    text: |-
+      Gets or sets the element's `rowspan` content attribute.
+  scope:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLTableCellElement.scope
+    text: |-
+      Gets or sets the element's `scope` content attribute.
+---
+class: HTMLTableRowElement
+base: HTMLElement
+docs: HTMLTableRowElement
+text: |-
+  Represents an HTML `<tr>` element.
+properties:
+  cells:
+    getter: true
+    docs: HTMLTableRowElement.cells
+    text: |-
+      Returns a live collection of this row's cells.
+  rowIndex:
+    getter: true
+    docs: HTMLTableRowElement.rowIndex
+    text: |-
+      Returns this row's position within the table, or `-1` when detached.
+  sectionRowIndex:
+    getter: true
+    docs: HTMLTableRowElement.sectionRowIndex
+    text: |-
+      Returns this row's position within its table section, or `-1` when detached.
+methods:
+  deleteCell:
+    args:
+      -
+        - Number
+    docs: HTMLTableRowElement.deleteCell
+    text: |-
+      Removes the cell at the supplied index.
+  insertCell:
+    args:
+      -
+        []
+      -
+        - Number
+    docs: HTMLTableRowElement.insertCell
+    text: |-
+      Inserts and returns a cell at the supplied index.
+---
+class: HTMLTableSectionElement
+base: HTMLElement
+docs: HTMLTableSectionElement
+text: |-
+  Represents an HTML `<thead>`, `<tbody>`, or `<tfoot>` table section.
+properties:
+  rows:
+    getter: true
+    docs: HTMLTableSectionElement.rows
+    text: |-
+      Returns a live collection of rows in this table section.
+methods:
+  deleteRow:
+    args:
+      -
+        - Number
+    docs: HTMLTableSectionElement.deleteRow
+    text: |-
+      Removes the row at the supplied index.
+  insertRow:
+    args:
+      -
+        []
+      -
+        - Number
+    docs: HTMLTableSectionElement.insertRow
+    text: |-
+      Inserts and returns a row at the supplied index.
+---
+class: HTMLDataListElement
+base: HTMLElement
+docs: HTMLDataListElement
+text: |-
+  Represents an HTML `<datalist>` element.
+properties:
+  options:
+    getter: true
+    docs: HTMLDataListElement.options
+    text: |-
+      Returns the `<option>` elements contained by this data list.
+---
+class: HTMLOListElement
+base: HTMLElement
+docs: HTMLOListElement
+text: |-
+  Represents an HTML `<ol>` element.
+properties:
+  reversed:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLOListElement.reversed
+    text: |-
+      Gets or sets the element's `reversed` content attribute.
+  start:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLOListElement.start
+    text: |-
+      Gets or sets the element's `start` content attribute.
+  type:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLOListElement.type
+    text: |-
+      Gets or sets the element's `type` content attribute.
+---
+class: HTMLOptGroupElement
+base: HTMLElement
+docs: HTMLOptGroupElement
+text: |-
+  Represents an HTML `<optgroup>` element.
+properties:
+  disabled:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLOptGroupElement.disabled
+    text: |-
+      Gets or sets the element's `disabled` content attribute.
+  label:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLOptGroupElement.label
+    text: |-
+      Gets or sets the element's `label` content attribute.
+---
+class: HTMLOptionElement
+base: HTMLElement
+docs: HTMLOptionElement
+text: |-
+  Represents an HTML `<option>` element.
+properties:
+  defaultSelected:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLOptionElement.defaultSelected
+    text: |-
+      Gets or sets the element's `selected` content attribute.
+  disabled:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLOptionElement.disabled
+    text: |-
+      Gets or sets the element's `disabled` content attribute.
+  form:
+    getter: true
+    docs: HTMLOptionElement.form
+    text: |-
+      Returns the form owner of this option, or `null`.
+  index:
+    getter: true
+    docs: HTMLOptionElement.index
+    text: |-
+      Returns this option's position in its containing list, or `-1` when detached.
+  label:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLOptionElement.label
+    text: |-
+      Gets or sets the element's `label` content attribute.
+  selected:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLOptionElement.selected
+    text: |-
+      Gets or sets whether this option is currently selected.
+  text:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLOptionElement.text
+    text: |-
+      Gets or sets the option's displayed text.
+  value:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLOptionElement.value
+    text: |-
+      Gets or sets the element's `value` content attribute.
+---
+class: HTMLSelectElement
+base: HTMLElement
+docs: HTMLSelectElement
+text: |-
+  Represents an HTML `<select>` element.
+properties:
+  autocomplete:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLSelectElement.autocomplete
+    text: |-
+      Gets or sets the element's `autocomplete` content attribute.
+  disabled:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLSelectElement.disabled
+    text: |-
+      Gets or sets the element's `disabled` content attribute.
+  form:
+    getter: true
+    docs: HTMLSelectElement.form
+    text: |-
+      Returns the form owner of this select element, or `null`.
+  length:
+    getter: true
+    setter:
+      - Number
+    docs: HTMLSelectElement.length
+    text: |-
+      Gets or sets the number of options in the select element.
+  multiple:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLSelectElement.multiple
+    text: |-
+      Gets or sets the element's `multiple` content attribute.
+  name:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLSelectElement.name
+    text: |-
+      Gets or sets the element's `name` content attribute.
+  options:
+    getter: true
+    docs: HTMLSelectElement.options
+    text: |-
+      Returns the collection of options in this select element.
+  required:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLSelectElement.required
+    text: |-
+      Gets or sets the element's `required` content attribute.
+  selectedIndex:
+    getter: true
+    setter:
+      - Number
+    docs: HTMLSelectElement.selectedIndex
+    text: |-
+      Gets or sets the index of the first selected option, or `-1`.
+  selectedOptions:
+    getter: true
+    docs: HTMLSelectElement.selectedOptions
+    text: |-
+      Returns a live collection of the currently selected options.
+  size:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLSelectElement.size
+    text: |-
+      Gets or sets the element's `size` content attribute.
+  type:
+    getter: true
+    docs: HTMLSelectElement.type
+    text: |-
+      Returns `select-one` or `select-multiple` according to the `multiple` state.
+  value:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLSelectElement.value
+    text: |-
+      Gets or sets the element's `value` content attribute.
+methods:
+  add:
+    args:
+      -
+        - HTMLElement
+    docs: HTMLSelectElement.add
+    text: |-
+      Adds an item to this collection.
+  item:
+    args:
+      -
+        - Number
+    docs: HTMLSelectElement.item
+    text: |-
+      Returns the item at the supplied index, or `null` when it is out of range.
+  namedItem:
+    args:
+      -
+        - String
+    docs: HTMLSelectElement.namedItem
+    text: |-
+      Returns the first item with the supplied name or ID, or `null`.
+  remove:
+    args:
+      -
+        - Number
+    docs: HTMLSelectElement.remove
+    text: |-
+      Removes this node from its parent.
+---
+class: HTMLTextAreaElement
+base: HTMLElement
+docs: HTMLTextAreaElement
+text: |-
+  Represents an HTML `<textarea>` element.
+properties:
+  defaultValue:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLTextAreaElement.defaultValue
+    text: |-
+      Gets or sets the element's `value` content attribute.
+  form:
+    getter: true
+    docs: HTMLTextAreaElement.form
+    text: |-
+      Returns the form owner of this text area, or `null`.
+  value:
+    getter: true
+    setter:
+      - Any
+    docs: HTMLTextAreaElement.value
+    text: |-
+      Gets or sets the element's `value` content attribute.
+---
+class: SVGLength
+docs: SVGLength
+text: |-
+  Represents a numeric SVG length value backed by an element attribute.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SVGLength
+properties:
+  baseVal:
+    getter: true
+    docs: SVGLength.baseVal
+    text: |-
+      Contains `this`.
+  value:
+    getter: true
+    setter:
+      - Number
+    docs: SVGLength.value
+    text: |-
+      Gets or sets value of the underlying attribute.
+methods:
+  "[Symbol.toPrimitive]":
+    args:
+      -
+        - String
+    docs: SVGLength.[Symbol.toPrimitive]
+    text: |-
+      Converts value of the underlying attribute to `String` or `Number` depending on the context.
+---
 class: SVGElement
 base: HTMLElement
 docs: SVGElement
@@ -2240,6 +3870,371 @@ text: |-
   Base class for all HTML elements in the SVG namespace.
 also:
   - https://developer.mozilla.org/en-US/docs/Web/API/SVGElement
+properties:
+  attributes:
+    getter: true
+    docs: SVGElement.attributes
+    text: |-
+      Returns the element's attributes as a live `NamedNodeMap`.
+  classList:
+    getter: true
+    docs: SVGElement.classList
+    text: |-
+      Returns a live `DOMTokenList` for the element's `class` attribute.
+  className:
+    getter: true
+    setter:
+      - Any
+    docs: SVGElement.className
+    text: |-
+      Gets or sets the element's `class` attribute.
+  dataset:
+    getter: true
+    docs: SVGElement.dataset
+    text: |-
+      Returns the element's `data-*` attributes through a `DOMStringMap`.
+  id:
+    getter: true
+    setter:
+      - Any
+    docs: SVGElement.id
+    text: |-
+      Gets or sets the element's `id` attribute.
+  innerHTML:
+    getter: true
+    setter:
+      - HTML
+      - Any
+    docs: SVGElement.innerHTML
+    text: |-
+      Gets or replaces the markup contained by this element.
+  outerHTML:
+    getter: true
+    setter:
+      - HTML
+      - Any
+    docs: SVGElement.outerHTML
+    text: |-
+      Gets this element's serialized markup or replaces the element from markup.
+  ownerSVGElement:
+    getter: true
+    docs: SVGElement.ownerSVGElement
+    text: |-
+      Returns the nearest containing `<svg>` element, or `null` for the outermost element.
+  style:
+    getter: true
+    docs: SVGElement.style
+    text: |-
+      Returns the element's inline style declaration.
+methods:
+  after:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: SVGElement.after
+    text: |-
+      Inserts the supplied nodes or strings immediately after this node.
+  append:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: SVGElement.append
+    text: |-
+      Appends the supplied nodes or strings after the existing children.
+  appendChild:
+    args:
+      -
+        - Node
+      -
+        - Image
+      -
+        - SVG
+    docs: SVGElement.appendChild
+    text: |-
+      Appends the supplied node as the last child and returns it.
+  before:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: SVGElement.before
+    text: |-
+      Inserts the supplied nodes or strings immediately before this node.
+  getAttributeNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: SVGElement.getAttributeNS
+    text: |-
+      Reflects the `<>` element's `getAttributeNS` attribute.
+  getAttributeNode:
+    args:
+      -
+        - (anonymous namespace)::Attr::Name
+    docs: SVGElement.getAttributeNode
+    text: |-
+      Reflects the `<>` element's `getAttributeNode` attribute.
+  getAttributeNodeNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: SVGElement.getAttributeNodeNS
+    text: |-
+      Reflects the `<>` element's `getAttributeNodeNS` attribute.
+  getElementsByClassName:
+    args:
+      -
+        - String
+    docs: SVGElement.getElementsByClassName
+    text: |-
+      Reflects the `<>` element's `getElementsByClassName` attribute.
+  getElementsByTagName:
+    args:
+      -
+        - String
+    docs: SVGElement.getElementsByTagName
+    text: |-
+      Reflects the `<>` element's `getElementsByTagName` attribute.
+  getElementsByTagNameNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: SVGElement.getElementsByTagNameNS
+    text: |-
+      Reflects the `<>` element's `getElementsByTagNameNS` attribute.
+  getHTML:
+    args:
+      -
+        []
+    docs: SVGElement.getHTML
+    text: |-
+      Reflects the `<>` element's `getHTML` attribute.
+  hasAttributeNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: SVGElement.hasAttributeNS
+    text: |-
+      Reflects the `<>` element's `hasAttributeNS` attribute.
+  insertAdjacentElement:
+    args:
+      -
+        - Element.Position
+        - Element
+      -
+        - Element.Position
+        - Image
+      -
+        - Element.Position
+        - SVG
+    docs: SVGElement.insertAdjacentElement
+    text: |-
+      Reflects the `<>` element's `insertAdjacentElement` attribute.
+  insertAdjacentHTML:
+    args:
+      -
+        - Element.Position
+        - String
+      -
+        - Element.Position
+        - HTML
+    docs: SVGElement.insertAdjacentHTML
+    text: |-
+      Reflects the `<>` element's `insertAdjacentHTML` attribute.
+  insertBefore:
+    args:
+      -
+        - Node
+        - "Null"
+      -
+        - Node
+        - Node
+      -
+        - Image
+        - Node
+      -
+        - SVG
+        - Node
+      -
+        - Image
+        - "Null"
+      -
+        - SVG
+        - "Null"
+    docs: SVGElement.insertBefore
+    text: |-
+      Inserts a node before the reference child, or appends it when the reference is `null`.
+  moveBefore:
+    args:
+      -
+        - Node
+        - "Null"
+      -
+        - Node
+        - Node
+      -
+        - Image
+        - Node
+      -
+        - SVG
+        - Node
+      -
+        - Image
+        - "Null"
+      -
+        - SVG
+        - "Null"
+    docs: SVGElement.moveBefore
+    text: |-
+      Moves the supplied node before the reference child without resetting its state.
+  prepend:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: SVGElement.prepend
+    text: |-
+      Inserts the supplied nodes or strings before the existing children.
+  removeAttributeNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - (anonymous namespace)::Attr::Name
+    docs: SVGElement.removeAttributeNS
+    text: |-
+      Reflects the `<>` element's `removeAttributeNS` attribute.
+  removeAttributeNode:
+    args:
+      -
+        - Attr
+    docs: SVGElement.removeAttributeNode
+    text: |-
+      Reflects the `<>` element's `removeAttributeNode` attribute.
+  replaceChild:
+    args:
+      -
+        - Node
+        - Node
+      -
+        - HTML
+        - Node
+      -
+        - Image
+        - Node
+      -
+        - SVG
+        - Node
+    docs: SVGElement.replaceChild
+    text: |-
+      Replaces one child with another and returns the removed child.
+  replaceChildren:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: SVGElement.replaceChildren
+    text: |-
+      Replaces all children with the supplied nodes or strings.
+  replaceWith:
+    args:
+      -
+        - Tail:
+            - 1
+            - Node
+            - String
+            - HTML
+            - Image
+            - SVG
+    docs: SVGElement.replaceWith
+    text: |-
+      Replaces this node with the supplied nodes or strings.
+  setAttributeNS:
+    args:
+      -
+        - "Null"
+        - String
+        - Any
+      -
+        - String
+        - String
+        - Any
+    docs: SVGElement.setAttributeNS
+    text: |-
+      Reflects the `<>` element's `setAttributeNS` attribute.
+  setAttributeNode:
+    args:
+      -
+        - Object
+    docs: SVGElement.setAttributeNode
+    text: |-
+      Reflects the `<>` element's `setAttributeNode` attribute.
+  setAttributeNodeNS:
+    args:
+      -
+        - Object
+    docs: SVGElement.setAttributeNodeNS
+    text: |-
+      Reflects the `<>` element's `setAttributeNodeNS` attribute.
+  toJSON:
+    args:
+      -
+        []
+    docs: SVGElement.toJSON
+    text: |-
+      Reflects the `<>` element's `toJSON` attribute.
+  toString:
+    args:
+      -
+        []
+    docs: SVGElement.toString
+    text: |-
+      Reflects the `<>` element's `toString` attribute.
 ---
 class: SVGSVGElement
 base: SVGElement
@@ -2254,6 +4249,39 @@ also:
   - image
 impl:
   - SVG::Interface
+properties:
+  height:
+    getter: true
+    docs: SVGSVGElement.height
+    text: |-
+      Reflects the `<svg>` element's `height` attribute.
+  preserveAspectRatio:
+    getter: true
+    setter:
+      - Any
+    docs: SVGSVGElement.preserveAspectRatio
+    text: |-
+      Reflects the `<svg>` element's `preserveAspectRatio` attribute.
+  viewBox:
+    getter: true
+    docs: SVGSVGElement.viewBox
+    text: |-
+      Returns this element's current SVG view box.
+  width:
+    getter: true
+    docs: SVGSVGElement.width
+    text: |-
+      Reflects the `<svg>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGSVGElement.x
+    text: |-
+      Reflects the `<svg>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGSVGElement.y
+    text: |-
+      Reflects the `<svg>` element's `y` attribute.
 ---
 class: SVGGraphicsElement
 base: SVGElement
@@ -2271,6 +4299,1906 @@ methods:
     text: |-
       Returns a `DOMRect` representing the bounding box of this element.
 ---
+class: SVGAnimationElement
+base: SVGElement
+docs: SVGAnimationElement
+text: |-
+  Provides the shared timing and value attributes used by SVG animation elements.
+properties:
+  attributeName:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAnimationElement.attributeName
+    text: |-
+      Reflects the `<animation>` element's `attributeName` attribute.
+  begin:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAnimationElement.begin
+    text: |-
+      Reflects the `<animation>` element's `begin` attribute.
+  by:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAnimationElement.by
+    text: |-
+      Reflects the `<animation>` element's `by` attribute.
+  dur:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAnimationElement.dur
+    text: |-
+      Reflects the `<animation>` element's `dur` attribute.
+  end:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAnimationElement.end
+    text: |-
+      Reflects the `<animation>` element's `end` attribute.
+  fill:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAnimationElement.fill
+    text: |-
+      Reflects the `<animation>` element's `fill` attribute.
+  from:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAnimationElement.from
+    text: |-
+      Reflects the `<animation>` element's `from` attribute.
+  repeatCount:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAnimationElement.repeatCount
+    text: |-
+      Reflects the `<animation>` element's `repeatCount` attribute.
+  to:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAnimationElement.to
+    text: |-
+      Reflects the `<animation>` element's `to` attribute.
+  values:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAnimationElement.values
+    text: |-
+      Reflects the `<animation>` element's `values` attribute.
+---
+class: SVGAnimateElement
+base: SVGAnimationElement
+docs: SVGAnimateElement
+text: |-
+  Represents an SVG `<animate>` element.
+---
+class: SVGAnimateMotionElement
+base: SVGAnimationElement
+docs: SVGAnimateMotionElement
+text: |-
+  Represents an SVG `<animateMotion>` element.
+---
+class: SVGDescElement
+base: SVGElement
+docs: SVGDescElement
+text: |-
+  Represents an SVG `<desc>` element.
+---
+class: SVGMetadataElement
+base: SVGElement
+docs: SVGMetadataElement
+text: |-
+  Represents an SVG `<metadata>` element.
+---
+class: SVGScriptElement
+base: SVGElement
+docs: SVGScriptElement
+text: |-
+  Represents an SVG `<script>` element.
+---
+class: SVGSolidColorElement
+base: SVGElement
+docs: SVGSolidColorElement
+text: |-
+  Represents an SVG `<solidcolor>` element.
+---
+class: SVGTitleElement
+base: SVGElement
+docs: SVGTitleElement
+text: |-
+  Represents an SVG `<title>` element.
+---
+class: SVGDefsElement
+base: SVGGraphicsElement
+docs: SVGDefsElement
+text: |-
+  Represents an SVG `<defs>` element.
+---
+class: SVGGElement
+base: SVGGraphicsElement
+docs: SVGGElement
+text: |-
+  Represents an SVG `<g>` element.
+---
+class: SVGSwitchElement
+base: SVGGraphicsElement
+docs: SVGSwitchElement
+text: |-
+  Represents an SVG `<switch>` element.
+---
+class: SVGSetElement
+base: SVGAnimationElement
+docs: SVGSetElement
+text: |-
+  Represents an SVG `<set>` element.
+---
+class: SVGAElement
+base: SVGGraphicsElement
+docs: SVGAElement
+text: |-
+  Represents an SVG `<a>` element.
+properties:
+  href:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAElement.href
+    text: |-
+      Reflects the `<a>` element's `href` attribute.
+  target:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAElement.target
+    text: |-
+      Reflects the `<a>` element's `target` attribute.
+---
+class: SVGAnimateTransformElement
+base: SVGAnimationElement
+docs: SVGAnimateTransformElement
+text: |-
+  Represents an SVG `<animateTransform>` element.
+properties:
+  type:
+    getter: true
+    setter:
+      - Any
+    docs: SVGAnimateTransformElement.type
+    text: |-
+      Reflects the `<animateTransform>` element's `type` attribute.
+---
+class: SVGCircleElement
+base: SVGGraphicsElement
+docs: SVGCircleElement
+text: |-
+  Represents a SVG `<circle>` element.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SVGCircleElement
+properties:
+  cx:
+    getter: true
+    docs: SVGCircleElement.cx
+    text: |-
+      Returns this element's `cx` attribute as an `SVGLength`.
+  cy:
+    getter: true
+    docs: SVGCircleElement.cy
+    text: |-
+      Returns this element's `cy` attribute as an `SVGLength`.
+  r:
+    getter: true
+    docs: SVGCircleElement.r
+    text: |-
+      Returns this element's `r` attribute as an `SVGLength`.
+---
+class: SVGClipPathElement
+base: SVGElement
+docs: SVGClipPathElement
+text: |-
+  Represents an SVG `<clipPath>` element.
+properties:
+  clipPathUnits:
+    getter: true
+    setter:
+      - Any
+    docs: SVGClipPathElement.clipPathUnits
+    text: |-
+      Reflects the `<clipPath>` element's `clipPathUnits` attribute.
+---
+class: SVGEllipseElement
+base: SVGGraphicsElement
+docs: SVGEllipseElement
+text: |-
+  Represents an SVG `<ellipse>` element.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SVGEllipseElement
+properties:
+  cx:
+    getter: true
+    docs: SVGEllipseElement.cx
+    text: |-
+      Returns this element's `cx` attribute as an `SVGLength`.
+  cy:
+    getter: true
+    docs: SVGEllipseElement.cy
+    text: |-
+      Returns this element's `cy` attribute as an `SVGLength`.
+  rx:
+    getter: true
+    docs: SVGEllipseElement.rx
+    text: |-
+      Returns this element's `rx` attribute as an `SVGLength`.
+  ry:
+    getter: true
+    docs: SVGEllipseElement.ry
+    text: |-
+      Returns this element's `ry` attribute as an `SVGLength`.
+---
+class: SVGFilterElement
+base: SVGElement
+docs: SVGFilterElement
+text: |-
+  Represents an SVG `<filter>` element.
+properties:
+  filterUnits:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFilterElement.filterUnits
+    text: |-
+      Reflects the `<filter>` element's `filterUnits` attribute.
+  height:
+    getter: true
+    docs: SVGFilterElement.height
+    text: |-
+      Reflects the `<filter>` element's `height` attribute.
+  href:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFilterElement.href
+    text: |-
+      Reflects the `<filter>` element's `href` attribute.
+  primitiveUnits:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFilterElement.primitiveUnits
+    text: |-
+      Reflects the `<filter>` element's `primitiveUnits` attribute.
+  width:
+    getter: true
+    docs: SVGFilterElement.width
+    text: |-
+      Reflects the `<filter>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFilterElement.x
+    text: |-
+      Reflects the `<filter>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFilterElement.y
+    text: |-
+      Reflects the `<filter>` element's `y` attribute.
+---
+class: SVGFEBlendElement
+base: SVGElement
+docs: SVGFEBlendElement
+text: |-
+  Represents an SVG `<feBlend>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGFEBlendElement.height
+    text: |-
+      Reflects the `<feBlend>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEBlendElement.in
+    text: |-
+      Reflects the `<feBlend>` element's `in` attribute.
+  in2:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEBlendElement.in2
+    text: |-
+      Reflects the `<feBlend>` element's `in2` attribute.
+  mode:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEBlendElement.mode
+    text: |-
+      Reflects the `<feBlend>` element's `mode` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEBlendElement.result
+    text: |-
+      Reflects the `<feBlend>` element's `result` attribute.
+  width:
+    getter: true
+    docs: SVGFEBlendElement.width
+    text: |-
+      Reflects the `<feBlend>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEBlendElement.x
+    text: |-
+      Reflects the `<feBlend>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEBlendElement.y
+    text: |-
+      Reflects the `<feBlend>` element's `y` attribute.
+---
+class: SVGFEColorMatrixElement
+base: SVGElement
+docs: SVGFEColorMatrixElement
+text: |-
+  Represents an SVG `<feColorMatrix>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGFEColorMatrixElement.height
+    text: |-
+      Reflects the `<feColorMatrix>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEColorMatrixElement.in
+    text: |-
+      Reflects the `<feColorMatrix>` element's `in` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEColorMatrixElement.result
+    text: |-
+      Reflects the `<feColorMatrix>` element's `result` attribute.
+  type:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEColorMatrixElement.type
+    text: |-
+      Reflects the `<feColorMatrix>` element's `type` attribute.
+  values:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEColorMatrixElement.values
+    text: |-
+      Reflects the `<feColorMatrix>` element's `values` attribute.
+  width:
+    getter: true
+    docs: SVGFEColorMatrixElement.width
+    text: |-
+      Reflects the `<feColorMatrix>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEColorMatrixElement.x
+    text: |-
+      Reflects the `<feColorMatrix>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEColorMatrixElement.y
+    text: |-
+      Reflects the `<feColorMatrix>` element's `y` attribute.
+---
+class: SVGFEComponentTransferElement
+base: SVGElement
+docs: SVGFEComponentTransferElement
+text: |-
+  Represents an SVG `<feComponentTransfer>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGFEComponentTransferElement.height
+    text: |-
+      Reflects the `<feComponentTransfer>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEComponentTransferElement.in
+    text: |-
+      Reflects the `<feComponentTransfer>` element's `in` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEComponentTransferElement.result
+    text: |-
+      Reflects the `<feComponentTransfer>` element's `result` attribute.
+  width:
+    getter: true
+    docs: SVGFEComponentTransferElement.width
+    text: |-
+      Reflects the `<feComponentTransfer>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEComponentTransferElement.x
+    text: |-
+      Reflects the `<feComponentTransfer>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEComponentTransferElement.y
+    text: |-
+      Reflects the `<feComponentTransfer>` element's `y` attribute.
+---
+class: SVGFECompositeElement
+base: SVGElement
+docs: SVGFECompositeElement
+text: |-
+  Represents an SVG `<feComposite>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGFECompositeElement.height
+    text: |-
+      Reflects the `<feComposite>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFECompositeElement.in
+    text: |-
+      Reflects the `<feComposite>` element's `in` attribute.
+  in2:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFECompositeElement.in2
+    text: |-
+      Reflects the `<feComposite>` element's `in2` attribute.
+  k1:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFECompositeElement.k1
+    text: |-
+      Reflects the `<feComposite>` element's `k1` attribute.
+  k2:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFECompositeElement.k2
+    text: |-
+      Reflects the `<feComposite>` element's `k2` attribute.
+  k3:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFECompositeElement.k3
+    text: |-
+      Reflects the `<feComposite>` element's `k3` attribute.
+  k4:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFECompositeElement.k4
+    text: |-
+      Reflects the `<feComposite>` element's `k4` attribute.
+  operator:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFECompositeElement.operator
+    text: |-
+      Reflects the `<feComposite>` element's `operator` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFECompositeElement.result
+    text: |-
+      Reflects the `<feComposite>` element's `result` attribute.
+  width:
+    getter: true
+    docs: SVGFECompositeElement.width
+    text: |-
+      Reflects the `<feComposite>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFECompositeElement.x
+    text: |-
+      Reflects the `<feComposite>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFECompositeElement.y
+    text: |-
+      Reflects the `<feComposite>` element's `y` attribute.
+---
+class: SVGFEConvolveMatrixElement
+base: SVGElement
+docs: SVGFEConvolveMatrixElement
+text: |-
+  Represents an SVG `<feConvolveMatrix>` element.
+properties:
+  bias:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEConvolveMatrixElement.bias
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `bias` attribute.
+  divisor:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEConvolveMatrixElement.divisor
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `divisor` attribute.
+  edgeMode:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEConvolveMatrixElement.edgeMode
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `edgeMode` attribute.
+  height:
+    getter: true
+    docs: SVGFEConvolveMatrixElement.height
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEConvolveMatrixElement.in
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `in` attribute.
+  kernelMatrix:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEConvolveMatrixElement.kernelMatrix
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `kernelMatrix` attribute.
+  kernelUnitLength:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEConvolveMatrixElement.kernelUnitLength
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `kernelUnitLength` attribute.
+  order:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEConvolveMatrixElement.order
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `order` attribute.
+  preserveAlpha:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEConvolveMatrixElement.preserveAlpha
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `preserveAlpha` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEConvolveMatrixElement.result
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `result` attribute.
+  targetX:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEConvolveMatrixElement.targetX
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `targetX` attribute.
+  targetY:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEConvolveMatrixElement.targetY
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `targetY` attribute.
+  width:
+    getter: true
+    docs: SVGFEConvolveMatrixElement.width
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEConvolveMatrixElement.x
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEConvolveMatrixElement.y
+    text: |-
+      Reflects the `<feConvolveMatrix>` element's `y` attribute.
+---
+class: SVGFEDiffuseLightingElement
+base: SVGElement
+docs: SVGFEDiffuseLightingElement
+text: |-
+  Represents an SVG `<feDiffuseLighting>` element.
+properties:
+  diffuseConstant:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDiffuseLightingElement.diffuseConstant
+    text: |-
+      Reflects the `<feDiffuseLighting>` element's `diffuseConstant` attribute.
+  height:
+    getter: true
+    docs: SVGFEDiffuseLightingElement.height
+    text: |-
+      Reflects the `<feDiffuseLighting>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDiffuseLightingElement.in
+    text: |-
+      Reflects the `<feDiffuseLighting>` element's `in` attribute.
+  kernelUnitLength:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDiffuseLightingElement.kernelUnitLength
+    text: |-
+      Reflects the `<feDiffuseLighting>` element's `kernelUnitLength` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDiffuseLightingElement.result
+    text: |-
+      Reflects the `<feDiffuseLighting>` element's `result` attribute.
+  surfaceScale:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDiffuseLightingElement.surfaceScale
+    text: |-
+      Reflects the `<feDiffuseLighting>` element's `surfaceScale` attribute.
+  width:
+    getter: true
+    docs: SVGFEDiffuseLightingElement.width
+    text: |-
+      Reflects the `<feDiffuseLighting>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEDiffuseLightingElement.x
+    text: |-
+      Reflects the `<feDiffuseLighting>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEDiffuseLightingElement.y
+    text: |-
+      Reflects the `<feDiffuseLighting>` element's `y` attribute.
+---
+class: SVGFEDisplacementMapElement
+base: SVGElement
+docs: SVGFEDisplacementMapElement
+text: |-
+  Represents an SVG `<feDisplacementMap>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGFEDisplacementMapElement.height
+    text: |-
+      Reflects the `<feDisplacementMap>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDisplacementMapElement.in
+    text: |-
+      Reflects the `<feDisplacementMap>` element's `in` attribute.
+  in2:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDisplacementMapElement.in2
+    text: |-
+      Reflects the `<feDisplacementMap>` element's `in2` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDisplacementMapElement.result
+    text: |-
+      Reflects the `<feDisplacementMap>` element's `result` attribute.
+  scale:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDisplacementMapElement.scale
+    text: |-
+      Reflects the `<feDisplacementMap>` element's `scale` attribute.
+  width:
+    getter: true
+    docs: SVGFEDisplacementMapElement.width
+    text: |-
+      Reflects the `<feDisplacementMap>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEDisplacementMapElement.x
+    text: |-
+      Reflects the `<feDisplacementMap>` element's `x` attribute.
+  xChannelSelector:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDisplacementMapElement.xChannelSelector
+    text: |-
+      Reflects the `<feDisplacementMap>` element's `xChannelSelector` attribute.
+  y:
+    getter: true
+    docs: SVGFEDisplacementMapElement.y
+    text: |-
+      Reflects the `<feDisplacementMap>` element's `y` attribute.
+  yChannelSelector:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDisplacementMapElement.yChannelSelector
+    text: |-
+      Reflects the `<feDisplacementMap>` element's `yChannelSelector` attribute.
+---
+class: SVGFEDistantLightElement
+base: SVGElement
+docs: SVGFEDistantLightElement
+text: |-
+  Represents an SVG `<feDistantLight>` element.
+properties:
+  azimuth:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDistantLightElement.azimuth
+    text: |-
+      Reflects the `<feDistantLight>` element's `azimuth` attribute.
+  elevation:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDistantLightElement.elevation
+    text: |-
+      Reflects the `<feDistantLight>` element's `elevation` attribute.
+---
+class: SVGFEDropShadowElement
+base: SVGElement
+docs: SVGFEDropShadowElement
+text: |-
+  Represents an SVG `<feDropShadow>` element.
+properties:
+  dx:
+    getter: true
+    docs: SVGFEDropShadowElement.dx
+    text: |-
+      Reflects the `<feDropShadow>` element's `dx` attribute.
+  dy:
+    getter: true
+    docs: SVGFEDropShadowElement.dy
+    text: |-
+      Reflects the `<feDropShadow>` element's `dy` attribute.
+  height:
+    getter: true
+    docs: SVGFEDropShadowElement.height
+    text: |-
+      Reflects the `<feDropShadow>` element's `height` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDropShadowElement.result
+    text: |-
+      Reflects the `<feDropShadow>` element's `result` attribute.
+  stdDeviation:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEDropShadowElement.stdDeviation
+    text: |-
+      Reflects the `<feDropShadow>` element's `stdDeviation` attribute.
+  width:
+    getter: true
+    docs: SVGFEDropShadowElement.width
+    text: |-
+      Reflects the `<feDropShadow>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEDropShadowElement.x
+    text: |-
+      Reflects the `<feDropShadow>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEDropShadowElement.y
+    text: |-
+      Reflects the `<feDropShadow>` element's `y` attribute.
+---
+class: SVGFEFloodElement
+base: SVGElement
+docs: SVGFEFloodElement
+text: |-
+  Represents an SVG `<feFlood>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGFEFloodElement.height
+    text: |-
+      Reflects the `<feFlood>` element's `height` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFloodElement.result
+    text: |-
+      Reflects the `<feFlood>` element's `result` attribute.
+  width:
+    getter: true
+    docs: SVGFEFloodElement.width
+    text: |-
+      Reflects the `<feFlood>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEFloodElement.x
+    text: |-
+      Reflects the `<feFlood>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEFloodElement.y
+    text: |-
+      Reflects the `<feFlood>` element's `y` attribute.
+---
+class: SVGFEFuncAElement
+base: SVGElement
+docs: SVGFEFuncAElement
+text: |-
+  Represents an SVG `<feFuncA>` element.
+properties:
+  amplitude:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncAElement.amplitude
+    text: |-
+      Reflects the `<feFuncA>` element's `amplitude` attribute.
+  exponent:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncAElement.exponent
+    text: |-
+      Reflects the `<feFuncA>` element's `exponent` attribute.
+  intercept:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncAElement.intercept
+    text: |-
+      Reflects the `<feFuncA>` element's `intercept` attribute.
+  offset:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncAElement.offset
+    text: |-
+      Reflects the `<feFuncA>` element's `offset` attribute.
+  slope:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncAElement.slope
+    text: |-
+      Reflects the `<feFuncA>` element's `slope` attribute.
+  tableValues:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncAElement.tableValues
+    text: |-
+      Reflects the `<feFuncA>` element's `tableValues` attribute.
+  type:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncAElement.type
+    text: |-
+      Reflects the `<feFuncA>` element's `type` attribute.
+---
+class: SVGFEFuncBElement
+base: SVGElement
+docs: SVGFEFuncBElement
+text: |-
+  Represents an SVG `<feFuncB>` element.
+properties:
+  amplitude:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncBElement.amplitude
+    text: |-
+      Reflects the `<feFuncB>` element's `amplitude` attribute.
+  exponent:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncBElement.exponent
+    text: |-
+      Reflects the `<feFuncB>` element's `exponent` attribute.
+  intercept:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncBElement.intercept
+    text: |-
+      Reflects the `<feFuncB>` element's `intercept` attribute.
+  offset:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncBElement.offset
+    text: |-
+      Reflects the `<feFuncB>` element's `offset` attribute.
+  slope:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncBElement.slope
+    text: |-
+      Reflects the `<feFuncB>` element's `slope` attribute.
+  tableValues:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncBElement.tableValues
+    text: |-
+      Reflects the `<feFuncB>` element's `tableValues` attribute.
+  type:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncBElement.type
+    text: |-
+      Reflects the `<feFuncB>` element's `type` attribute.
+---
+class: SVGFEFuncGElement
+base: SVGElement
+docs: SVGFEFuncGElement
+text: |-
+  Represents an SVG `<feFuncG>` element.
+properties:
+  amplitude:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncGElement.amplitude
+    text: |-
+      Reflects the `<feFuncG>` element's `amplitude` attribute.
+  exponent:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncGElement.exponent
+    text: |-
+      Reflects the `<feFuncG>` element's `exponent` attribute.
+  intercept:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncGElement.intercept
+    text: |-
+      Reflects the `<feFuncG>` element's `intercept` attribute.
+  offset:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncGElement.offset
+    text: |-
+      Reflects the `<feFuncG>` element's `offset` attribute.
+  slope:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncGElement.slope
+    text: |-
+      Reflects the `<feFuncG>` element's `slope` attribute.
+  tableValues:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncGElement.tableValues
+    text: |-
+      Reflects the `<feFuncG>` element's `tableValues` attribute.
+  type:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncGElement.type
+    text: |-
+      Reflects the `<feFuncG>` element's `type` attribute.
+---
+class: SVGFEFuncRElement
+base: SVGElement
+docs: SVGFEFuncRElement
+text: |-
+  Represents an SVG `<feFuncR>` element.
+properties:
+  amplitude:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncRElement.amplitude
+    text: |-
+      Reflects the `<feFuncR>` element's `amplitude` attribute.
+  exponent:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncRElement.exponent
+    text: |-
+      Reflects the `<feFuncR>` element's `exponent` attribute.
+  intercept:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncRElement.intercept
+    text: |-
+      Reflects the `<feFuncR>` element's `intercept` attribute.
+  offset:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncRElement.offset
+    text: |-
+      Reflects the `<feFuncR>` element's `offset` attribute.
+  slope:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncRElement.slope
+    text: |-
+      Reflects the `<feFuncR>` element's `slope` attribute.
+  tableValues:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncRElement.tableValues
+    text: |-
+      Reflects the `<feFuncR>` element's `tableValues` attribute.
+  type:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEFuncRElement.type
+    text: |-
+      Reflects the `<feFuncR>` element's `type` attribute.
+---
+class: SVGFEGaussianBlurElement
+base: SVGElement
+docs: SVGFEGaussianBlurElement
+text: |-
+  Represents an SVG `<feGaussianBlur>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGFEGaussianBlurElement.height
+    text: |-
+      Reflects the `<feGaussianBlur>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEGaussianBlurElement.in
+    text: |-
+      Reflects the `<feGaussianBlur>` element's `in` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEGaussianBlurElement.result
+    text: |-
+      Reflects the `<feGaussianBlur>` element's `result` attribute.
+  stdDeviation:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEGaussianBlurElement.stdDeviation
+    text: |-
+      Reflects the `<feGaussianBlur>` element's `stdDeviation` attribute.
+  width:
+    getter: true
+    docs: SVGFEGaussianBlurElement.width
+    text: |-
+      Reflects the `<feGaussianBlur>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEGaussianBlurElement.x
+    text: |-
+      Reflects the `<feGaussianBlur>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEGaussianBlurElement.y
+    text: |-
+      Reflects the `<feGaussianBlur>` element's `y` attribute.
+---
+class: SVGFEImageElement
+base: SVGElement
+docs: SVGFEImageElement
+text: |-
+  Represents an SVG `<feImage>` element.
+properties:
+  crossOrigin:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEImageElement.crossOrigin
+    text: |-
+      Reflects the `<feImage>` element's `crossOrigin` attribute.
+  height:
+    getter: true
+    docs: SVGFEImageElement.height
+    text: |-
+      Reflects the `<feImage>` element's `height` attribute.
+  href:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEImageElement.href
+    text: |-
+      Reflects the `<feImage>` element's `href` attribute.
+  preserveAspectRatio:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEImageElement.preserveAspectRatio
+    text: |-
+      Reflects the `<feImage>` element's `preserveAspectRatio` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEImageElement.result
+    text: |-
+      Reflects the `<feImage>` element's `result` attribute.
+  width:
+    getter: true
+    docs: SVGFEImageElement.width
+    text: |-
+      Reflects the `<feImage>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEImageElement.x
+    text: |-
+      Reflects the `<feImage>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEImageElement.y
+    text: |-
+      Reflects the `<feImage>` element's `y` attribute.
+---
+class: SVGFEMergeElement
+base: SVGElement
+docs: SVGFEMergeElement
+text: |-
+  Represents an SVG `<feMerge>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGFEMergeElement.height
+    text: |-
+      Reflects the `<feMerge>` element's `height` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEMergeElement.result
+    text: |-
+      Reflects the `<feMerge>` element's `result` attribute.
+  width:
+    getter: true
+    docs: SVGFEMergeElement.width
+    text: |-
+      Reflects the `<feMerge>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEMergeElement.x
+    text: |-
+      Reflects the `<feMerge>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEMergeElement.y
+    text: |-
+      Reflects the `<feMerge>` element's `y` attribute.
+---
+class: SVGFEMergeNodeElement
+base: SVGElement
+docs: SVGFEMergeNodeElement
+text: |-
+  Represents an SVG `<feMergeNode>` element.
+properties:
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEMergeNodeElement.in
+    text: |-
+      Reflects the `<feMergeNode>` element's `in` attribute.
+---
+class: SVGFEMorphologyElement
+base: SVGElement
+docs: SVGFEMorphologyElement
+text: |-
+  Represents an SVG `<feMorphology>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGFEMorphologyElement.height
+    text: |-
+      Reflects the `<feMorphology>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEMorphologyElement.in
+    text: |-
+      Reflects the `<feMorphology>` element's `in` attribute.
+  operator:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEMorphologyElement.operator
+    text: |-
+      Reflects the `<feMorphology>` element's `operator` attribute.
+  radius:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEMorphologyElement.radius
+    text: |-
+      Reflects the `<feMorphology>` element's `radius` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEMorphologyElement.result
+    text: |-
+      Reflects the `<feMorphology>` element's `result` attribute.
+  width:
+    getter: true
+    docs: SVGFEMorphologyElement.width
+    text: |-
+      Reflects the `<feMorphology>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEMorphologyElement.x
+    text: |-
+      Reflects the `<feMorphology>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEMorphologyElement.y
+    text: |-
+      Reflects the `<feMorphology>` element's `y` attribute.
+---
+class: SVGFEOffsetElement
+base: SVGElement
+docs: SVGFEOffsetElement
+text: |-
+  Represents an SVG `<feOffset>` element.
+properties:
+  dx:
+    getter: true
+    docs: SVGFEOffsetElement.dx
+    text: |-
+      Reflects the `<feOffset>` element's `dx` attribute.
+  dy:
+    getter: true
+    docs: SVGFEOffsetElement.dy
+    text: |-
+      Reflects the `<feOffset>` element's `dy` attribute.
+  height:
+    getter: true
+    docs: SVGFEOffsetElement.height
+    text: |-
+      Reflects the `<feOffset>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEOffsetElement.in
+    text: |-
+      Reflects the `<feOffset>` element's `in` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEOffsetElement.result
+    text: |-
+      Reflects the `<feOffset>` element's `result` attribute.
+  width:
+    getter: true
+    docs: SVGFEOffsetElement.width
+    text: |-
+      Reflects the `<feOffset>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFEOffsetElement.x
+    text: |-
+      Reflects the `<feOffset>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFEOffsetElement.y
+    text: |-
+      Reflects the `<feOffset>` element's `y` attribute.
+---
+class: SVGFEPointLightElement
+base: SVGElement
+docs: SVGFEPointLightElement
+text: |-
+  Represents an SVG `<fePointLight>` element.
+properties:
+  x:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEPointLightElement.x
+    text: |-
+      Reflects the `<fePointLight>` element's `x` attribute.
+  y:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEPointLightElement.y
+    text: |-
+      Reflects the `<fePointLight>` element's `y` attribute.
+  z:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFEPointLightElement.z
+    text: |-
+      Reflects the `<fePointLight>` element's `z` attribute.
+---
+class: SVGFESpecularLightingElement
+base: SVGElement
+docs: SVGFESpecularLightingElement
+text: |-
+  Represents an SVG `<feSpecularLighting>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGFESpecularLightingElement.height
+    text: |-
+      Reflects the `<feSpecularLighting>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpecularLightingElement.in
+    text: |-
+      Reflects the `<feSpecularLighting>` element's `in` attribute.
+  kernelUnitLength:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpecularLightingElement.kernelUnitLength
+    text: |-
+      Reflects the `<feSpecularLighting>` element's `kernelUnitLength` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpecularLightingElement.result
+    text: |-
+      Reflects the `<feSpecularLighting>` element's `result` attribute.
+  specularConstant:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpecularLightingElement.specularConstant
+    text: |-
+      Reflects the `<feSpecularLighting>` element's `specularConstant` attribute.
+  specularExponent:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpecularLightingElement.specularExponent
+    text: |-
+      Reflects the `<feSpecularLighting>` element's `specularExponent` attribute.
+  surfaceScale:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpecularLightingElement.surfaceScale
+    text: |-
+      Reflects the `<feSpecularLighting>` element's `surfaceScale` attribute.
+  width:
+    getter: true
+    docs: SVGFESpecularLightingElement.width
+    text: |-
+      Reflects the `<feSpecularLighting>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFESpecularLightingElement.x
+    text: |-
+      Reflects the `<feSpecularLighting>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFESpecularLightingElement.y
+    text: |-
+      Reflects the `<feSpecularLighting>` element's `y` attribute.
+---
+class: SVGFESpotLightElement
+base: SVGElement
+docs: SVGFESpotLightElement
+text: |-
+  Represents an SVG `<feSpotLight>` element.
+properties:
+  limitingConeAngle:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpotLightElement.limitingConeAngle
+    text: |-
+      Reflects the `<feSpotLight>` element's `limitingConeAngle` attribute.
+  pointsAtX:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpotLightElement.pointsAtX
+    text: |-
+      Reflects the `<feSpotLight>` element's `pointsAtX` attribute.
+  pointsAtY:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpotLightElement.pointsAtY
+    text: |-
+      Reflects the `<feSpotLight>` element's `pointsAtY` attribute.
+  pointsAtZ:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpotLightElement.pointsAtZ
+    text: |-
+      Reflects the `<feSpotLight>` element's `pointsAtZ` attribute.
+  specularExponent:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpotLightElement.specularExponent
+    text: |-
+      Reflects the `<feSpotLight>` element's `specularExponent` attribute.
+  x:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpotLightElement.x
+    text: |-
+      Reflects the `<feSpotLight>` element's `x` attribute.
+  y:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpotLightElement.y
+    text: |-
+      Reflects the `<feSpotLight>` element's `y` attribute.
+  z:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFESpotLightElement.z
+    text: |-
+      Reflects the `<feSpotLight>` element's `z` attribute.
+---
+class: SVGFETileElement
+base: SVGElement
+docs: SVGFETileElement
+text: |-
+  Represents an SVG `<feTile>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGFETileElement.height
+    text: |-
+      Reflects the `<feTile>` element's `height` attribute.
+  in:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFETileElement.in
+    text: |-
+      Reflects the `<feTile>` element's `in` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFETileElement.result
+    text: |-
+      Reflects the `<feTile>` element's `result` attribute.
+  width:
+    getter: true
+    docs: SVGFETileElement.width
+    text: |-
+      Reflects the `<feTile>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFETileElement.x
+    text: |-
+      Reflects the `<feTile>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFETileElement.y
+    text: |-
+      Reflects the `<feTile>` element's `y` attribute.
+---
+class: SVGFETurbulenceElement
+base: SVGElement
+docs: SVGFETurbulenceElement
+text: |-
+  Represents an SVG `<feTurbulence>` element.
+properties:
+  baseFrequency:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFETurbulenceElement.baseFrequency
+    text: |-
+      Reflects the `<feTurbulence>` element's `baseFrequency` attribute.
+  height:
+    getter: true
+    docs: SVGFETurbulenceElement.height
+    text: |-
+      Reflects the `<feTurbulence>` element's `height` attribute.
+  numOctaves:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFETurbulenceElement.numOctaves
+    text: |-
+      Reflects the `<feTurbulence>` element's `numOctaves` attribute.
+  result:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFETurbulenceElement.result
+    text: |-
+      Reflects the `<feTurbulence>` element's `result` attribute.
+  seed:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFETurbulenceElement.seed
+    text: |-
+      Reflects the `<feTurbulence>` element's `seed` attribute.
+  stitchTiles:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFETurbulenceElement.stitchTiles
+    text: |-
+      Reflects the `<feTurbulence>` element's `stitchTiles` attribute.
+  type:
+    getter: true
+    setter:
+      - Any
+    docs: SVGFETurbulenceElement.type
+    text: |-
+      Reflects the `<feTurbulence>` element's `type` attribute.
+  width:
+    getter: true
+    docs: SVGFETurbulenceElement.width
+    text: |-
+      Reflects the `<feTurbulence>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGFETurbulenceElement.x
+    text: |-
+      Reflects the `<feTurbulence>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGFETurbulenceElement.y
+    text: |-
+      Reflects the `<feTurbulence>` element's `y` attribute.
+---
+class: SVGForeignObjectElement
+base: SVGGraphicsElement
+docs: SVGForeignObjectElement
+text: |-
+  Represents an SVG `<foreignObject>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGForeignObjectElement.height
+    text: |-
+      Reflects the `<foreignObject>` element's `height` attribute.
+  width:
+    getter: true
+    docs: SVGForeignObjectElement.width
+    text: |-
+      Reflects the `<foreignObject>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGForeignObjectElement.x
+    text: |-
+      Reflects the `<foreignObject>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGForeignObjectElement.y
+    text: |-
+      Reflects the `<foreignObject>` element's `y` attribute.
+---
+class: SVGLineElement
+base: SVGGraphicsElement
+docs: SVGLineElement
+text: |-
+  Represents an SVG `<line>` element.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SVGLineElement
+properties:
+  x1:
+    getter: true
+    docs: SVGLineElement.x1
+    text: |-
+      Returns this element's `x1` attribute as an `SVGLength`.
+  x2:
+    getter: true
+    docs: SVGLineElement.x2
+    text: |-
+      Returns this element's `x2` attribute as an `SVGLength`.
+  y1:
+    getter: true
+    docs: SVGLineElement.y1
+    text: |-
+      Returns this element's `y1` attribute as an `SVGLength`.
+  y2:
+    getter: true
+    docs: SVGLineElement.y2
+    text: |-
+      Returns this element's `y2` attribute as an `SVGLength`.
+---
+class: SVGMarkerElement
+base: SVGElement
+docs: SVGMarkerElement
+text: |-
+  Represents an SVG `<marker>` element.
+properties:
+  markerHeight:
+    getter: true
+    docs: SVGMarkerElement.markerHeight
+    text: |-
+      Reflects the `<marker>` element's `markerHeight` attribute.
+  markerUnits:
+    getter: true
+    setter:
+      - Any
+    docs: SVGMarkerElement.markerUnits
+    text: |-
+      Reflects the `<marker>` element's `markerUnits` attribute.
+  markerWidth:
+    getter: true
+    docs: SVGMarkerElement.markerWidth
+    text: |-
+      Reflects the `<marker>` element's `markerWidth` attribute.
+  orient:
+    getter: true
+    setter:
+      - Any
+    docs: SVGMarkerElement.orient
+    text: |-
+      Reflects the `<marker>` element's `orient` attribute.
+  preserveAspectRatio:
+    getter: true
+    setter:
+      - Any
+    docs: SVGMarkerElement.preserveAspectRatio
+    text: |-
+      Reflects the `<marker>` element's `preserveAspectRatio` attribute.
+  refX:
+    getter: true
+    docs: SVGMarkerElement.refX
+    text: |-
+      Reflects the `<marker>` element's `refX` attribute.
+  refY:
+    getter: true
+    docs: SVGMarkerElement.refY
+    text: |-
+      Reflects the `<marker>` element's `refY` attribute.
+  viewBox:
+    getter: true
+    docs: SVGMarkerElement.viewBox
+    text: |-
+      Reflects the `<marker>` element's `viewBox` attribute.
+---
+class: SVGMaskElement
+base: SVGElement
+docs: SVGMaskElement
+text: |-
+  Represents an SVG `<mask>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGMaskElement.height
+    text: |-
+      Reflects the `<mask>` element's `height` attribute.
+  maskContentUnits:
+    getter: true
+    setter:
+      - Any
+    docs: SVGMaskElement.maskContentUnits
+    text: |-
+      Reflects the `<mask>` element's `maskContentUnits` attribute.
+  maskUnits:
+    getter: true
+    setter:
+      - Any
+    docs: SVGMaskElement.maskUnits
+    text: |-
+      Reflects the `<mask>` element's `maskUnits` attribute.
+  width:
+    getter: true
+    docs: SVGMaskElement.width
+    text: |-
+      Reflects the `<mask>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGMaskElement.x
+    text: |-
+      Reflects the `<mask>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGMaskElement.y
+    text: |-
+      Reflects the `<mask>` element's `y` attribute.
+---
+class: SVGMPathElement
+base: SVGElement
+docs: SVGMPathElement
+text: |-
+  Represents an SVG `<mpath>` element.
+properties:
+  href:
+    getter: true
+    setter:
+      - Any
+    docs: SVGMPathElement.href
+    text: |-
+      Reflects the `<mpath>` element's `href` attribute.
+---
+class: SVGPathElement
+base: SVGGraphicsElement
+docs: SVGPathElement
+text: |-
+  Represents an SVG `<path>` element.
+properties:
+  pathLength:
+    getter: true
+    setter:
+      - Number
+    docs: SVGPathElement.pathLength
+    text: |-
+      Reflects the `<path>` element's `pathLength` attribute.
+methods:
+  getPointAtLength:
+    args:
+      -
+        - Number
+    docs: SVGPathElement.getPointAtLength
+    text: |-
+      Returns the point at the specified distance along the path.
+  getTotalLength:
+    args:
+      -
+        []
+    docs: SVGPathElement.getTotalLength
+    text: |-
+      Returns the user-agent-computed total length of the path.
+---
+class: SVGPatternElement
+base: SVGElement
+docs: SVGPatternElement
+text: |-
+  Represents an SVG `<pattern>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGPatternElement.height
+    text: |-
+      Reflects the `<pattern>` element's `height` attribute.
+  href:
+    getter: true
+    setter:
+      - Any
+    docs: SVGPatternElement.href
+    text: |-
+      Reflects the `<pattern>` element's `href` attribute.
+  patternContentUnits:
+    getter: true
+    setter:
+      - Any
+    docs: SVGPatternElement.patternContentUnits
+    text: |-
+      Reflects the `<pattern>` element's `patternContentUnits` attribute.
+  patternUnits:
+    getter: true
+    setter:
+      - Any
+    docs: SVGPatternElement.patternUnits
+    text: |-
+      Reflects the `<pattern>` element's `patternUnits` attribute.
+  preserveAspectRatio:
+    getter: true
+    setter:
+      - Any
+    docs: SVGPatternElement.preserveAspectRatio
+    text: |-
+      Reflects the `<pattern>` element's `preserveAspectRatio` attribute.
+  viewBox:
+    getter: true
+    docs: SVGPatternElement.viewBox
+    text: |-
+      Reflects the `<pattern>` element's `viewBox` attribute.
+  width:
+    getter: true
+    docs: SVGPatternElement.width
+    text: |-
+      Reflects the `<pattern>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGPatternElement.x
+    text: |-
+      Reflects the `<pattern>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGPatternElement.y
+    text: |-
+      Reflects the `<pattern>` element's `y` attribute.
+---
+class: SVGPolygonElement
+base: SVGGraphicsElement
+docs: SVGPolygonElement
+text: |-
+  Represents an SVG `<polygon>` element.
+properties:
+  points:
+    getter: true
+    setter:
+      - Any
+    docs: SVGPolygonElement.points
+    text: |-
+      Reflects the `<polygon>` element's `points` attribute.
+---
+class: SVGPolylineElement
+base: SVGGraphicsElement
+docs: SVGPolylineElement
+text: |-
+  Represents an SVG `<polyline>` element.
+properties:
+  points:
+    getter: true
+    setter:
+      - Any
+    docs: SVGPolylineElement.points
+    text: |-
+      Reflects the `<polyline>` element's `points` attribute.
+---
 class: SVGRectElement
 base: SVGGraphicsElement
 docs: SVGRectElement
@@ -2281,49 +6209,215 @@ also:
 properties:
   height:
     getter: true
-    setter:
-      - Any
     docs: SVGRectElement.height
     text: |-
-      Gets or sets the value of the `height` attribute.
+      Returns this element's `height` attribute as an `SVGLength`.
   rx:
     getter: true
-    setter:
-      - Any
     docs: SVGRectElement.rx
     text: |-
-      Gets or sets the value of the `rx` attribute.
+      Reflects the `<rect>` element's `rx` attribute.
   ry:
     getter: true
-    setter:
-      - Any
     docs: SVGRectElement.ry
     text: |-
-      Gets or sets the value of the `ry` attribute.
+      Reflects the `<rect>` element's `ry` attribute.
   width:
     getter: true
-    setter:
-      - Any
     docs: SVGRectElement.width
     text: |-
-      Gets or sets the value of the `width` attribute.
+      Returns this element's `width` attribute as an `SVGLength`.
   x:
     getter: true
-    setter:
-      - Any
     docs: SVGRectElement.x
     text: |-
-      Gets or sets the value of the `x` attribute.
+      Returns this element's `x` attribute as an `SVGLength`.
   y:
+    getter: true
+    docs: SVGRectElement.y
+    text: |-
+      Returns this element's `y` attribute as an `SVGLength`.
+---
+class: SVGImageElement
+base: SVGGraphicsElement
+docs: SVGImageElement
+text: |-
+  Represents an SVG `<image>` element.
+properties:
+  height:
+    getter: true
+    docs: SVGImageElement.height
+    text: |-
+      Reflects the `<image>` element's `height` attribute.
+  href:
     getter: true
     setter:
       - Any
-    docs: SVGRectElement.y
+    docs: SVGImageElement.href
     text: |-
-      Gets or sets the value of the `y` attribute.
+      Reflects the `<image>` element's `href` attribute.
+  width:
+    getter: true
+    docs: SVGImageElement.width
+    text: |-
+      Reflects the `<image>` element's `width` attribute.
+  x:
+    getter: true
+    docs: SVGImageElement.x
+    text: |-
+      Reflects the `<image>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGImageElement.y
+    text: |-
+      Reflects the `<image>` element's `y` attribute.
+---
+class: SVGLinearGradientElement
+base: SVGElement
+docs: SVGLinearGradientElement
+text: |-
+  Represents an SVG `<linearGradient>` element.
+properties:
+  gradientUnits:
+    getter: true
+    setter:
+      - Any
+    docs: SVGLinearGradientElement.gradientUnits
+    text: |-
+      Reflects the `<linearGradient>` element's `gradientUnits` attribute.
+  href:
+    getter: true
+    setter:
+      - Any
+    docs: SVGLinearGradientElement.href
+    text: |-
+      Reflects the `<linearGradient>` element's `href` attribute.
+  spreadMethod:
+    getter: true
+    setter:
+      - Any
+    docs: SVGLinearGradientElement.spreadMethod
+    text: |-
+      Reflects the `<linearGradient>` element's `spreadMethod` attribute.
+  x1:
+    getter: true
+    docs: SVGLinearGradientElement.x1
+    text: |-
+      Reflects the `<linearGradient>` element's `x1` attribute.
+  x2:
+    getter: true
+    docs: SVGLinearGradientElement.x2
+    text: |-
+      Reflects the `<linearGradient>` element's `x2` attribute.
+  y1:
+    getter: true
+    docs: SVGLinearGradientElement.y1
+    text: |-
+      Reflects the `<linearGradient>` element's `y1` attribute.
+  y2:
+    getter: true
+    docs: SVGLinearGradientElement.y2
+    text: |-
+      Reflects the `<linearGradient>` element's `y2` attribute.
+---
+class: SVGRadialGradientElement
+base: SVGElement
+docs: SVGRadialGradientElement
+text: |-
+  Represents an SVG `<radialGradient>` element.
+properties:
+  cx:
+    getter: true
+    docs: SVGRadialGradientElement.cx
+    text: |-
+      Reflects the `<radialGradient>` element's `cx` attribute.
+  cy:
+    getter: true
+    docs: SVGRadialGradientElement.cy
+    text: |-
+      Reflects the `<radialGradient>` element's `cy` attribute.
+  fr:
+    getter: true
+    docs: SVGRadialGradientElement.fr
+    text: |-
+      Reflects the `<radialGradient>` element's `fr` attribute.
+  fx:
+    getter: true
+    docs: SVGRadialGradientElement.fx
+    text: |-
+      Reflects the `<radialGradient>` element's `fx` attribute.
+  fy:
+    getter: true
+    docs: SVGRadialGradientElement.fy
+    text: |-
+      Reflects the `<radialGradient>` element's `fy` attribute.
+  gradientUnits:
+    getter: true
+    setter:
+      - Any
+    docs: SVGRadialGradientElement.gradientUnits
+    text: |-
+      Reflects the `<radialGradient>` element's `gradientUnits` attribute.
+  href:
+    getter: true
+    setter:
+      - Any
+    docs: SVGRadialGradientElement.href
+    text: |-
+      Reflects the `<radialGradient>` element's `href` attribute.
+  r:
+    getter: true
+    docs: SVGRadialGradientElement.r
+    text: |-
+      Reflects the `<radialGradient>` element's `r` attribute.
+  spreadMethod:
+    getter: true
+    setter:
+      - Any
+    docs: SVGRadialGradientElement.spreadMethod
+    text: |-
+      Reflects the `<radialGradient>` element's `spreadMethod` attribute.
+---
+class: SVGStopElement
+base: SVGElement
+docs: SVGStopElement
+text: |-
+  Represents an SVG `<stop>` element.
+properties:
+  offset:
+    getter: true
+    setter:
+      - Number
+    docs: SVGStopElement.offset
+    text: |-
+      Reflects the `<stop>` element's `offset` attribute.
+---
+class: SVGStyleElement
+base: SVGElement
+docs: SVGStyleElement
+text: |-
+  Represents an SVG `<style>` element.
+properties:
+  sheet:
+    getter: true
+    docs: SVGStyleElement.sheet
+    text: |-
+      Returns the style sheet associated with this SVG `<style>` element.
+---
+class: SVGTextContentElement
+base: SVGGraphicsElement
+docs: SVGTextContentElement
+text: |-
+  Provides shared text-layout properties for SVG text-content elements.
+properties:
+  textLength:
+    getter: true
+    docs: SVGTextContentElement.textLength
+    text: |-
+      Reflects the `<text content>` element's `textLength` attribute.
 ---
 class: SVGTextElement
-base: SVGGraphicsElement
+base: SVGTextContentElement
 docs: SVGTextElement
 text: |-
   Represents an SVG <text> element.
@@ -2332,39 +6426,163 @@ also:
 properties:
   dx:
     getter: true
-    setter:
-      - Any
     docs: SVGTextElement.dx
     text: |-
-      Gets or sets the value of the `dx` attribute.
+      Returns this element's `dx` attribute as an `SVGLength`.
   dy:
     getter: true
-    setter:
-      - Any
     docs: SVGTextElement.dy
     text: |-
-      Gets or sets the value of the `dy` attribute.
+      Returns this element's `dy` attribute as an `SVGLength`.
   rotate:
     getter: true
-    setter:
-      - Any
     docs: SVGTextElement.rotate
     text: |-
-      Gets or sets the value of the `rotate` attribute.
+      Returns this element's `rotate` attribute as an `SVGLength`.
   x:
     getter: true
-    setter:
-      - Any
     docs: SVGTextElement.x
     text: |-
-      Gets or sets the value of the `x` attribute.
+      Returns this element's `x` attribute as an `SVGLength`.
   y:
+    getter: true
+    docs: SVGTextElement.y
+    text: |-
+      Returns this element's `y` attribute as an `SVGLength`.
+---
+class: SVGTSpanElement
+base: SVGTextContentElement
+docs: SVGTSpanElement
+text: |-
+  Represents an SVG `<tspan>` element.
+properties:
+  dx:
+    getter: true
+    docs: SVGTSpanElement.dx
+    text: |-
+      Reflects the `<tspan>` element's `dx` attribute.
+  dy:
+    getter: true
+    docs: SVGTSpanElement.dy
+    text: |-
+      Reflects the `<tspan>` element's `dy` attribute.
+  rotate:
+    getter: true
+    docs: SVGTSpanElement.rotate
+    text: |-
+      Reflects the `<tspan>` element's `rotate` attribute.
+  x:
+    getter: true
+    docs: SVGTSpanElement.x
+    text: |-
+      Reflects the `<tspan>` element's `x` attribute.
+  y:
+    getter: true
+    docs: SVGTSpanElement.y
+    text: |-
+      Reflects the `<tspan>` element's `y` attribute.
+---
+class: SVGTextPathElement
+base: SVGTextContentElement
+docs: SVGTextPathElement
+text: |-
+  Represents an SVG `<textPath>` element.
+properties:
+  href:
     getter: true
     setter:
       - Any
-    docs: SVGTextElement.y
+    docs: SVGTextPathElement.href
     text: |-
-      Gets or sets the value of the `y` attribute.
+      Reflects the `<textPath>` element's `href` attribute.
+  method:
+    getter: true
+    setter:
+      - Any
+    docs: SVGTextPathElement.method
+    text: |-
+      Reflects the `<textPath>` element's `method` attribute.
+  spacing:
+    getter: true
+    setter:
+      - Any
+    docs: SVGTextPathElement.spacing
+    text: |-
+      Reflects the `<textPath>` element's `spacing` attribute.
+  startOffset:
+    getter: true
+    docs: SVGTextPathElement.startOffset
+    text: |-
+      Reflects the `<textPath>` element's `startOffset` attribute.
+---
+class: SVGSymbolElement
+base: SVGElement
+docs: SVGSymbolElement
+text: |-
+  Represents an SVG `<symbol>` element.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SVGSymbolElement
+properties:
+  viewBox:
+    getter: true
+    docs: SVGSymbolElement.viewBox
+    text: |-
+      Gets the value of `viewBox` attribute as `SVGRect`.
+---
+class: SVGUseElement
+base: SVGGraphicsElement
+docs: SVGUseElement
+text: |-
+  Represents an SVG `<use>` element.
+also:
+  - https://developer.mozilla.org/en-US/docs/Web/API/SVGUseElement
+properties:
+  height:
+    getter: true
+    docs: SVGUseElement.height
+    text: |-
+      Returns this element's `height` attribute as an `SVGLength`.
+  href:
+    getter: true
+    setter:
+      - Any
+    docs: SVGUseElement.href
+    text: |-
+      Returns this element's `href` attribute as `String`.
+  width:
+    getter: true
+    docs: SVGUseElement.width
+    text: |-
+      Returns this element's `width` attribute as an `SVGLength`.
+  x:
+    getter: true
+    docs: SVGUseElement.x
+    text: |-
+      Returns this element's `x` attribute as an `SVGLength`.
+  y:
+    getter: true
+    docs: SVGUseElement.y
+    text: |-
+      Returns this element's `y` attribute as an `SVGLength`.
+---
+class: SVGViewElement
+base: SVGElement
+docs: SVGViewElement
+text: |-
+  Represents an SVG `<view>` element.
+properties:
+  preserveAspectRatio:
+    getter: true
+    setter:
+      - Any
+    docs: SVGViewElement.preserveAspectRatio
+    text: |-
+      Reflects the `<view>` element's `preserveAspectRatio` attribute.
+  viewBox:
+    getter: true
+    docs: SVGViewElement.viewBox
+    text: |-
+      Reflects the `<view>` element's `viewBox` attribute.
 ---
 class: HTMLDocument
 base: Document
@@ -2391,11 +6609,21 @@ properties:
     docs: HTMLDocument.documentElement
     text: |-
       Returns the root `HTMLElement` of `this` `HTMLdocument`.
+  forms:
+    getter: true
+    docs: HTMLDocument.forms
+    text: |-
+      Returns a live collection of the document's `<form>` elements.
   head:
     getter: true
     docs: HTMLDocument.head
     text: |-
       Contains the document’s `<head>` element.
+  namespaceURI:
+    getter: true
+    docs: HTMLDocument.namespaceURI
+    text: |-
+      Returns the HTML namespace URI.
   title:
     getter: true
     setter:
@@ -2407,6 +6635,45 @@ properties:
 
       The title is stored in the document’s `<title>` element. Assigning `null` clears the title.
 methods:
+  createAttribute:
+    args:
+      -
+        - String
+    docs: HTMLDocument.createAttribute
+    text: |-
+      Creates an attribute with the supplied qualified name.
+  createAttributeNS:
+    args:
+      -
+        - "Null"
+        - String
+      -
+        - String
+        - String
+    docs: HTMLDocument.createAttributeNS
+    text: |-
+      Creates an attribute with the supplied namespace URI and qualified name.
+  createCDATASection:
+    args:
+      -
+        - String
+    docs: HTMLDocument.createCDATASection
+    text: |-
+      Creates a CDATA section containing the supplied text.
+  createComment:
+    args:
+      -
+        - String
+    docs: HTMLDocument.createComment
+    text: |-
+      Creates a comment node containing the supplied text.
+  createDocumentFragment:
+    args:
+      -
+        []
+    docs: HTMLDocument.createDocumentFragment
+    text: |-
+      Creates an empty document fragment owned by this document.
   createElement:
     args:
       -
@@ -2431,6 +6698,14 @@ methods:
       The returned element is not automatically inserted into the document.
 
       Throws `DOMException (NamespaceError)` if `arg0` is unsupported namespace.
+  createProcessingInstruction:
+    args:
+      -
+        - String
+        - String
+    docs: HTMLDocument.createProcessingInstruction
+    text: |-
+      Creates a processing instruction with the supplied target and data.
   createTextNode:
     args:
       -
@@ -2501,17 +6776,6 @@ text: |-
   {.warning}
 also:
   - https://developer.mozilla.org/en-US/docs/Web/API/Window
-defs:
-  - struct: Config
-    fields:
-      notebook:
-        type: Boolean
-        docs: Window.Config.notebook
-        text: |-
-          If `true`, the window and document are attached at notebook scope.
-    docs: Window.Config
-    text: |-
-      Configuration object used when attaching a window.
 ctor:
   args:
     -
@@ -2520,23 +6784,6 @@ ctor:
   text: |-
     Creates a new `Window` instance.
 methods:
-  attach:
-    args:
-      -
-        []
-      -
-        - Window.Config
-    docs: Window.attach
-    text: |-
-      Attaches this window to the current execution environment and exposes it as `globalThis.window`.
-
-      As part of the attachment process, a new `HTMLDocument` is created and exposed as `globalThis.document`.
-
-      If `arg0` is omitted, the window and document are attached to the current cell.
-
-      If `arg0.notebook` is `true`, the window and document are attached at notebook scope and become available to all cells in the notebook. Otherwise, they are available only within the current cell.
-
-      Returns `globalThis.document`.
   getComputedStyle:
     args:
       -

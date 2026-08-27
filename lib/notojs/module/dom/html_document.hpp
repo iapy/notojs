@@ -31,8 +31,11 @@ struct HTMLDocument : Node
 
     JSValue body() const;
     JSValue head() const;
+    JSValue createComment(std::string_view const &);
+    JSValue createProcessingInstruction(std::string_view const &, std::string_view const &);
     JSValue createElement(std::string_view const &);
     JSValue createElement(std::string_view const &, uintptr_t ns);
+    JSValue createDocumentFragment();
     JSValue createTextNode(std::string_view const &);
     JSValue documentElement() const;
     JSValue getElementById(std::string_view const &) const;

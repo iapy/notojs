@@ -17,6 +17,7 @@ constexpr auto router = detail::router(
     detail::route("/redirect/noloc"),
     detail::route("/redirect/badloc"),
     detail::route("/redirect/post"),
+    detail::route("/multipart"),
     detail::route("/module.js"),
     detail::route("/script.js"),
     detail::route("/svg")
@@ -117,7 +118,7 @@ void Handle::process(std::shared_ptr<Handle> self)
                 {
                 case boost::beast::http::verb::get:
                     self->response.result(boost::beast::http::status::moved_permanently);
-                    self->response.set(boost::beast::http::field::location, "https://api.myip.com/");
+                    self->response.set(boost::beast::http::field::location, "https://jsonplaceholder.typicode.com/todos/1");
                     break;
                 default:
                     self->response.result(boost::beast::http::status::method_not_allowed);
@@ -153,6 +154,42 @@ void Handle::process(std::shared_ptr<Handle> self)
                 case boost::beast::http::verb::post:
                     self->response.set(boost::beast::http::field::location, "/json");
                     self->response.result(boost::beast::http::status::see_other);
+                    break;
+                default:
+                    self->response.result(boost::beast::http::status::method_not_allowed);
+                    break;
+                }
+                break;
+            case router["/multipart"]:
+                switch(self->parser.get().method())
+                {
+                case boost::beast::http::verb::get:
+                    self->response.set(
+                        boost::beast::http::field::content_type,
+                        "multipart/form-data; boundary=\"notojs-test-boundary\""
+                    );
+                    self->response.body() =
+                        "--notojs-test-boundary\r\n"
+                        "Content-Disposition: form-data; name=\"title\"\r\n\r\n"
+                        "multipart response\r\n"
+                        "--notojs-test-boundary\r\n"
+                        "Content-Disposition: form-data; name=\"tag\"\r\n\r\n"
+                        "first\r\n"
+                        "--notojs-test-boundary\r\n"
+                        "Content-Disposition: form-data; name=\"tag\"\r\n\r\n"
+                        "second\r\n"
+                        "--notojs-test-boundary\r\n"
+                        "Content-Disposition: form-data; name=\"upload\"; filename=\"response.txt\"\r\n"
+                        "Content-Type: text/plain\r\n\r\n"
+                        "response payload\r\n"
+                        "--notojs-test-boundary--\r\n";
+                    break;
+                case boost::beast::http::verb::post:
+                    self->response.set(
+                        boost::beast::http::field::content_type,
+                        self->parser.get()[boost::beast::http::field::content_type]
+                    );
+                    self->response.body() = self->parser.get().body();
                     break;
                 default:
                     self->response.result(boost::beast::http::status::method_not_allowed);

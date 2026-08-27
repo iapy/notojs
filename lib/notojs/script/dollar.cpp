@@ -1,4 +1,5 @@
 #include <notojs/script/dollar.hpp>
+#include <notojs/global.hpp>
 #include <bridge.hpp>
 #include <global.hpp>
 
@@ -71,16 +72,29 @@ JSValue ajax(JSContext *ctx, Config config)
     );
 }
 
-} // namespace
-
-JSValue notojs_init_dollar(JSContext *ctx)
+JSValue init(JSContext *ctx, bool cleanup)
 {
     JSValue glob = JS_GetGlobalObject(ctx);
     JSValue impl = JS_GetPropertyStr(ctx, glob, "$");
     JS_SetPropertyStr(ctx, impl, "ajax", JS_NewCFunction(ctx, &bridge::Function<&ajax>::invoke, "ajax", 1));
     JS_FreeValue(ctx, impl);
     JS_FreeValue(ctx, glob);
+    if(cleanup)
+        Global::Context::ptr(ctx)->cleanup.insert("$.ajax");
     return JS_UNDEFINED;
+}
+
+} // namespace
+
+JSValue notojs_init_dollar(JSContext *ctx)
+{
+    return init(ctx, false);
+}
+
+JSValue notojs_init_dollar(JSContext *ctx, ScriptConfig cfg)
+{
+    auto scope = cfg.get<ScriptConfig::Scope>("scope");
+    return init(ctx, (scope && "cell" == static_cast<std::string_view const &>(*scope)));
 }
 
 } // namespace notojs

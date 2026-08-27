@@ -82,30 +82,43 @@ assert(() => 2 == s.getItem('counter'));
     BOOST_TEST(get_error() == std::nullopt);
 }
 
-BOOST_AUTO_TEST_CASE(Attach)
+BOOST_AUTO_TEST_CASE(Require)
 {
     bridge::Context context{notojs::testing::engine->get_context()};
     db();
 
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-
-const st = new Storage('foo').attach();
-assert(() => st === localStorage);
+assert(() => throws(() => require('storage')));
     )JS", context.get(), "cell-001");
 
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-
-assert(() => undefined === globalThis['localStorage']);
-const st = new Storage('bar').attach({notebook: true});
+require('storage', {ns: 'foo'});
+assert(() => globalThis.localStorage instanceof Storage);
     )JS", context.get(), "cell-002");
 
     eval(R"JS(
-import { assert, throws } from 'noto:assert';
-
-assert(() => localStorage instanceof Storage);
+import { assert } from 'noto:assert';
+assert(() => globalThis.localStorage instanceof Storage);
+require('storage', {scope: 'cell', ns: 'foo'});
     )JS", context.get(), "cell-003");
+
+    eval(R"JS(
+import { assert } from 'noto:assert';
+assert(() => undefined === globalThis.localStorage);
+require('storage', {scope: 'notebook', ns: 'foo'});
+    )JS", context.get(), "cell-004");
+
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+assert(() => globalThis.localStorage instanceof Storage);
+
+assert(() => throws(() => require('storage', {scope: 1}), 'No matching function overload found'));
+assert(() => throws(() => require('storage', {scope: 'foo'}), 'invalid scope [foo]'));
+assert(() => throws(() => require('storage', {ns: 'a b'}), 'Storage constructor: invalid namespace [a b]'));
+assert(() => throws(() => require('storage', {ns: 'a/b'}), 'Storage constructor: invalid namespace [a/b]'));
+    )JS", context.get(), "cell-005");
 
     BOOST_TEST(get_error() == std::nullopt);
 }

@@ -59,7 +59,7 @@ nj-cell > div > div.preview.nj-output {
 nj-cell > div > div.preview div.nj-block pre + div.nj-run-code {
     display: none;
 }
-nj-cell > div > div.preview div.nj-block li.nj-see-also::after {
+nj-cell > div > div.preview div.nj-block li.nj-doc-reference::after {
     display: none;
 }
 .CodeMirror {
@@ -79,6 +79,19 @@ nj-cell > div > div.preview div.nj-block li.nj-see-also::after {
     padding: 0 4px;
     opacity: 0.25;
 }
+.CodeMirror-matchingbracket {
+    color: inherit !important;
+    background: #f1f3f5;
+    border-radius: 2px;
+}
+.cm-notojs-matchingmacro,
+.cm-notojs-matchingfence {
+    background: #f1f3f5;
+    border-radius: 2px;
+}
+.CodeMirror-nonmatchingbracket {
+    color: red !important;
+}
 .cm-gutter-error {
     padding-right: 3px;
     text-align: right;
@@ -95,6 +108,9 @@ span.cm-task {
 }
 span.cm-task.cm-task-checked {
     color: #1a7f37;
+}
+span.cm-notojs-embedded {
+    opacity: 0.6;
 }
 .CodeMirror textarea {
   caret-color: transparent;

@@ -1,8 +1,9 @@
 #pragma once
+#include <notojs/detail/config.hpp>
+
 #include <boost/asio.hpp>
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/asio/thread_pool.hpp>
-#include <boost/property_tree/ptree.hpp>
 
 #include <nanodi.hpp>
 
@@ -19,7 +20,7 @@ class Server : public Requires<Engine, Plugin, Router, Timers, Window>
 {
 private:
     int main();
-    void configure(boost::property_tree::ptree const &);
+    void configure(detail::Config const &);
     friend class Config;
 
 public:

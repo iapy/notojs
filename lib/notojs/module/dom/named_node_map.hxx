@@ -8,7 +8,17 @@ struct NamedNodeMap : bridge::Interface<NamedNodeMap, dom::NamedNodeMap>
         return item_(ctx, ref().doc->attributes[ref().node], const_cast<dom::NamedNodeMap &>(ref()), i, JS_UNDEFINED);
     }
 
-    JSValue getNamedItem(JSValue self, JSContext *ctx, bridge::String name)
+    JSValue getNamedItem(JSValue self, JSContext *ctx, Attr::Name name)
+    {
+        auto const key = dom::Attr::Name{name.get(ref().base())};
+        if(auto it = ref().attributes.find(key); it != std::end(ref().attributes))
+            return JS_DupValue(ctx, it->second);
+        else if(ref().hasAttribute(key))
+            return ref().attributes[key] = Attr::from(ctx, dom::Attr{ref().doc, ref().node, key}, self);
+        return JS_NULL;
+    }
+
+    JSValue getNamedItemExact(JSValue self, JSContext *ctx, bridge::String name)
     {
         auto const key = dom::Attr::Name{name};
         if(auto it = ref().attributes.find(key); it != std::end(ref().attributes))
@@ -41,7 +51,7 @@ struct NamedNodeMap : bridge::Interface<NamedNodeMap, dom::NamedNodeMap>
         return bridge::Number{ctx, ref().attributesCount()};
     }
 
-    JSValue removeNamedItem(JSValue self, JSContext *ctx, bridge::String name)
+    JSValue removeNamedItem(JSValue self, JSContext *ctx, Attr::Name name)
     {
         auto item = getNamedItem(self, ctx, name);
         if(!JS_IsNull(item))
@@ -53,7 +63,7 @@ struct NamedNodeMap : bridge::Interface<NamedNodeMap, dom::NamedNodeMap>
             ref().attributes.erase(a.name);
             ref().removeAttribute(a.name);
         }
-        return item;
+        return JS_IsNull(item) ? DOMException::throwNotFoundError(ctx) : item;
     }
 
     JSValue setNamedItem(JSValue self, JSContext *ctx, bridge::Object a)
@@ -63,6 +73,7 @@ struct NamedNodeMap : bridge::Interface<NamedNodeMap, dom::NamedNodeMap>
         auto attr = Attr(ctx, a);
         if(attr.ref().node == ref().node) return JS_DupValue(ctx, a);
         if(attr.ref().doc != ref().doc) return DOMException::throwWrongDocumentError(ctx);
+        if(attr.ref().node) return DOMException::throwInUseAttributeError(ctx);
 
         JSValue prev = JS_NULL;
         auto const &key = attr.ref().name;
@@ -80,19 +91,9 @@ struct NamedNodeMap : bridge::Interface<NamedNodeMap, dom::NamedNodeMap>
             ref().removeAttribute(a.name);
         }
 
-        if(ref().attributes[key] = a; attr.ref().value)
-        {
-            ref().setAttribute(key, *attr.ref().value);
-            attr.ref().value.reset();
-        }
-        else if(auto it = attr.ref().doc->attributes.find(attr.ref().node); it != std::end(attr.ref().doc->attributes))
-        {
-            ref().setAttribute(key, bridge::Strong<bridge::String>(ctx, attr.nodeValue(ctx)));
-
-            auto &map = NamedNodeMap::get(it->second);
-            map.attributes.erase(key);
-            map.removeAttribute(key);
-        }
+        ref().attributes[key] = a;
+        ref().setAttribute(key, attr.ref().value.value_or(""));
+        attr.ref().value.reset();
         bridge::detail::set_allocator(ctx, a, self);
         attr.ref().node = ref().node;
         return prev;
@@ -196,7 +197,7 @@ private:
     std::optional<dom::Attr::Name> attr(std::string const &n, std::string_view const &ns) const
     {
         auto doc = dynamic_cast<dom::HTMLBackend *>(ref().doc.get());
-        if(auto nsid = doc->lookupNS(n); LXB_NS__UNDEF != nsid)
+        if(auto nsid = doc->lookupNS(ns); LXB_NS__UNDEF != nsid)
             return dom::Attr::Name{n, nsid};
         return std::nullopt;
     }

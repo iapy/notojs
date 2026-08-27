@@ -1,7 +1,6 @@
 #include <notojs/module/assert.hpp>
 #include <notojs/global.hpp>
 #include <bridge.hpp>
-#include <iostream>
 #include <regex>
 
 #ifdef assert
@@ -10,6 +9,17 @@
 
 namespace notojs {
 namespace {
+
+class AssertionError : public bridge::Exception<AssertionError>
+{
+    std::string message;
+public:
+    AssertionError(std::string &&message): message{message} {}
+    void populate(JSContext *ctx, bridge::Object &obj) const
+    {
+        obj.set("message", bridge::String(ctx, message));
+    }
+};
 
 JSValue assert(JSContext *ctx, bridge::Lambda lambda)
 {
@@ -22,17 +32,14 @@ JSValue assert(JSContext *ctx, bridge::Lambda lambda)
     else if(!JS_ToBool(ctx, res))
     {
         String expr{ctx, lambda};
-        Error error{ctx};
-
         if(std::cmatch m; std::regex_match(std::begin(expr), std::end(expr), m, std::regex{R"(\s*\(\s*\)\s*=>\s*(.+))"}))
         {
-            error.message(String(ctx, m[1]));
+            return AssertionError::throw_(ctx, AssertionError{m[1]});
         }
         else
         {
-            error.message(expr);
+            return AssertionError::throw_(ctx, AssertionError{expr});
         }
-        return JS_Throw(ctx, error);
     }
     ++assertions;
     return JS_UNDEFINED;
@@ -55,11 +62,6 @@ JSValue throws_1(JSContext *ctx, bridge::Lambda lambda)
         auto *ptr = Global::Context::ptr(ctx);
         ptr->wait(ctx);
 
-        if(ptr->perror)
-        {
-            JS_FreeValue(ctx, *(ptr->perror));
-            ptr->perror.reset();
-        }
         return JS_PromiseResult(ctx, p);
     }
     else
@@ -77,20 +79,16 @@ JSValue throws_2(JSContext *ctx, bridge::Lambda lambda, bridge::String message)
             [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv){
                 return JS_UNDEFINED;
             },
-            [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv){
-                return argv[0];
+            [](JSContext *ctx, JSValueConst, int argc, JSValueConst *argv){
+                return argc ? JS_DupValue(ctx, argv[0]) : JS_UNDEFINED;
             }
         );
 
         auto *ptr = Global::Context::ptr(ctx);
         ptr->wait(ctx);
 
-        if(ptr->perror)
-        {
-            JS_FreeValue(ctx, *(ptr->perror));
-            ptr->perror.reset();
-        }
-        if(auto msg = Error(ctx, JS_PromiseResult(ctx, p)).message(); msg)
+        auto result = Strong<Error>{ctx, JS_PromiseResult(ctx, p)};
+        if(auto msg = result.message(); msg)
         {
             return static_cast<std::string_view const &>(message) == *msg ? JS_TRUE : JS_FALSE;
         }
@@ -118,6 +116,7 @@ JSCFunctionListEntry func[] = {
 
 int init(JSContext *ctx, JSModuleDef *m)
 {
+    AssertionError::init(ctx, m);
     return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
 }
 
@@ -125,17 +124,24 @@ int init(JSContext *ctx, JSModuleDef *m)
 
 std::atomic<std::uint64_t> assertions{0};
 
-void notojs_init_assert() {}
+void notojs_init_assert()
+{
+    AssertionError::init();
+}
 
-void notojs_init_assert(JSRuntime *) {}
+void notojs_init_assert(JSRuntime *rt)
+{
+    AssertionError::init(rt);
+}
 
-void notojs_init_assert(boost::property_tree::ptree const &) {}
+void notojs_init_assert(detail::Config const &) {}
 
 JSModuleDef *notojs_init_assert(JSContext *ctx, const char *name)
 {
     JSModuleDef *mod = JS_NewCModule(ctx, name, init);
     if(!mod) return NULL;
 
+    JS_AddModuleExport(ctx, mod, AssertionError::name());
     JS_AddModuleExportList(ctx, mod, func, sizeof(func)/sizeof(func[0]));
     return mod;
 }

@@ -13,6 +13,9 @@ struct XMLDocument : Node
         return static_cast<pugi::xml_node_struct *>(node);
     }
 
+    JSValue createCDATASection(std::string_view const &);
+    JSValue createComment(std::string_view const &);
+    JSValue createProcessingInstruction(std::string_view const &, std::string_view const &);
     JSValue createElement(std::string_view const &);
     JSValue createTextNode(std::string_view const &);
     JSValue documentElement() const;

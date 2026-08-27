@@ -2,21 +2,22 @@
 #include <notojs/module/dom/lexbor.hpp>
 #include <notojs/module/dom/node.hpp>
 #include <notojs/module/dom/xpath.hpp>
+#include <notojs/module/dom/attr.hpp>
 
 #include <lexbor/style/attribute_steps.h>
 #include <lexbor/style/element_steps.h>
+#include <unordered_set>
 #include <bridge.hpp>
 #include <cstring>
-
-#include <iostream>
 
 namespace notojs::dom {
 namespace {
 
-constexpr std::string_view NN_CDATA    {"#cdata-section"};
-constexpr std::string_view NN_COMMENT  {"#comment"};
-constexpr std::string_view NN_DOCUMENT {"#document"};
-constexpr std::string_view NN_TEXT     {"#text"};
+constexpr std::string_view NN_CDATA             {"#cdata-section"};
+constexpr std::string_view NN_COMMENT           {"#comment"};
+constexpr std::string_view NN_DOCUMENT          {"#document"};
+constexpr std::string_view NN_DOCUMENT_FRAGMENT {"#document-fragment"};
+constexpr std::string_view NN_TEXT              {"#text"};
 
 bool is_equal_node(pugi::xml_node a, pugi::xml_node b)
 {
@@ -114,7 +115,7 @@ bool is_equal_node(lxb_dom_node_t *a, lxb_dom_node_t *b)
     return !ac && !bc;
 }
 
-void normalize(pugi::xml_node node, std::unordered_map<pugi::xml_node_struct *, JSValue> &nodes)
+void normalize(pugi::xml_node node, XMLBackend &backend)
 {
     for(auto child = node.first_child(); child;)
     {
@@ -131,7 +132,11 @@ void normalize(pugi::xml_node node, std::unordered_map<pugi::xml_node_struct *, 
                 auto remove = next;
                 next = next.next_sibling();
 
-                if(nodes.count(remove.internal_object())) node.root().append_move(remove);
+                if(backend.nodes.count(remove.internal_object()))
+                {
+                    auto detached = backend.doc.append_move(remove);
+                    backend.mark_detached(detached);
+                }
                 else node.remove_child(remove);
             }
 
@@ -140,12 +145,16 @@ void normalize(pugi::xml_node node, std::unordered_map<pugi::xml_node_struct *, 
                 auto remove = child;
                 child = next;
 
-                if(nodes.count(node.internal_object())) node.root().append_move(node);
+                if(backend.nodes.count(remove.internal_object()))
+                {
+                    auto detached = backend.doc.append_move(remove);
+                    backend.mark_detached(detached);
+                }
                 else node.remove_child(remove);
                 continue;
             }
         }
-        else normalize(child, nodes);
+        else normalize(child, backend);
         child = next;
     }
 }
@@ -166,9 +175,10 @@ void normalize(lxb_dom_node_t *node, std::unordered_map<lxb_dom_node_t *, JSValu
 
                 lxb_dom_node_t *remove = next;
                 next = next->next;
+
+                lxb_dom_node_remove(remove);
                 if(!nodes.count(remove))
                     lxb_dom_node_destroy(remove);
-                lxb_dom_node_remove(remove);
             }
             lxb_dom_node_text_content_set(child, (lxb_char_t const *)merged.data(), merged.size());
             if(text->data.length == 0)
@@ -195,21 +205,31 @@ lxb_status_t find_node(lxb_dom_node_t *node, lxb_css_selector_specificity_t, voi
     return LXB_STATUS_STOP;
 }
 
+lxb_dom_node_t *style_ancestor(lxb_dom_node_t *node)
+{
+    for(auto *parent = node->parent; parent; parent = parent->parent)
+        if(LXB_DOM_NODE_TYPE_ELEMENT == parent->type
+            && LXB_TAG_STYLE == lxb_dom_node_tag_id(parent))
+            return parent;
+    return nullptr;
+}
+
 lxb_status_t node_inserted(lxb_dom_node_t *node)
 {
     if(node->owner_document && node->owner_document->user)
     {
+        auto *backend = reinterpret_cast<HTMLBackend *>(node->owner_document->user);
         switch(node->type) {
         case LXB_DOM_NODE_TYPE_ELEMENT:
-            reinterpret_cast<HTMLBackend *>(node->owner_document->user)->live.pub(node);
-            reinterpret_cast<HTMLBackend *>(node->owner_document->user)->comp.pub(node);
+            backend->live.pub(node);
+            backend->comp.pub();
             break;
         case LXB_DOM_NODE_TYPE_CDATA_SECTION:
         case LXB_DOM_NODE_TYPE_TEXT:
             if(node->parent && LXB_TAG_STYLE == lxb_dom_node_tag_id(node->parent))
             {
-                reinterpret_cast<HTMLBackend *>(node->owner_document->user)->comp.pub();
-                reinterpret_cast<HTMLBackend *>(node->owner_document->user)->csss.pub();
+                backend->comp.pub();
+                backend->csss.pub();
             }
         default: break;
         };
@@ -221,19 +241,19 @@ lxb_status_t node_removed(lxb_dom_node_t *node, lxb_dom_node_t *from)
 {
     if(node->owner_document && node->owner_document->user)
     {
+        auto *backend = reinterpret_cast<HTMLBackend *>(node->owner_document->user);
         switch(node->type) {
         case LXB_DOM_NODE_TYPE_ELEMENT:
-            reinterpret_cast<HTMLBackend *>(node->owner_document->user)->live.pub(node);
-            reinterpret_cast<HTMLBackend *>(node->owner_document->user)->live.pub(from);
-            reinterpret_cast<HTMLBackend *>(node->owner_document->user)->comp.pub(node);
-            reinterpret_cast<HTMLBackend *>(node->owner_document->user)->comp.pub(from);
+            backend->live.pub(node);
+            backend->live.pub(from);
+            backend->comp.pub();
             break;
         case LXB_DOM_NODE_TYPE_CDATA_SECTION:
         case LXB_DOM_NODE_TYPE_TEXT:
             if(LXB_TAG_STYLE == lxb_dom_node_tag_id(from))
             {
-                reinterpret_cast<HTMLBackend *>(node->owner_document->user)->comp.pub();
-                reinterpret_cast<HTMLBackend *>(node->owner_document->user)->csss.pub();
+                backend->comp.pub();
+                backend->csss.pub();
             }
         default: break;
         };
@@ -245,19 +265,20 @@ lxb_status_t node_moved(lxb_dom_node_t *node, lxb_dom_node_t *from)
 {
     if(node->owner_document && node->owner_document->user)
     {
+        auto *backend = reinterpret_cast<HTMLBackend *>(node->owner_document->user);
         switch(node->type) {
         case LXB_DOM_NODE_TYPE_ELEMENT:
-            reinterpret_cast<HTMLBackend *>(node->owner_document->user)->live.pub(node);
-            reinterpret_cast<HTMLBackend *>(node->owner_document->user)->live.pub(from);
-            reinterpret_cast<HTMLBackend *>(node->owner_document->user)->comp.pub(node);
-            reinterpret_cast<HTMLBackend *>(node->owner_document->user)->comp.pub(from);
+            backend->live.pub(node);
+            backend->live.pub(from);
+            backend->comp.pub();
             break;
         case LXB_DOM_NODE_TYPE_CDATA_SECTION:
         case LXB_DOM_NODE_TYPE_TEXT:
-            if(node->parent && LXB_TAG_STYLE == lxb_dom_node_tag_id(node->parent) || LXB_TAG_STYLE == lxb_dom_node_tag_id(from))
+            if((node->parent && LXB_TAG_STYLE == lxb_dom_node_tag_id(node->parent))
+                || LXB_TAG_STYLE == lxb_dom_node_tag_id(from))
             {
-                reinterpret_cast<HTMLBackend *>(node->owner_document->user)->comp.pub();
-                reinterpret_cast<HTMLBackend *>(node->owner_document->user)->comp.pub();
+                backend->comp.pub();
+                backend->csss.pub();
             }
         default: break;
         };
@@ -272,12 +293,35 @@ lxb_status_t attr_change(lxb_dom_element_t *e, lxb_dom_attr_id_t a, lxb_char_t c
     {
         switch(a) {
         case LXB_DOM_ATTR_CLASS:
+        case LXB_DOM_ATTR_ID:
             reinterpret_cast<HTMLBackend *>(node->owner_document->user)->live.pub(node);
             break;
         }
         reinterpret_cast<HTMLBackend *>(node->owner_document->user)->comp.pub();
     }
     return fn(e, a, ov, ol, nv, nl, id);
+}
+
+lxb_status_t match(lxb_dom_node_t*, lxb_css_selector_specificity_t, void *ctx)
+{
+    *reinterpret_cast<bool*>(ctx) = true;
+    return LXB_STATUS_STOP;
+}
+
+void sync_document(lxb_dom_node_t *node)
+{
+    if(!node || LXB_DOM_NODE_TYPE_DOCUMENT != node->type) return;
+
+    auto *document = lxb_dom_interface_document(node);
+    document->element = nullptr;
+    document->doctype = nullptr;
+    for(auto *child = node->first_child; child; child = child->next)
+    {
+        if(LXB_DOM_NODE_TYPE_ELEMENT == child->type && !document->element)
+            document->element = lxb_dom_interface_element(child);
+        else if(LXB_DOM_NODE_TYPE_DOCUMENT_TYPE == child->type && !document->doctype)
+            document->doctype = lxb_dom_interface_document_type(child);
+    }
 }
 
 const lxb_dom_document_mutation_cb_t lxb_dom_document_mutation_cbs = {
@@ -298,11 +342,92 @@ const lxb_dom_document_attr_mutation_cb_t lxb_dom_document_attr_mutation_cbs = {
 
 } // namespace
 
+bool XMLBackend::is_detached(pugi::xml_node const &node) const
+{
+    for(auto current = node; current && current != doc; current = current.parent())
+        if(detached.count(current.internal_object())) return true;
+    return false;
+}
+
+bool XMLBackend::is_connected(pugi::xml_node const &node) const
+{
+    if(node == doc) return true;
+    if(!node || is_detached(node)) return false;
+
+    auto current = node;
+    while(current.parent()) current = current.parent();
+    return current == doc;
+}
+
+pugi::xml_node XMLBackend::logical_root(pugi::xml_node const &node) const
+{
+    auto current = node;
+    while(current.parent())
+    {
+        if(detached.count(current.internal_object())) return current;
+        current = current.parent();
+    }
+    return current;
+}
+
+void XMLBackend::mark_detached(pugi::xml_node const &node)
+{
+    if(node) detached.insert(node.internal_object());
+}
+
+void XMLBackend::mark_attached(pugi::xml_node const &node)
+{
+    if(node) detached.erase(node.internal_object());
+}
+
+pugi::xml_node XMLBackend::first_child(pugi::xml_node const &parent) const
+{
+    for(auto child = parent.first_child(); child; child = child.next_sibling())
+        if(parent != doc || !detached.count(child.internal_object())) return child;
+    return {};
+}
+
+pugi::xml_node XMLBackend::last_child(pugi::xml_node const &parent) const
+{
+    for(auto child = parent.last_child(); child; child = child.previous_sibling())
+        if(parent != doc || !detached.count(child.internal_object())) return child;
+    return {};
+}
+
+pugi::xml_node XMLBackend::next_sibling(pugi::xml_node const &node) const
+{
+    for(auto sibling = node.next_sibling(); sibling; sibling = sibling.next_sibling())
+        if(node.parent() != doc || !detached.count(sibling.internal_object())) return sibling;
+    return {};
+}
+
+pugi::xml_node XMLBackend::previous_sibling(pugi::xml_node const &node) const
+{
+    for(auto sibling = node.previous_sibling(); sibling; sibling = sibling.previous_sibling())
+        if(node.parent() != doc || !detached.count(sibling.internal_object())) return sibling;
+    return {};
+}
+
 JSValue XMLBackend::appendChild(Node const &p, Node const &c)
 {
     pugi::xml_node pn{static_cast<pugi::xml_node_struct *>(p.node)};
     pugi::xml_node cn{static_cast<pugi::xml_node_struct *>(c.node)};
-    return make(pn.append_move(cn).internal_object());
+    pugi::xml_node moved;
+    if(pn == doc)
+    {
+        pugi::xml_node storage;
+        for(auto child = doc.first_child(); child; child = child.next_sibling())
+            if(child != cn && detached.count(child.internal_object()))
+            {
+                storage = child;
+                break;
+            }
+        moved = storage ? pn.insert_move_before(cn, storage) : pn.append_move(cn);
+    }
+    else moved = pn.append_move(cn);
+
+    if(moved) mark_attached(moved);
+    return make(moved.internal_object());
 }
 
 JSValue XMLBackend::cloneNode(Node const &n, bool deep)
@@ -311,6 +436,7 @@ JSValue XMLBackend::cloneNode(Node const &n, bool deep)
     if(deep || pugi::node_element != nn.type())
     {
         pugi::xml_node clone = doc.append_copy(nn);
+        mark_detached(clone);
         return make(clone.internal_object());
     }
     else
@@ -318,8 +444,28 @@ JSValue XMLBackend::cloneNode(Node const &n, bool deep)
         pugi::xml_node clone = doc.append_child(nn.name());
         for(auto attr: nn.attributes())
             clone.append_attribute(attr.name()).set_value(attr.value());
+        mark_detached(clone);
         return make(clone.internal_object());
     }
+}
+
+JSValue XMLBackend::closest(Node const &n, std::string_view const &sel, std::optional<std::string> &error)
+{
+    std::string xpath;
+    if(!css_to_xpath(std::begin(sel), std::end(sel), xpath))
+        return error = "Unsupported selector", JS_NULL;
+
+    pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
+    auto const root = logical_root(nn);
+    std::unordered_set<pugi::xml_node_struct *> matches;
+
+    for(auto const &match: nn.root().select_nodes(xpath.c_str()))
+        if(logical_root(match.node()) == root)
+            matches.insert(match.node().internal_object());
+
+    for(;pugi::node_element == nn.type(); nn = nn.parent())
+        if(matches.count(nn.internal_object())) return make(nn.internal_object());
+    return JS_NULL;
 }
 
 JSValue XMLBackend::compareDocumentPosition(Node const &n, Node const &o)
@@ -332,17 +478,19 @@ JSValue XMLBackend::compareDocumentPosition(Node const &n, Node const &o)
 
     std::vector<pugi::xml_node> opath;
     for(pugi::xml_node x = on; x; x = x.parent()) {
-        if(x == nn) return bridge::Number{ctx, 8 | 2}; // CONTAINS
-        if(!is_connected(x)) break;
+        if(x == nn) return bridge::Number{ctx, 16 | 4}; // CONTAINED_BY | FOLLOWING
         opath.push_back(x);
+        if(detached.count(x.internal_object())) break;
     }
 
     std::vector<pugi::xml_node> npath;
     for(pugi::xml_node x = nn; x; x = x.parent()) {
-        if(x == on) return bridge::Number{ctx, 16 | 4}; // CONTAINED_BY
-        if(!is_connected(x)) break;
+        if(x == on) return bridge::Number{ctx, 8 | 2}; // CONTAINS | PRECEDING
         npath.push_back(x);
+        if(detached.count(x.internal_object())) break;
     }
+
+    if(opath.back() != npath.back()) return bridge::Number{ctx, 1};
 
     auto ot = std::rbegin(opath);
     auto nt = std::rbegin(npath);
@@ -350,10 +498,10 @@ JSValue XMLBackend::compareDocumentPosition(Node const &n, Node const &o)
     for(;ot != std::rend(opath) && nt != std::rend(npath); ++ot, ++nt)
     {
         if(*ot == *nt) continue;
-        for(pugi::xml_node x = ot->next_sibling(); x && is_connected(x); x = x.next_sibling())
-            if(x == *nt) return bridge::Number{ctx, 4}; // FOLLOWING
-        for(pugi::xml_node x = nt->next_sibling(); x && is_connected(x); x = x.next_sibling())
-            if(x == *ot) return bridge::Number{ctx, 2}; // PRECEEDING
+        for(pugi::xml_node x = next_sibling(*ot); x; x = next_sibling(x))
+            if(x == *nt) return bridge::Number{ctx, 2}; // PRECEDING
+        for(pugi::xml_node x = next_sibling(*nt); x; x = next_sibling(x))
+            if(x == *ot) return bridge::Number{ctx, 4}; // FOLLOWING
         break;
     }
 
@@ -369,7 +517,7 @@ bool XMLBackend::contains(Node const &n, Node const &o)
 
     for(pugi::xml_node x = on; x; x = x.parent()) {
         if(x == nn) return true;
-        if(!is_connected(x)) return false;
+        if(detached.count(x.internal_object())) return false;
     }
 
     return false;
@@ -378,22 +526,22 @@ bool XMLBackend::contains(Node const &n, Node const &o)
 JSValue XMLBackend::firstChild(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    if(auto fc = nn.first_child()) return make(fc.internal_object());
+    if(auto fc = first_child(nn)) return make(fc.internal_object());
     return JS_NULL;
 }
 
 JSValue XMLBackend::getRootNode(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    for(;nn.parent(); nn = nn.parent()) {
-        if(!is_connected(nn)) return make(nn.internal_object());
-    }
+    for(;nn.parent(); nn = nn.parent())
+        if(detached.count(nn.internal_object())) return make(nn.internal_object());
     return make(nn.internal_object());
 }
 
 JSValue XMLBackend::hasChildNodes(Node const &n)
 {
-    return pugi::xml_node{static_cast<pugi::xml_node_struct *>(n.node)}.children().empty() ? JS_FALSE : JS_TRUE;
+    return first_child(pugi::xml_node{static_cast<pugi::xml_node_struct *>(n.node)})
+        ? JS_TRUE : JS_FALSE;
 }
 
 JSValue XMLBackend::insertBefore(Node const &n, Node const &o, Node const &r)
@@ -401,7 +549,9 @@ JSValue XMLBackend::insertBefore(Node const &n, Node const &o, Node const &r)
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
     pugi::xml_node on{static_cast<pugi::xml_node_struct *>(o.node)};
     pugi::xml_node rn{static_cast<pugi::xml_node_struct *>(r.node)};
-    return make(nn.insert_move_before(on, rn).internal_object());
+    auto moved = nn.insert_move_before(on, rn);
+    if(moved) mark_attached(moved);
+    return make(moved.internal_object());
 }
 
 void XMLBackend::insertBeforeVoid(Node const &n, Node const &o, Node const &r)
@@ -409,14 +559,33 @@ void XMLBackend::insertBeforeVoid(Node const &n, Node const &o, Node const &r)
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
     pugi::xml_node on{static_cast<pugi::xml_node_struct *>(o.node)};
     pugi::xml_node rn{static_cast<pugi::xml_node_struct *>(r.node)};
-    (void)nn.insert_move_before(on, rn);
+    auto moved = nn.insert_move_before(on, rn);
+    if(moved) mark_attached(moved);
+}
+
+JSValue XMLBackend::replaceChild(Node const &p, Node const &n, Node const &o)
+{
+    pugi::xml_node pn{static_cast<pugi::xml_node_struct *>(p.node)};
+    pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
+    pugi::xml_node on{static_cast<pugi::xml_node_struct *>(o.node)};
+    if(nn != on)
+    {
+        auto inserted = pn.insert_move_before(nn, on);
+        if(inserted)
+        {
+            mark_attached(inserted);
+            auto removed = doc.append_move(on);
+            mark_detached(removed);
+        }
+    }
+    return make(on.internal_object());
 }
 
 bool XMLBackend::isChild(Node const &n, Node const &c)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
     pugi::xml_node cn{static_cast<pugi::xml_node_struct *>(c.node)};
-    return cn.parent() == nn;
+    return cn.parent() == nn && (nn != doc || !detached.count(cn.internal_object()));
 }
 
 JSValue XMLBackend::isConnected(Node const &n)
@@ -432,16 +601,29 @@ JSValue XMLBackend::isDefaultNamespace(Node const &, std::string_view const &sv)
 
 JSValue XMLBackend::isEqualNode(Node const &n, Node const &o)
 {
-    return is_equal_node(
-        pugi::xml_node{static_cast<pugi::xml_node_struct *>(n.node)},
-        pugi::xml_node{static_cast<pugi::xml_node_struct *>(o.node)}
-    ) ? JS_TRUE : JS_FALSE;
+    auto *other = dynamic_cast<XMLBackend *>(o.doc.get());
+    if(!other) return JS_FALSE;
+
+    pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
+    pugi::xml_node on{static_cast<pugi::xml_node_struct *>(o.node)};
+    if(pugi::node_document == nn.type() && pugi::node_document == on.type())
+    {
+        auto left = first_child(nn);
+        auto right = other->first_child(on);
+        for(; left && right;
+            left = next_sibling(left), right = other->next_sibling(right))
+        {
+            if(!is_equal_node(left, right)) return JS_FALSE;
+        }
+        return !left && !right ? JS_TRUE : JS_FALSE;
+    }
+    return is_equal_node(nn, on) ? JS_TRUE : JS_FALSE;
 }
 
 JSValue XMLBackend::lastChild(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    if(auto fc = nn.last_child()) return make(fc.internal_object());
+    if(auto fc = last_child(nn)) return make(fc.internal_object());
     return JS_NULL;
 }
 
@@ -453,8 +635,8 @@ JSValue XMLBackend::namespaceURI(Node const &n)
 JSValue XMLBackend::nextSibling(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    if(auto fc = nn.next_sibling(); fc && is_connected(nn) && is_connected(fc))
-        return make(fc.internal_object());
+    if(detached.count(nn.internal_object())) return JS_NULL;
+    if(auto sibling = next_sibling(nn)) return make(sibling.internal_object());
     return JS_NULL;
 }
 
@@ -469,6 +651,12 @@ JSValue XMLBackend::nodeName(Node const &n)
             return bridge::String{ctx, NN_COMMENT};
         case pugi::node_document:
             return bridge::String{ctx, NN_DOCUMENT};
+        case pugi::node_doctype:
+            {
+                std::string_view value{nn.value()};
+                auto const pos = value.find_first_of(" \t\r\n");
+                return bridge::String{ctx, std::string{value.substr(0, pos)}};
+            }
         case pugi::node_element:
         case pugi::node_pi:
             return bridge::String{ctx, std::string(nn.name())};
@@ -480,10 +668,29 @@ JSValue XMLBackend::nodeName(Node const &n)
     return JS_UNDEFINED;
 }
 
-JSValue XMLBackend::nodeType(Node const &n)
+std::string_view XMLBackend::characterData(Node const &n)
 {
-    constexpr int types[] = {0, 9, 1, 3, 4, 8, 7, 0, 10, 0, 0, 0, 0, 0, 0};
-    return bridge::Number(ctx, types[pugi::xml_node(static_cast<pugi::xml_node_struct *>(n.node)).type()]);
+    pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
+    return std::string_view{nn.value(), std::strlen(nn.value())};
+}
+
+bool XMLBackend::matches(Node const &n, std::string_view const &sel, std::optional<std::string> &error)
+{
+    std::string xpath;
+    if(!css_to_xpath(std::begin(sel), std::end(sel), xpath))
+        return error = "Unsupported selector", false;
+
+    pugi::xml_node const node{static_cast<pugi::xml_node_struct *>(n.node)};
+    auto const root = logical_root(node);
+    for(auto const &match: node.root().select_nodes(xpath.c_str()))
+        if(match.node() == node && logical_root(match.node()) == root) return true;
+    return false;
+}
+
+std::uint16_t XMLBackend::nodeType(Node const &n)
+{
+    constexpr std::uint16_t types[] = {0, 9, 1, 3, 4, 8, 7, 0, 10, 0, 0, 0, 0, 0, 0};
+    return types[pugi::xml_node(static_cast<pugi::xml_node_struct *>(n.node)).type()];
 }
 
 JSValue XMLBackend::nodeValue(Node const &n)
@@ -519,7 +726,7 @@ void XMLBackend::nodeValue(Node const &n, std::string_view const &text)
 
 void XMLBackend::normalize(Node const &n)
 {
-    dom::normalize(pugi::xml_node{static_cast<pugi::xml_node_struct *>(n.node)}, nodes);
+    dom::normalize(pugi::xml_node{static_cast<pugi::xml_node_struct *>(n.node)}, *this);
 }
 
 JSValue XMLBackend::ownerDocument()
@@ -530,31 +737,33 @@ JSValue XMLBackend::ownerDocument()
 JSValue XMLBackend::parentElement(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    if(auto p = nn.parent(); p && (p != doc || nn == p.first_child()))
-        return make(p.internal_object());
+    if(detached.count(nn.internal_object())) return JS_NULL;
+    if(auto parent = nn.parent()) return make(parent.internal_object());
     return JS_NULL;
 }
 
 JSValue XMLBackend::parentNode(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    if(auto p = nn.parent(); p && is_connected(nn))
-        return make(p.internal_object());
+    if(detached.count(nn.internal_object())) return JS_NULL;
+    if(auto p = nn.parent()) return make(p.internal_object());
     return JS_NULL;
 }
 
 JSValue XMLBackend::previousSibling(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    if(auto fc = nn.previous_sibling(); fc && is_connected(nn) && is_connected(fc))
-        return make(fc.internal_object());
+    if(detached.count(nn.internal_object())) return JS_NULL;
+    if(auto sibling = previous_sibling(nn)) return make(sibling.internal_object());
     return JS_NULL;
 }
 
 JSValue XMLBackend::remove(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    return make(nn.root().append_move(nn).internal_object());
+    auto removed = doc.append_move(nn);
+    mark_detached(removed);
+    return make(removed.internal_object());
 }
 
 JSValue XMLBackend::textContent(Node const &n)
@@ -563,8 +772,7 @@ JSValue XMLBackend::textContent(Node const &n)
     if(pugi::node_document != nn.type())
     {
         std::string result;
-        std::invoke(boost::hana::fix([this, &result](auto self, pugi::xml_node nn) -> void {
-            if(!is_connected(nn)) return;
+        std::invoke(boost::hana::fix([&result](auto self, pugi::xml_node nn) -> void {
             if(pugi::node_pcdata == nn.type() || pugi::node_cdata == nn.type())
                 result.append(nn.value());
             else if(pugi::node_element == nn.type())
@@ -588,16 +796,17 @@ void XMLBackend::textContent(Node const &n, std::optional<std::string_view> &&te
     case pugi::node_pi:
         if(text)
             nn.set_value(*text);
-        else if(nodes.count(nn.internal_object()))
-            nn.root().append_move(nn);
         else
-            nn.parent().remove_child(nn);
+            nn.set_value("");
         break;
     default:
         while(auto fc = nn.first_child())
         {
             if(nodes.count(fc.internal_object()))
-                nn.root().append_move(fc);
+            {
+                auto removed = doc.append_move(fc);
+                mark_detached(removed);
+            }
             else
                 nn.remove_child(fc);
         }
@@ -614,22 +823,24 @@ JSValue XMLBackend::childNodes(Node const &n)
 {
     bridge::Array arr{ctx};
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    for (auto n = nn.first_child(); n; n = n.next_sibling())
-        arr.append(make(n.internal_object()));
+    for(auto child = first_child(nn); child; child = next_sibling(child))
+        arr.append(make(child.internal_object()));
     return arr;
 }
 
 std::uint64_t XMLBackend::childNodeCount(Node const &n)
 {
+    std::uint64_t count{0};
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    return static_cast<std::uint64_t>(std::distance(nn.begin(), nn.end()));
+    for(auto child = first_child(nn); child; child = next_sibling(child)) ++count;
+    return count;
 }
 
 JSValue XMLBackend::childNode(Node const &n, std::int64_t i, JSValue d)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    for (auto ch = nn.first_child(); ch; ch = ch.next_sibling(), --i)
-        if(!i) return make(ch.internal_object());
+    for(auto child = first_child(nn); child; child = next_sibling(child), --i)
+        if(!i) return make(child.internal_object());
     return d;
 }
 
@@ -637,16 +848,16 @@ JSValue XMLBackend::childElements(Node const &n)
 {
     bridge::Array arr{ctx};
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    for (auto n = nn.first_child(); n; n = n.next_sibling())
-        if(pugi::node_element == n.type()) arr.append(make(n.internal_object()));
+    for(auto child = first_child(nn); child; child = next_sibling(child))
+        if(pugi::node_element == child.type()) arr.append(make(child.internal_object()));
     return arr;
 }
 
 JSValue XMLBackend::childElement(Node const &n, std::int64_t i, JSValue d)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    for (auto n = nn.first_child(); n; n = n.next_sibling())
-        if(pugi::node_element == n.type() && !i--) return make(n.internal_object());
+    for(auto child = first_child(nn); child; child = next_sibling(child))
+        if(pugi::node_element == child.type() && !i--) return make(child.internal_object());
     return d;
 }
 
@@ -667,49 +878,76 @@ JSValue XMLBackend::collection_item(std::vector<void*> const &nodes, std::int64_
     return i < nodes.size() ? make(static_cast<pugi::xml_node_struct *>(nodes[i])) : def;
 }
 
+JSValue XMLBackend::collection_item(std::vector<void*> const &nodes, std::string_view const &name, JSValue def)
+{
+    return def;
+}
+
 void XMLBackend::appendChildVoid(Node const &p, Node const &c)
 {
     pugi::xml_node pn{static_cast<pugi::xml_node_struct *>(p.node)};
     pugi::xml_node cn{static_cast<pugi::xml_node_struct *>(c.node)};
-    pn.append_move(cn);
+    pugi::xml_node moved;
+    if(pn == doc)
+    {
+        pugi::xml_node storage;
+        for(auto child = doc.first_child(); child; child = child.next_sibling())
+            if(child != cn && detached.count(child.internal_object()))
+            {
+                storage = child;
+                break;
+            }
+        moved = storage ? pn.insert_move_before(cn, storage) : pn.append_move(cn);
+    }
+    else moved = pn.append_move(cn);
+
+    if(moved) mark_attached(moved);
 }
 
 std::uint64_t XMLBackend::childElementCount(Node const &n)
 {
     std::uint64_t count{0};
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    for(auto ch = nn.first_child(); ch && is_connected(ch); ch = ch.next_sibling())
-        if(pugi::node_element == ch.type()) ++count;
+    for(auto child = first_child(nn); child; child = next_sibling(child))
+        if(pugi::node_element == child.type()) ++count;
     return count;
+}
+
+JSValue XMLBackend::doctype()
+{
+    for(auto child = first_child(doc); child; child = next_sibling(child))
+        if(pugi::node_doctype == child.type()) return make(child.internal_object());
+    return JS_NULL;
 }
 
 Node XMLBackend::createTextNode(std::string_view const &text)
 {
     auto node = doc.append_child(pugi::node_pcdata);
     node.text().set(text);
+    mark_detached(node);
     return Node{shared_from_this(), node.internal_object()};
 }
 
 std::optional<Node> XMLBackend::first(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    if(auto ch = nn.first_child()) return Node{shared_from_this(), ch.internal_object()};
+    if(auto child = first_child(nn)) return Node{shared_from_this(), child.internal_object()};
     return std::nullopt;
 }
 
 JSValue XMLBackend::firstElementChild(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    for(auto ch = nn.first_child(); ch && is_connected(ch); ch = ch.next_sibling())
-        if(pugi::node_element == ch.type()) return make(ch.internal_object());
+    for(auto child = first_child(nn); child; child = next_sibling(child))
+        if(pugi::node_element == child.type()) return make(child.internal_object());
     return JS_NULL;
 }
 
 JSValue XMLBackend::lastElementChild(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    for(auto ch = nn.last_child(); ch && is_connected(ch); ch = ch.previous_sibling())
-        if(pugi::node_element == ch.type()) return make(ch.internal_object());
+    for(auto child = last_child(nn); child; child = previous_sibling(child))
+        if(pugi::node_element == child.type()) return make(child.internal_object());
     return JS_NULL;
 }
 
@@ -723,39 +961,67 @@ JSValue *XMLBackend::lookup(Node const &n)
 std::optional<Node> XMLBackend::next(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    if(auto sb = nn.next_sibling()) return Node{shared_from_this(), sb.internal_object()};
+    if(auto sibling = next_sibling(nn)) return Node{shared_from_this(), sibling.internal_object()};
     return std::nullopt;
 }
 
 std::optional<Node> XMLBackend::parent(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    if(auto pn = nn.parent(); pn &&  pugi::node_element == pn.type()) return Node{shared_from_this(), pn.internal_object()};
+    if(detached.count(nn.internal_object())) return std::nullopt;
+
+    if(auto pn = nn.parent(); pn
+        && (pugi::node_element == pn.type() || pugi::node_document == pn.type()))
+        return Node{shared_from_this(), pn.internal_object()};
     return std::nullopt;
 }
 
 JSValue XMLBackend::nextElementSibling(Node const &n)
 {
-    if(pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)}; !is_connected(nn))
-        return JS_NULL;
-    else for(auto sb = nn.next_sibling(); sb && is_connected(sb); sb = sb.next_sibling())
-        if(pugi::node_element == sb.type()) return make(sb.internal_object());
+    pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
+    if(detached.count(nn.internal_object())) return JS_NULL;
+    for(auto sibling = next_sibling(nn); sibling; sibling = next_sibling(sibling))
+        if(pugi::node_element == sibling.type()) return make(sibling.internal_object());
     return JS_NULL;
 }
 
 JSValue XMLBackend::previousElementSibling(Node const &n)
 {
-    if(pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)}; !is_connected(nn))
-        return JS_NULL;
-    else for(auto sb = nn.previous_sibling(); sb && is_connected(sb); sb = sb.previous_sibling())
-        if(pugi::node_element == sb.type()) return make(sb.internal_object());
+    pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
+    if(detached.count(nn.internal_object())) return JS_NULL;
+    for(auto sibling = previous_sibling(nn); sibling; sibling = previous_sibling(sibling))
+        if(pugi::node_element == sibling.type()) return make(sibling.internal_object());
     return JS_NULL;
 }
 
 void XMLBackend::removeVoid(Node const &n)
 {
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    if(is_connected(nn)) nn.root().append_move(nn).internal_object();
+    if(nn.parent() && !detached.count(nn.internal_object()))
+    {
+        auto removed = doc.append_move(nn);
+        mark_detached(removed);
+    }
+}
+
+JSValue XMLBackend::documentTypeName(Node const &n)
+{
+    pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
+    if(pugi::node_doctype != nn.type()) return bridge::String{ctx};
+
+    std::string_view value{nn.value()};
+    auto const pos = value.find_first_of(" \t\r\n");
+    return bridge::String{ctx, value.substr(0, pos)};
+}
+
+JSValue XMLBackend::documentTypePublicId(Node const &n)
+{
+    return bridge::String{ctx};
+}
+
+JSValue XMLBackend::documentTypeSystemId(Node const &n)
+{
+    return bridge::String{ctx};
 }
 
 JSValue XMLBackend::querySelector(Node const &n, std::string_view const &sel, std::optional<std::string> &error)
@@ -765,8 +1031,9 @@ JSValue XMLBackend::querySelector(Node const &n, std::string_view const &sel, st
         return error = "Unsupported selector", JS_NULL;
 
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    if(auto const nodes = nn.select_nodes(xpath.c_str()); nodes.begin() != nodes.end())
-        return make(nodes.begin()->node().internal_object());
+    for(auto const match: nn.select_nodes(xpath.c_str()))
+        if(nn != doc || is_connected(match.node()))
+            return make(match.node().internal_object());
     return JS_NULL;
 }
 
@@ -778,8 +1045,9 @@ std::vector<void*> XMLBackend::querySelectorAll(Node const &n, std::string_view 
         return error = "Unsupported selector", result;
 
     pugi::xml_node nn{static_cast<pugi::xml_node_struct *>(n.node)};
-    for(auto const node: nn.select_nodes(xpath.c_str()))
-        result.push_back(node.node().internal_object());
+    for(auto const match: nn.select_nodes(xpath.c_str()))
+        if(nn != doc || is_connected(match.node()))
+            result.push_back(match.node().internal_object());
     return result;
 }
 
@@ -794,9 +1062,12 @@ HTMLBackend::HTMLBackend(JSContext *ctx, JSValue val, lxb_html_document_t *doc)
     dom->user = this;
 }
 
+
 JSValue HTMLBackend::appendChild(Node const &p, Node const &c)
 {
-    lxb_dom_node_append_child(static_cast<lxb_dom_node_t *>(p.node), static_cast<lxb_dom_node_t *>(c.node));
+    auto *parent = static_cast<lxb_dom_node_t *>(p.node);
+    lxb_dom_node_append_child(parent, static_cast<lxb_dom_node_t *>(c.node));
+    sync_document(parent);
     return make(static_cast<lxb_dom_node_t *>(c.node));
 }
 
@@ -804,6 +1075,26 @@ JSValue HTMLBackend::cloneNode(Node const &n, bool deep)
 {
     auto *nn = static_cast<lxb_dom_node_t *>(n.node);
     return make(lxb_dom_node_clone(nn, deep));
+}
+
+JSValue HTMLBackend::closest(Node const &n, std::string_view const &selector, std::optional<std::string> &error)
+{
+    bool matched = false;
+    lxb_dom_node_t *result{nullptr};
+
+    auto *css = lxb_dom_interface_document(doc.get())->css;
+    if(auto *lst = lxb_css_selectors_parse(css->parser, (const lxb_char_t *) selector.data(), selector.size()))
+    {
+        for(lxb_dom_node_t *nn = static_cast<lxb_dom_node_t *>(n.node); nn && !result; nn = nn->parent)
+        {
+            if(LXB_DOM_NODE_TYPE_ELEMENT == nn->type && lxb_selectors_match_node(
+                css->selectors, nn, lst, match, &matched
+            ); matched) { result = nn; break; }
+        }
+        lxb_css_selector_list_destroy(lst);
+    }
+    else return error = "Unsupported selector", JS_NULL;
+    return result ? make(result) : JS_NULL;
 }
 
 JSValue HTMLBackend::compareDocumentPosition(Node const &n, Node const &o)
@@ -816,13 +1107,13 @@ JSValue HTMLBackend::compareDocumentPosition(Node const &n, Node const &o)
 
     std::vector<lxb_dom_node_t *> opath;
     for(lxb_dom_node_t *x = on; x; x = x->parent) {
-        if(x == nn) return bridge::Number{ctx, 8 | 2}; // CONTAINS
+        if(x == nn) return bridge::Number{ctx, 16 | 4}; // CONTAINED_BY | FOLLOWING
         opath.push_back(x);
     }
 
     std::vector<lxb_dom_node_t *> npath;
     for(lxb_dom_node_t *x = nn; x; x = x->parent) {
-        if(x == on) return bridge::Number{ctx, 16 | 4}; // CONTAINED_BY
+        if(x == on) return bridge::Number{ctx, 8 | 2}; // CONTAINS | PRECEDING
         npath.push_back(x);
     }
 
@@ -833,9 +1124,9 @@ JSValue HTMLBackend::compareDocumentPosition(Node const &n, Node const &o)
     {
         if(*ot == *nt) continue;
         for(lxb_dom_node_t *n = (*ot)->next; n; n = n->next)
-            if(n == *nt) return bridge::Number{ctx, 4}; // FOLLOWING
+            if(n == *nt) return bridge::Number{ctx, 2}; // PRECEDING
         for(lxb_dom_node_t *n = (*nt)->next; n; n = n->next)
-            if(n == *ot) return bridge::Number{ctx, 2}; // PRECEEDING
+            if(n == *ot) return bridge::Number{ctx, 4}; // FOLLOWING
         break;
     }
 
@@ -879,6 +1170,7 @@ JSValue HTMLBackend::insertBefore(Node const &n, Node const &o, Node const &r)
     lxb_dom_node_t *rn = static_cast<lxb_dom_node_t *>(r.node);
 
     lxb_dom_node_insert_before_spec(nn, on, rn);
+    sync_document(nn);
     return make(on);
 }
 
@@ -889,6 +1181,23 @@ void HTMLBackend::insertBeforeVoid(Node const &n, Node const &o, Node const &r)
     lxb_dom_node_t *rn = static_cast<lxb_dom_node_t *>(r.node);
 
     lxb_dom_node_insert_before_spec(nn, on, rn);
+    sync_document(nn);
+}
+
+JSValue HTMLBackend::replaceChild(Node const &p, Node const &n, Node const &o)
+{
+    auto *pn = static_cast<lxb_dom_node_t *>(p.node);
+    auto *nn = static_cast<lxb_dom_node_t *>(n.node);
+    auto *on = static_cast<lxb_dom_node_t *>(o.node);
+    if(nn != on)
+    {
+        auto *before = on->next;
+        lxb_dom_node_remove(on);
+        if(before) lxb_dom_node_insert_before_spec(pn, nn, before);
+        else lxb_dom_node_append_child(pn, nn);
+        sync_document(pn);
+    }
+    return make(on);
 }
 
 bool HTMLBackend::isChild(Node const &n, Node const &c)
@@ -906,7 +1215,8 @@ JSValue HTMLBackend::isDefaultNamespace(Node const &, std::string_view const &sv
 JSValue HTMLBackend::isConnected(Node const &n)
 {
     auto const *node = static_cast<lxb_dom_node_t *>(n.node);
-    return node->type == LXB_DOM_NODE_TYPE_DOCUMENT || node->parent ? JS_TRUE : JS_FALSE;
+    while(node->parent) node = node->parent;
+    return node->type == LXB_DOM_NODE_TYPE_DOCUMENT ? JS_TRUE : JS_FALSE;
 }
 
 JSValue HTMLBackend::isEqualNode(Node const &n, Node const &o)
@@ -922,6 +1232,19 @@ JSValue HTMLBackend::lastChild(Node const &n)
     auto *nn = static_cast<lxb_dom_node_t *>(n.node);
     lxb_dom_node_t *lc = lxb_dom_node_last_child(nn);
     return lc ? make(lc) : JS_NULL;
+}
+
+bool HTMLBackend::matches(Node const &n, std::string_view const &selector, std::optional<std::string> &error)
+{
+    bool matched{false};
+    auto *css = lxb_dom_interface_document(doc.get())->css;
+    if(auto *lst = lxb_css_selectors_parse(css->parser, (const lxb_char_t *) selector.data(), selector.size()))
+    {
+        lxb_selectors_match_node(css->selectors, static_cast<lxb_dom_node_t *>(n.node), lst, match, &matched);
+        lxb_css_selector_list_destroy(lst);
+    }
+    else return error = "Unsupported selector", false;
+    return matched;
 }
 
 JSValue HTMLBackend::namespaceURI(Node const &n)
@@ -949,10 +1272,17 @@ JSValue HTMLBackend::nodeName(Node const &n)
         return bridge::String{ctx, NN_COMMENT};
     case LXB_DOM_NODE_TYPE_DOCUMENT:
         return bridge::String{ctx, NN_DOCUMENT};
+    case LXB_DOM_NODE_TYPE_DOCUMENT_FRAGMENT:
+        return bridge::String{ctx, NN_DOCUMENT_FRAGMENT};
     case LXB_DOM_NODE_TYPE_ELEMENT:
         return bridge::String{ctx, lexbor::get_name(lxb_dom_interface_element(nn))};
     case LXB_DOM_NODE_TYPE_PROCESSING_INSTRUCTION:
-        return bridge::String{ctx, lexbor::get_name(nn->local_name)};
+        {
+            std::size_t len;
+            auto *pi = lxb_dom_interface_processing_instruction(nn);
+            auto *target = lxb_dom_processing_instruction_target(pi, &len);
+            return bridge::String{ctx, std::string_view{(char const *)target, len}};
+        }
     case LXB_DOM_NODE_TYPE_TEXT:
         return bridge::String{ctx, NN_TEXT};
     case LXB_DOM_NODE_TYPE_DOCUMENT_TYPE:
@@ -963,10 +1293,17 @@ JSValue HTMLBackend::nodeName(Node const &n)
     return JS_NULL;
 }
 
-JSValue HTMLBackend::nodeType(Node const &n)
+std::uint16_t HTMLBackend::nodeType(Node const &n)
 {
     auto const *node = static_cast<lxb_dom_node_t *>(n.node);
-    return bridge::Number{ctx, node->type};
+    return static_cast<std::uint16_t>(node->type);
+}
+
+std::string_view HTMLBackend::characterData(Node const &n)
+{
+    auto *nn = static_cast<lxb_dom_node_t *>(n.node);
+    lxb_dom_character_data_t *cd = lxb_dom_interface_character_data(nn);
+    return std::string_view{(char const *)cd->data.data, cd->data.length};
 }
 
 JSValue HTMLBackend::nodeValue(Node const &n)
@@ -994,7 +1331,17 @@ void HTMLBackend::nodeValue(Node const &n, std::string_view const &text)
     case LXB_DOM_NODE_TYPE_TEXT:
     case LXB_DOM_NODE_TYPE_CDATA_SECTION:
     case LXB_DOM_NODE_TYPE_PROCESSING_INSTRUCTION:
-        lxb_dom_node_text_content_set(nn, (lxb_char_t const *)text.data(), text.size());
+        if(characterData(n) == text) return;
+        if(LXB_STATUS_OK != lxb_dom_node_text_content_set(
+            nn, reinterpret_cast<lxb_char_t const *>(text.data()), text.size()))
+            return;
+
+        if(auto *style = style_ancestor(nn))
+        {
+            csss.pub(style);
+            comp.pub();
+        }
+        break;
     default:
         break;
     }
@@ -1014,8 +1361,6 @@ JSValue HTMLBackend::parentElement(Node const &n)
 {
     if(lxb_dom_node_t *nn = static_cast<lxb_dom_node_t *>(n.node); nn->parent && (
         LXB_DOM_NODE_TYPE_ELEMENT == nn->parent->type
-        || LXB_DOM_NODE_TYPE_DOCUMENT == nn->parent->type
-        || LXB_DOM_NODE_TYPE_DOCUMENT_FRAGMENT == nn->parent->type
     )) return make(nn->parent);
     return JS_NULL;
 }
@@ -1036,7 +1381,9 @@ JSValue HTMLBackend::previousSibling(Node const &n)
 JSValue HTMLBackend::remove(Node const &o)
 {
     auto *on = static_cast<lxb_dom_node_t *>(o.node);
+    auto *parent = on->parent;
     lxb_dom_node_remove(on);
+    sync_document(parent);
     return make(on);
 }
 
@@ -1058,8 +1405,7 @@ void HTMLBackend::textContent(Node const &n, std::optional<std::string_view> &&t
         case LXB_DOM_NODE_TYPE_TEXT:
         case LXB_DOM_NODE_TYPE_CDATA_SECTION:
         case LXB_DOM_NODE_TYPE_PROCESSING_INSTRUCTION:
-            if(text) lxb_dom_node_text_content_set(nn, (lxb_char_t const *)text->data(), text->size());
-            else lxb_dom_node_remove(nn);
+            nodeValue(n, text.value_or(std::string_view{}));
             break;
         default:
             if(text) lexbor::set_text(nn, *text);
@@ -1126,7 +1472,7 @@ JSValue HTMLBackend::childElement(Node const &n, std::string_view const &name)
         if(LXB_DOM_NODE_TYPE_ELEMENT != ch->type) continue;
         for(auto *attr = lxb_dom_element_first_attribute(lxb_dom_interface_element(ch)); attr; attr = lxb_dom_element_next_attribute(attr))
         {
-            if(attr->node.ns != LXB_NS_HTML) continue;
+            if(!Attr::eq_ns(ch, attr->node.ns, LXB_NS__UNDEF)) continue;
             if(char const *nstr = reinterpret_cast<char const *>(lxb_dom_attr_qualified_name(attr, &nlen));
                 std::string_view{nstr, nlen} == "id")
             {
@@ -1155,9 +1501,37 @@ JSValue HTMLBackend::collection_item(std::vector<void*> const &nodes, std::int64
     return i < nodes.size() ? make(static_cast<lxb_dom_node_t *>(nodes[i])) : def;
 }
 
+JSValue HTMLBackend::collection_item(std::vector<void*> const &nodes, std::string_view const &name, JSValue def)
+{
+    std::size_t nlen;
+    lxb_dom_node_t *candidate{nullptr};
+    for(std::size_t i = 0; i < nodes.size(); ++i)
+    {
+        auto *ch = static_cast<lxb_dom_node_t *>(nodes[i]);
+        for(auto *attr = lxb_dom_element_first_attribute(lxb_dom_interface_element(ch)); attr; attr = lxb_dom_element_next_attribute(attr))
+        {
+            if(!Attr::eq_ns(ch, attr->node.ns, LXB_NS__UNDEF)) continue;
+            if(char const *nstr = reinterpret_cast<char const *>(lxb_dom_attr_qualified_name(attr, &nlen));
+                std::string_view{nstr, nlen} == "id")
+            {
+                char const *vstr = reinterpret_cast<char const *>(lxb_dom_attr_value(attr, &nlen));
+                if(name == std::string_view{vstr, nlen}) return make(ch);
+            }
+            else if(std::string_view{nstr, nlen} == "name")
+            {
+                char const *vstr = reinterpret_cast<char const *>(lxb_dom_attr_value(attr, &nlen));
+                if(name == std::string_view{vstr, nlen}) candidate = ch;
+            }
+        }
+    }
+    return candidate ? make(candidate) : def;
+}
+
 void HTMLBackend::appendChildVoid(Node const &p, Node const &c)
 {
-    lxb_dom_node_append_child(static_cast<lxb_dom_node_t *>(p.node), static_cast<lxb_dom_node_t *>(c.node));
+    auto *parent = static_cast<lxb_dom_node_t *>(p.node);
+    lxb_dom_node_append_child(parent, static_cast<lxb_dom_node_t *>(c.node));
+    sync_document(parent);
 }
 
 std::uint64_t HTMLBackend::childElementCount(Node const &n)
@@ -1167,6 +1541,12 @@ std::uint64_t HTMLBackend::childElementCount(Node const &n)
     for(lxb_dom_node_t *ch = nn->first_child; ch; ch = ch->next)
         if(LXB_DOM_NODE_TYPE_ELEMENT == ch->type) ++count;
     return count;
+}
+
+JSValue HTMLBackend::doctype()
+{
+    auto *document = lxb_dom_interface_document(doc.get());
+    return document->doctype ? make(lxb_dom_interface_node(document->doctype)) : JS_NULL;
 }
 
 Node HTMLBackend::createTextNode(std::string_view const &text)
@@ -1228,7 +1608,8 @@ std::optional<Node> HTMLBackend::next(Node const &n)
 std::optional<Node> HTMLBackend::parent(Node const &n)
 {
     auto *nn = static_cast<lxb_dom_node_t *>(n.node);
-    if(auto pn = nn->parent; pn && LXB_DOM_NODE_TYPE_ELEMENT == pn->type) return Node{shared_from_this(), pn};
+    if(auto pn = nn->parent; pn && (LXB_DOM_NODE_TYPE_ELEMENT == pn->type
+        || LXB_DOM_NODE_TYPE_DOCUMENT == pn->type)) return Node{shared_from_this(), pn};
     return std::nullopt;
 }
 
@@ -1244,10 +1625,39 @@ JSValue HTMLBackend::previousElementSibling(Node const &n)
 void HTMLBackend::removeVoid(Node const &n)
 {
     auto *nn = static_cast<lxb_dom_node_t *>(n.node);
-    if(nn->parent) lxb_dom_node_remove(nn);
+    if(nn->parent)
+    {
+        auto *parent = nn->parent;
+        lxb_dom_node_remove(nn);
+        sync_document(parent);
+    }
 }
 
-JSValue HTMLBackend::querySelector(Node const &n, std::string_view const &s, std::optional<std::string> &err)
+JSValue HTMLBackend::documentTypeName(Node const &n)
+{
+    std::size_t len{0};
+    auto *doctype = lxb_dom_interface_document_type(static_cast<lxb_dom_node_t *>(n.node));
+    auto *name = lxb_dom_document_type_name(doctype, &len);
+    return name ? bridge::String{ctx, std::string_view{reinterpret_cast<char const *>(name), len}} : bridge::String{ctx};
+}
+
+JSValue HTMLBackend::documentTypePublicId(Node const &n)
+{
+    std::size_t len{0};
+    auto *doctype = lxb_dom_interface_document_type(static_cast<lxb_dom_node_t *>(n.node));
+    auto *id = lxb_dom_document_type_public_id(doctype, &len);
+    return id ? bridge::String{ctx, std::string_view{reinterpret_cast<char const *>(id), len}} : bridge::String{ctx};
+}
+
+JSValue HTMLBackend::documentTypeSystemId(Node const &n)
+{
+    std::size_t len{0};
+    auto *doctype = lxb_dom_interface_document_type(static_cast<lxb_dom_node_t *>(n.node));
+    auto *id = lxb_dom_document_type_system_id(doctype, &len);
+    return id ? bridge::String{ctx, std::string_view{reinterpret_cast<char const *>(id), len}} : bridge::String{ctx};
+}
+
+JSValue HTMLBackend::querySelector(Node const &n, std::string_view const &s, std::optional<std::string> &error)
 {
     lxb_dom_node_t* result{nullptr};
     auto *nn = static_cast<lxb_dom_node_t *>(n.node);
@@ -1258,10 +1668,11 @@ JSValue HTMLBackend::querySelector(Node const &n, std::string_view const &s, std
         lxb_selectors_find(css->selectors, nn, lst, find_node, &result);
         lxb_css_selector_list_destroy(lst);
     }
+    else return error = "Unsupported selector", JS_NULL;
     return result ? make(result) : JS_NULL;
 }
 
-std::vector<void*> HTMLBackend::querySelectorAll(Node const &n, std::string_view const &s, std::optional<std::string> &err)
+std::vector<void*> HTMLBackend::querySelectorAll(Node const &n, std::string_view const &s, std::optional<std::string> &error)
 {
     std::vector<void*> result;
     auto *nn = static_cast<lxb_dom_node_t *>(n.node);
@@ -1272,6 +1683,7 @@ std::vector<void*> HTMLBackend::querySelectorAll(Node const &n, std::string_view
         lxb_selectors_find(css->selectors, nn, lst, append_node, &result);
         lxb_css_selector_list_destroy(lst);
     }
+    else error = "Unsupported selector";
     return result;
 }
 
@@ -1285,9 +1697,16 @@ std::optional<std::string_view> HTMLBackend::lookupNS(uintptr_t ns) const
 {
     size_t len;
     std::optional<std::string_view> result;
-    if(const lxb_char_t *uri = lxb_ns_by_id(doc->dom_document.ns, ns, &len); uri)
+    if(const lxb_char_t *uri = lxb_ns_by_id(doc->dom_document.ns, ns, &len); len)
         result.emplace((char const *)uri, len);
     return result;
+}
+
+lxb_dom_node_t *HTMLBackend::createElement(char const *name, std::size_t size) const
+{
+    return lxb_dom_interface_node(lxb_dom_document_create_element(
+        lxb_dom_interface_document(doc.get()),
+        reinterpret_cast<lxb_char_t const *>(name), size, NULL));
 }
 
 } // namespace notojs:dom

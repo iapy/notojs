@@ -1,9 +1,11 @@
 #pragma once
-#include <boost/property_tree/ptree.hpp>
-#include <boost/beast.hpp>
-
+#include <notojs/detail/config.hpp>
 #include <notojs/detail/jscode.hpp>
 #include <nanodi.hpp>
+
+#include <boost/beast.hpp>
+
+#include <unordered_set>
 #include <filesystem>
 #include <optional>
 
@@ -21,9 +23,10 @@ class Module;
 
 class Engine : public Requires<Global, Folder, Module>
 {
-    void configure(boost::property_tree::ptree const &);
+    void configure(detail::Config const &);
     friend class Config;
 
+    std::unordered_set<std::string> cdn;
     boost::optional<std::filesystem::path> jspath;
     boost::optional<std::filesystem::path> sopath;
 

@@ -362,7 +362,12 @@ public:
                 args.push_back(model->make(fn->getParamDecl(i)->getType(), *result.Context));
 
             if constexpr (!Static)
-                if(!args.empty() && args[0].lock()->name == "JSValue") args.erase(args.begin());
+            {
+                // Static mixin functions receive the bridged object before the
+                // context; neither parameter is part of the JavaScript API.
+                if(args.size() > 1 && args[1].lock()->name == "JSContext*")
+                    args.erase(args.begin());
+            }
             if(!args.empty() && args[0].lock()->name == "JSContext*") args.erase(args.begin());
             if constexpr (Static)
                 c.second->statics[std::string(name->getString().data(), name->getString().size())].emplace_back(std::move(args));

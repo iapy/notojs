@@ -1,0 +1,13 @@
+text: |-
+  `globalThis` extender that defines the `window` and `document` objects.
+
+  ```js!noplay
+  require('dom');
+  ```
+
+  `window` references the object exported by `noto:dom`. `document` is a new
+  HTML document created using `Document.html()`.
+also:
+  - noto:dom
+  - Document
+  - Document.html

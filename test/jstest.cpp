@@ -1,5 +1,7 @@
 #include <boost/test/unit_test.hpp>
+#include <notojs/detail/config.hpp>
 #include <notojs/module/assert.hpp>
+#include <notojs/module/doc.hpp>
 #include <notojs/module/fs.hpp>
 #include <notojs/config.hpp>
 #include <notojs/folder.hpp>
@@ -62,12 +64,16 @@ int Main::main(int argc, char **argv)
     if(std::filesystem::exists(p))
         std::filesystem::remove_all(p);
     std::filesystem::create_directories(p);
-    boost::property_tree::ptree tree;
+    notojs::detail::Config cfg;
     boost::property_tree::ptree fs;
     fs.put("/rw", p.u8string() + ",rw");
     fs.put("/ro", p.u8string() + ",ro");
-    tree.add_child("module:fs", fs);
-    notojs::notojs_init_fs(tree);
+    cfg.add_child("module:fs", fs);
+    boost::property_tree::ptree doc;
+    doc.put("suite", NOTOJS_DOC_SUITE);
+    cfg.add_child("module:doc", doc);
+    notojs::notojs_init_fs(cfg);
+    notojs::notojs_init_doc(cfg);
     return boost::unit_test::unit_test_main(&Main::init_test, argc, argv);
 }
 
@@ -80,4 +86,3 @@ int main(int argc, char **argv)
 {
     return container.main<Main>(argc, argv);
 }
-

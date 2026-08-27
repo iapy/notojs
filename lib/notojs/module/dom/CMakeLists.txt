@@ -1,7 +1,8 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 set(SRC
     backend.cpp
+    css_rule.cpp
     css_rule_list.cpp
     css_style_properties.cpp
     css_style_sheet.cpp
@@ -11,6 +12,7 @@ set(SRC
     html_collection.cpp
     html_document.cpp
     html_element.cpp
+    node.cpp
     xml_document.cpp
     lexbor.cpp)
 

@@ -5,6 +5,7 @@
 #include <notojs/window.hpp>
 #include <chrono>
 #include <iostream>
+#include <limits>
 #include <queue>
 
 #include <boost/asio/system_timer.hpp>
@@ -74,8 +75,13 @@ public:
 private:
     void cout()
     {
-        boost::beast::http::async_read(out, requests.front()->buffer, requests.front()->response,
-            [self=shared_from_this()](boost::system::error_code ec, std::size_t n) {
+        using Parser = boost::beast::http::response_parser<boost::beast::http::string_body>;
+        auto parser = std::make_shared<Parser>();
+        parser->body_limit(std::numeric_limits<std::uint64_t>::max());
+
+        boost::beast::http::async_read(out, requests.front()->buffer, *parser,
+            [self=shared_from_this(), parser](boost::system::error_code ec, std::size_t n) {
+                if(!ec) self->requests.front()->response = parser->release();
                 self->requests.front()->finish(nullptr);
                 if(self->requests.pop(); !self->requests.empty() && self->live()) self->post();
             });

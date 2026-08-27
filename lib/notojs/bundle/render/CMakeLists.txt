@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 get_filename_component(BUNDLER_DIR ${CMAKE_CURRENT_BINARY_DIR} DIRECTORY)
 
@@ -19,6 +19,7 @@ add_custom_command(
     VERBATIM
 )
 add_custom_target(${name} ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${name}.js)
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${name}.js DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/notojs/script)
 endmacro()
 
 render(charts)
