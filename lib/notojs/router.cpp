@@ -40,6 +40,7 @@ extern const std::string_view FAVICON_16X16_PNG;
 extern const std::string_view FAVICON_32X32_PNG;
 extern const std::string_view KEYMAP_INI;
 extern const std::string_view LOGO_PNG;
+extern const std::string_view NOTOAC_JS;
 extern const std::string_view NOTOCM_JS;
 extern const std::string_view NOTOJS_CSS;
 extern const std::string_view NOTOJS_JS;
@@ -58,6 +59,8 @@ extern const std::string_view HTMLMIXED_JS;
 extern const std::string_view XML_JS;
 extern const std::string_view MATCHBRACKETS_JS;
 extern const std::string_view MARKDOWN_JS;
+extern const std::string_view SHOW_HINT_CSS;
+extern const std::string_view SHOW_HINT_JS;
 
 extern const std::string_view ETAG;
 
@@ -96,6 +99,7 @@ constexpr auto router = detail::router(
     detail::route("/client.js"),
     detail::route("/editor.js"),
     detail::route("/editor.css"),
+    detail::route("/notoac.js"),
     detail::route("/notocm.js"),
     detail::route("/notojs.js"),
     detail::route("/notojs.css"),
@@ -119,6 +123,8 @@ constexpr auto router = detail::router(
     detail::route("/logo.png"),
     detail::route("/markdown.js"),
     detail::route("/matchbrackets.js"),
+    detail::route("/show-hint.css"),
+    detail::route("/show-hint.js"),
     detail::route("/site.webmanifest"),
     detail::route("/xml.js"),
 
@@ -149,6 +155,7 @@ constexpr std::array<Static, router["/"]> static_{{
     {&CLIENT_JS,       "application/javascript"},
     {&EDITOR_JS,       "application/javascript"},
     {&EDITOR_CSS,      "text/css"},
+    {&NOTOAC_JS,       "application/javascript"},
     {&NOTOCM_JS,       "application/javascript"},
     {&NOTOJS_JS,       "application/javascript"},
     {&NOTOJS_CSS,      "text/css"},
@@ -172,6 +179,8 @@ constexpr std::array<Static, router["/"]> static_{{
     {&LOGO_PNG,             "image/png"},
     {&MARKDOWN_JS,          "application/javascript"},
     {&MATCHBRACKETS_JS,     "application/javascript"},
+    {&SHOW_HINT_CSS,        "text/css"},
+    {&SHOW_HINT_JS,         "application/javascript"},
     {&SITE_WEBMANIFEST,     "application/manifest+json"},
     {&XML_JS,               "application/javascript"}
 }};
@@ -730,9 +739,14 @@ void Router::route(std::shared_ptr<Handle> handle, Engine &engine, boost::asio::
                     handle->finish();
                 });
                 return;
+            case boost::beast::http::verb::propfind:
+                boost::asio::post(*get<Server>().disk, [this, &engine, handle=std::move(handle)]{
+                    engine.modules(handle->response);
+                    handle->finish();
+                });
+                return;
             default:
                 handle->response.result(boost::beast::http::status::method_not_allowed);
-                break;
             }
             break;
         case router["/notojs.Render/"]:

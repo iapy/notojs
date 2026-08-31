@@ -68,7 +68,7 @@ public:
         std::ofstream stream;
     };
 
-    BOOST_FORCEINLINE MDB_env *env() { return env_; }
+    BOOST_FORCEINLINE MDB_env *env() const { return env_; }
     BOOST_FORCEINLINE std::filesystem::path env(std::filesystem::path const &p) { return path / ".db" / p; };
 private:
     void configure(detail::Config const &);

@@ -6,6 +6,7 @@ target_compile_features(builder PUBLIC cxx_std_17)
 
 set(DOCS
     ${PROJECT_SOURCE_DIR}/lib/notojs/global.yml
+    ${PROJECT_SOURCE_DIR}/lib/notojs/module/assert.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/module/core.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/module/db.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/module/doc.yml
@@ -18,6 +19,7 @@ set(DOCS
     ${PROJECT_SOURCE_DIR}/lib/notojs/script/dom.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/script/storage.yml
     ${PROJECT_SOURCE_DIR}/std/crypto/crypto.yml
+    ${PROJECT_SOURCE_DIR}/std/yaml/yaml.yml
     ${CMAKE_CURRENT_SOURCE_DIR}/global.yml
     ${CMAKE_CURRENT_SOURCE_DIR}/module.yml
     ${CMAKE_CURRENT_SOURCE_DIR}/api.md
@@ -38,6 +40,7 @@ set(DOCS
     ${CMAKE_CURRENT_SOURCE_DIR}/selectors.md
     ${CMAKE_CURRENT_SOURCE_DIR}/timers.md
     ${CMAKE_CURRENT_SOURCE_DIR}/ui.md
+    ${CMAKE_CURRENT_SOURCE_DIR}/yaml.md
 )
 
 if(ZLIB_FOUND)

@@ -68,6 +68,7 @@ macro(doc source)
 endmacro()
 
 doc(${NOTOJS_DIR}/lib/notojs/global.cpp)
+doc(${NOTOJS_DIR}/lib/notojs/module/assert.cpp)
 doc(${NOTOJS_DIR}/lib/notojs/module/db.cpp)
 doc(${NOTOJS_DIR}/lib/notojs/module/doc.cpp)
 doc(${NOTOJS_DIR}/lib/notojs/module/dom.cpp)
@@ -76,7 +77,8 @@ doc(${NOTOJS_DIR}/lib/notojs/module/noto.cpp)
 
 doc(${NOTOJS_DIR}/std/crypto/crypto.cpp)
 doc(${NOTOJS_DIR}/std/gzip/gzip.cpp)
+doc(${NOTOJS_DIR}/std/yaml/yaml.cpp)
 doc(${NOTOJS_DIR}/std/zip/zip.cpp)
 
-doc(${NOTOJS_DIR}/api/global.hpp)
-doc(${NOTOJS_DIR}/api/module.hpp)
+doc(${NOTOJS_DIR}/sdk/global.hpp)
+doc(${NOTOJS_DIR}/sdk/module.hpp)

@@ -20,6 +20,10 @@ fields:
     type: String
     text: |-
       If `json`, the response body is returned as JSON; otherwise, it is returned as text.
+  timeout:
+    type: Number
+    text: |-
+      Request timeout in milliseconds. Defaults to 10000 (10s).
   data:
     type: String
     text: |-

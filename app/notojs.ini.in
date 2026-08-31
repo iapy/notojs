@@ -33,9 +33,10 @@ suite = @CMAKE_INSTALL_PREFIX@/lib/notojs/libdoc.so
 path = @CMAKE_INSTALL_PREFIX@/lib/notojs/plugin
 
 # HTTP server configuration.
-# bind is required; base sets the URL prefix; threads is HTTP_threads,sync_IO_threads.
+# bind is required; base sets the URL prefix; threads is HTTP_threads,sync_IO_threads; autocompete is autocompetion plugin.
 [server]
 bind = 127.0.0.1:8000
+autocomplete = notoac.js
 # base = /
 # threads = 2,1
 # log = /var/log/notojs.log

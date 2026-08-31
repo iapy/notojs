@@ -49,6 +49,7 @@ file(GLOB SRC
     test_vararg.cpp
     test_xml.cpp
     test_xpath.cpp
+    test_yaml.cpp
 )
 
 if(libzip_FOUND)

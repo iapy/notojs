@@ -336,6 +336,27 @@ GET /p
 
 Returns the package resolver configuration as `text/plain`.
 
+##### List available modules and scripts
+
+```http
+PROPFIND /api/v1/packages
+PROPFIND /p
+```
+
+Returns the JavaScript modules and scripts available to the runtime as `application/json`:
+
+```json
+{
+  "modules": ["example.so"],
+  "scripts": ["console", "example.js"]
+}
+```
+
+- `modules` contains names that can be used as module specifiers in JavaScript `import` statements. Shared libraries discovered in the configured module path are returned as filenames including the `.so` extension.
+- `scripts` contains names that can be passed to `require()`. JavaScript entries discovered in the configured script path are returned as filenames including the `.js` extension; entries whose names end in `.js` may be files or directories.
+
+The arrays can also contain built-in and package-resolver entries. Their order is not guaranteed, and duplicate names may be present when the same name is available from multiple sources.
+
 ##### Update package resolver configuration
 
 ```http

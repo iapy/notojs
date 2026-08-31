@@ -161,7 +161,7 @@ sign:
     args:
       - JSContext *
       - int
-      - JSValueConst *
+      - JSValue *
 docs: noto::clog
 text: |-
   Writes JavaScript values to the server log. The first value must be a string.
@@ -176,6 +176,7 @@ sign:
       - "boost::beast::http::request<boost::beast::http::string_body> &&"
       - "boost::urls::url &&"
       - "JSValue (*)(JSContext *, JSValue, const boost::beast::http::response<boost::beast::http::string_body> &)"
+      - std::chrono::milliseconds
 docs: noto::fetch
 text: |-
   Sends an HTTP request and returns a JavaScript `Promise`. The callback converts a successful response to the promise result.
@@ -198,7 +199,7 @@ sign:
     args:
       - JSContext *
       - int
-      - JSValueConst *
+      - JSValue *
 docs: noto::print
 text: |-
   Sends JavaScript values to the current cell output and returns `undefined`.

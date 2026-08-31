@@ -3,7 +3,6 @@
 #include <boost/url/url_view.hpp>
 #include <boost/asio.hpp>
 #include <nanodi.hpp>
-#include <utility>
 #include <memory>
 
 namespace notojs {

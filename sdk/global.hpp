@@ -1,8 +1,9 @@
 #pragma once
 #include <boost/beast.hpp>
 #include <boost/url.hpp>
-#include "bridge.hpp"
 
+#include "bridge.hpp"
+#include <chrono>
 #include <optional>
 #include <string>
 #include <vector>
@@ -70,7 +71,8 @@ JSValue fetch(JSContext *,
     JSValue(*)(
         JSContext *, JSValue,
         boost::beast::http::response<boost::beast::http::string_body> const &
-    ));
+    ),
+    std::chrono::milliseconds timeout = std::chrono::milliseconds{10000});
 
 JSValue print(JSContext *,
     int,

@@ -13,6 +13,7 @@ struct Config : bridge::Struct<Config>
         bridge::field<bridge::Dict<bridge::String>>("headers"),
         bridge::field<bridge::String>("contentType"),
         bridge::field<bridge::String>("dataType"),
+        bridge::field<bridge::Number>("timeout"),
         bridge::field<bridge::String>("method"),
         bridge::field<bridge::String>("data"),
         bridge::field<bridge::String>("url")
@@ -28,6 +29,14 @@ JSValue ajax(JSContext *ctx, Config config)
 
     auto url = facade::URL::parse(static_cast<std::string_view>(*u).data());
     if(!url) return JS_ThrowTypeError(ctx, "$.ajax: malformed url %s", static_cast<std::string_view>(*u).data());
+
+    std::chrono::milliseconds timeout{10000};
+    if(auto to = config.get<bridge::Number>("timeout"))
+    {
+        std::int64_t millis = static_cast<std::int64_t>(*to);
+        if(millis < 0) return JS_ThrowRangeError(ctx, "$.ajax: timeout must be non-negative");
+        timeout = std::chrono::milliseconds{millis};
+    }
 
     boost::beast::http::request<boost::beast::http::string_body> request{
         std::invoke([&config]{
@@ -48,13 +57,13 @@ JSValue ajax(JSContext *ctx, Config config)
     };
 
     bool json = false;
-    if(auto dt = config.get<bridge::String>("dataType"); dt)
+    if(auto dt = config.get<bridge::String>("dataType"))
         json = "json" == static_cast<std::string_view>(*dt);
-    if(auto ct = config.get<bridge::String>("contentType"); ct)
+    if(auto ct = config.get<bridge::String>("contentType"))
         request.set(boost::beast::http::field::content_type, static_cast<std::string_view>(*ct));
-    if(auto data = config.get<bridge::String>("data"); data)
+    if(auto data = config.get<bridge::String>("data"))
         request.body() = static_cast<std::string_view>(*data);
-    if(auto headers = config.get<bridge::Dict<bridge::String>>("headers"); headers)
+    if(auto headers = config.get<bridge::Dict<bridge::String>>("headers"))
         headers->each([&request](auto &&key, auto value){
             request.set(key, static_cast<std::string_view const &>(value));
         });
@@ -68,7 +77,7 @@ JSValue ajax(JSContext *ctx, Config config)
         : +[](JSContext *ctx, JSValue, boost::beast::http::response<boost::beast::http::string_body> const &response) -> JSValue
         {
             return bridge::String(ctx, response.body());
-        }
+        }, timeout
     );
 }
 

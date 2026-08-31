@@ -94,6 +94,7 @@ etc/notojs.ini                  Generated configuration
 lib/notojs/libdoc.so            Documentation suite
 lib/notojs/stdlib/crypto.so     Standard native module
 lib/notojs/stdlib/gzip.so       Optional, when zlib is available
+lib/notojs/stdlib/yaml.so       YAML parser and emitter
 lib/notojs/stdlib/zip.so        Optional, when libzip is available
 lib/notojs/script/charts.js     Chart renderer
 lib/notojs/script/tables.js     Table renderer

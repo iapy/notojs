@@ -34,6 +34,16 @@ public:
     JSValue load(JSContext *ctx, decltype(SCRIPT), boost::urls::url &&, const char *name, bool cache = false);
     JSModuleDef *load(JSContext *ctx, decltype(MODULE), boost::urls::url &&, const char *name, bool cache = false);
 
+    template<typename W>
+    BOOST_FORCEINLINE void list(W &writer) const
+    {
+        for(auto it = std::begin(modules); it != std::end(modules); ++it)
+            writer.string("noto:" + it->first);
+
+        for(auto it = std::begin(plugins); it != std::end(plugins); ++it)
+            writer.string("noto:" + it->first);
+    }
+
 private:
     struct Impl
     {

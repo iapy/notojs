@@ -118,11 +118,18 @@ void Server::configure(detail::Config const &cfg)
         this->threads.second = std::max(1, std::atoi(threads.c_str() + pos + 1));
     }
 
-    WINDOW_HTML.replace(WINDOW_HTML.find("<base/>"), 7, "<base href=\"" + cfg.get<std::string>("server.base", "/") + "\"/>");
-    if(auto script = cfg.get_optional<std::string>("server.script"); script)
+    WINDOW_HTML.replace(WINDOW_HTML.find("<base/>"), 7, R"(<base href=")" + cfg.get<std::string>("server.base", "/") + R"("/>)");
+    if(auto script = cfg.get_optional<std::string>("server.script"))
     {
-        WINDOW_HTML.replace(WINDOW_HTML.find("</head>"), 7, "<script src=\"" + *script + "\"></script></head>");
+        std::string HEAD = R"(</head>)";
+        WINDOW_HTML.replace(WINDOW_HTML.find(HEAD), HEAD.size(), R"(<script src=")" + *script + R"(" type="module"></script>)" + HEAD);
     }
+    if(auto autocomplete = cfg.get_optional<std::string>("server.autocomplete"))
+    {
+        std::string SCRIPT = R"(<script src="notocm.js"></script>)";
+        WINDOW_HTML.replace(WINDOW_HTML.find(SCRIPT), SCRIPT.size(), SCRIPT + R"(<script src=")" + *autocomplete + R"("></script></head>)");
+    }
+
     get<Router>().window(std::string_view(WINDOW_HTML.c_str(), WINDOW_HTML.size()));
 
     if (auto log = cfg.get_optional<std::string>("server.log"); log)

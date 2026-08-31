@@ -340,7 +340,7 @@ int server(boost::property_tree::ptree const &pt, int argc, char **argv)
                 bp::process proc(
                     worker.ctx(),
                     (BINARY_DIR / "esbuild").u8string(),
-                    {(BINARY_DIR / fn).u8string(), "--legal-comments=none", "--bundle", "--format=esm", "--minify-syntax", "--minify-whitespace"},
+                    {(BINARY_DIR / fn).u8string(), "--legal-comments=none", "--bundle", "--format=esm", "--alias:acorn=./acorn.js", "--minify-syntax", "--minify-whitespace"},
                     bp::process_stdio{{}, pipe, {}});
 
                 while (true)

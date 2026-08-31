@@ -1,0 +1,41 @@
+text: |-
+  `noto:assert` provides functions for defining and evaluating assertions.
+
+  ###### Exports
+  - `class AssertionError`
+  - `function assert`
+  - `function throws`
+---
+exception: AssertionError
+docs: AssertionError
+text: |-
+  Represents a failed assertion.
+
+  `AssertionError` extends `Error`. Its `message` property contains the expression that evaluated to `false`.
+---
+function: assert
+args:
+  -
+    - Function
+docs: assert
+text: |-
+  Evaluates assertion function `arg0`.
+
+  The function must return a `Boolean`. If it returns `true`, the assertion count is incremented and `undefined` is returned. If it returns `false`, an `AssertionError` is thrown with the asserted expression as its message.
+
+  For an arrow function of the form `() => expression`, only `expression` is included in the error message.
+
+  Throws `TypeError` if the function does not return a `Boolean`.
+---
+function: throws
+args:
+  -
+    - Function
+  -
+    - Function
+    - String
+docs: throws
+text: |-
+  Returns `true` if function `arg0` throws an `Error` or returns a `Promise` that rejects with an error; otherwise returns `false`.
+
+  If `arg1` is provided, returns `true` only when the error message exactly matches `arg1`.

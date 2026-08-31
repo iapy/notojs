@@ -18,6 +18,7 @@ path = /path/to/workspace
 lmdb = 250mb
 
 [server]
+autocomplete = notoac.js
 bind = 127.0.0.1:2310
 base = /
 threads = 2
@@ -42,6 +43,7 @@ suite = /path/to/libdoc.so
   - `path` — required workspace directory. NotoJS creates `app` and `lib` directories inside it if they do not exist.
   - `lmdb` — optional LMDB map size, for example `250mb` or `2gb`. Default is `10mb`.
 - `[server]`
+  - `autocomplete` — optional script URL loaded as a module in the notebook window to provide autocomplete. 
   - `bind` — required `host:port` bind address.
   - `base` — optional base URL for the notebook window. Defaults to `/`.
   - `threads` — optional `HTTP,sync` thread configuration. The first integer is the number of threads used to process HTTP requests; the second integer is the number of threads used to schedule synchronous operations such as disk I/O. Defaults to `1,1`.

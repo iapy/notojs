@@ -1,0 +1,72 @@
+text: |-
+  `yaml.so` parses and serializes **YAML** documents using **yaml-cpp**.
+
+  ###### Exports
+  - `object YAML`
+also:
+  - topic:yaml
+---
+class: YAML
+docs: YAML
+text: |-
+  Converts between YAML documents and JavaScript values.
+
+  The default export of `yaml.so` is a frozen `YAML` instance. Its methods cannot be
+  replaced and new properties cannot be added.
+ctor:
+  args:
+    -
+      []
+  docs: YAML.constructor
+  text: |-
+    `YAML` instances are provided by `yaml.so` and cannot be constructed directly.
+
+    Import the module's default export instead:
+
+    ```js
+    import YAML from 'yaml.so';
+    ```
+methods:
+  parse:
+    args:
+      -
+        - String
+    docs: YAML.parse
+    text: |-
+      Parses the YAML document in `arg0` and returns the corresponding JavaScript value.
+
+      YAML nodes are converted as follows:
+
+      - null nodes become `null`
+      - boolean, integer, and floating-point scalars become JavaScript primitives
+      - quoted strings and scalars tagged with `!!str` remain strings
+      - sequences become `Array` instances
+      - mappings become `Object` instances
+
+      Mapping keys must be scalar values. Anchors and non-cyclic aliases are supported,
+      but aliases are converted into independent JavaScript values rather than shared references.
+
+      Throws `SyntaxError` if the YAML is malformed or an explicitly typed scalar is invalid.
+      Throws `TypeError` if a mapping contains a non-scalar key or aliases form a cycle.
+  stringify:
+    args:
+      -
+        - Any
+    docs: YAML.stringify
+    text: |-
+      Serializes `arg0` as a block-style YAML document and returns it as a `String`.
+
+      Values are processed using semantics compatible with `JSON.stringify`:
+
+      - enumerable object properties are serialized
+      - an object's `toJSON` method is honored
+      - object properties containing `undefined`, functions, or symbols are omitted
+      - unsupported values in arrays become `null`
+      - `NaN` and infinite numbers become `null`
+      - a top-level `undefined`, function, or symbol returns `undefined`
+
+      Strings that YAML would otherwise interpret as nulls, booleans, or numbers are emitted
+      with an explicit string tag so that parsing the result preserves their type.
+
+      Throws `TypeError` for cyclic objects, `BigInt` values, and other values that cannot be
+      serialized with JSON-compatible semantics.

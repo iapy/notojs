@@ -64,6 +64,9 @@ public:
     void render(
         std::string const &name, std::string &output) const;
 
+    void modules(
+        boost::beast::http::response<boost::beast::http::string_body> &) const;
+
     void set_sopath(std::filesystem::path &&path);
     void set_jspath(std::filesystem::path &&path);
 

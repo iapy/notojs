@@ -4455,14 +4455,17 @@ JSValue facade::fetch(JSContext *ctx,
     boost::urls::url &&url,
     JSValue(*callback)(
         JSContext *, JSValue,
-        boost::beast::http::response<boost::beast::http::string_body> const &))
+        boost::beast::http::response<boost::beast::http::string_body> const &),
+    std::chrono::milliseconds timeout)
 {
     using Callback = decltype(callback);
     JSValue cb = JS_NewObjectClass(ctx, callback_id);
     JS_SetOpaque(cb, (void*)callback);
 
     Request_::maybenoto(url);
-    auto req = bridge::Strong<bridge::Object>{ctx, Request::from(ctx, Request_{std::move(request), std::move(url)})};
+    Request_ request_{std::move(request), std::move(url)};
+    request_.timeout = timeout;
+    auto req = bridge::Strong<bridge::Object>{ctx, Request::from(ctx, std::move(request_))};
     auto fut = bridge::Strong<bridge::Promise>{ctx, fetch_(ctx, Request{ctx, req})}.wrap(
         [](JSContext *ctx, JSValueConst, int, JSValue *resp, int size, JSValue *data)
         {

@@ -682,6 +682,89 @@ void Engine::render(boost::beast::http::fields const &headers, std::string const
     else response.result(boost::beast::http::status::not_found);
 }
 
+void Engine::modules(
+    boost::beast::http::response<boost::beast::http::string_body> &response) const
+{
+    lmdb::val k, v;
+    response.set(boost::beast::http::field::content_type, "application/json");
+    Writer w{response.body()};
+    w.startObject();
+    w.startArray("scripts");
+    w.string("console");
+    w.string("crypto");
+    w.string("dollar");
+    w.string("dom");
+    w.string("storage");
+    try {
+        auto [tx, db] = DB(get<Folder>().env()).pkgs();
+        auto cr = lmdb::cursor::open(tx, db);
+        if(cr.get(k, v, MDB_FIRST)) do {
+            if(!detail::Module::is_script(v)) continue;
+            w.string(k.data(), k.size());
+        } while(cr.get(k, v, MDB_NEXT));
+        tx.abort();
+    } catch(std::runtime_error const &e) {}
+    w.endArray();
+    w.startArray("modules");
+    get<Module>().list(w);
+    try {
+        auto [tx, db] = DB(get<Folder>().env()).pkgs();
+        auto cr = lmdb::cursor::open(tx, db);
+        if(cr.get(k, v, MDB_FIRST)) do {
+            if(!detail::Module::is_module(v)) continue;
+            w.string(k.data(), k.size());
+        } while(cr.get(k, v, MDB_NEXT));
+        tx.abort();
+    } catch(std::runtime_error const &e) {}
+    if(jspath)
+    {
+        std::error_code ec;
+        for(std::filesystem::directory_iterator it{
+                *jspath,
+                std::filesystem::directory_options::skip_permission_denied,
+                ec}, end;
+            it != end;
+            it.increment(ec))
+        {
+            if(ec)
+            {
+                ec.clear();
+                continue;
+            }
+            if(it->path().extension() == ".js")
+                w.string(it->path().filename().string());
+        }
+    }
+    if(sopath)
+    {
+        std::error_code ec;
+        for(std::filesystem::directory_iterator it{
+                *sopath,
+                std::filesystem::directory_options::skip_permission_denied,
+                ec}, end;
+            it != end;
+            it.increment(ec))
+        {
+            if(ec)
+            {
+                ec.clear();
+                continue;
+            }
+
+            std::error_code file_ec;
+            if(it->is_regular_file(file_ec) &&
+               !file_ec &&
+               it->path().extension() == ".so")
+            {
+                w.string(it->path().filename().string());
+            }
+        }
+    }
+    w.endArray();
+    w.endObject();
+    response.result(boost::beast::http::status::ok);
+}
+
 } // namespace notojs
 
 template boost::beast::http::status notojs::Engine::eval<notojs::Silent>(detail::Bytecode const &, notojs::Silent &, JSContext *, std::optional<std::string> &&) const;

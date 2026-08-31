@@ -15,7 +15,25 @@ if(!index.data.includes("doc('Storage')") ||
    !index.data.includes("doc('crypto.so.Storage')") ||
    index.data.includes("doc('noto:global.Storage')"))
     throw new Error('Global/package documentation references are incorrect');
+if(!index.data.includes("doc('noto:noto.Config')") ||
+   !index.data.includes("doc('dollar.Config')") ||
+   index.data.includes("doc('Config')"))
+    throw new Error('Ambiguous Config references are not qualified');
 print(index);
+
+const noto = doc('noto:noto');
+const dollar = doc('dollar');
+if(!noto.data.includes("doc('noto:noto.Config')") ||
+   !dollar.data.includes("doc('dollar.Config')"))
+    throw new Error('Ambiguous Config links are not qualified');
+
+const notoConfig = doc('noto:noto.Config');
+const dollarConfig = doc('dollar.Config');
+if(notoConfig.data.includes('Not found') || dollarConfig.data.includes('Not found'))
+    throw new Error('Qualified Config documentation reference not found');
+if(!notoConfig.data.includes('**`module`** `noto:noto`') ||
+   !dollarConfig.data.includes('Set of options that can be used to configure a `Request`.'))
+    throw new Error('Qualified Config documentation resolved incorrectly');
 
 const global = doc('noto:global');
 if(!global.data.includes("doc('Storage')") ||

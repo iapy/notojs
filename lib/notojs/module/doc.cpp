@@ -75,12 +75,36 @@ struct Handler
              global->second.functions.count(name));
     }
 
+    static bool ambiguous_symbol(doc::Suite const *suite, std::string const &name)
+    {
+        if(!suite) return false;
+
+        std::size_t sources = 0;
+        for(auto const &[_, module]: suite->modules)
+        {
+            if(module.exceptions.count(name) ||
+               module.classes.count(name) ||
+               module.functions.count(name))
+            {
+                if(1 < ++sources) return true;
+            }
+        }
+        for(auto const &[_, script]: suite->scripts)
+        {
+            if(script.types.count(name) || script.functions.count(name))
+            {
+                if(1 < ++sources) return true;
+            }
+        }
+        return false;
+    }
+
     static std::string member_reference(
         doc::Suite const *suite,
         std::string const &source,
         std::string const &name)
     {
-        return "noto:global" == source || !global_symbol(suite, name)
+        return "noto:global" == source || !ambiguous_symbol(suite, name)
             ? name
             : source + "." + name;
     }
@@ -173,7 +197,10 @@ struct Handler
             for(auto const &[name, script]: self.suite->scripts)
             {
                 references[name].insert(name);
-                for(auto const &[name, _]: script.functions) references[name].insert(name);
+                for(auto const &[symbol, _]: script.types)
+                    references[symbol].insert(member_reference(self.suite, name, symbol));
+                for(auto const &[symbol, _]: script.functions)
+                    references[symbol].insert(member_reference(self.suite, name, symbol));
             }
             for(auto const &[name, module]: self.suite->modules)
             {
@@ -367,13 +394,17 @@ struct Handler
             {
                 auto &s = std::get<Script>(self.target);
                 auto const name = *s.top + "." + attr;
-                if(auto it = s.get().types.find(name); it != std::end(s.get().types))
+                auto type = s.get().types.find(name);
+                if(type == std::end(s.get().types)) type = s.get().types.find(attr);
+                auto function = s.get().functions.find(name);
+                if(function == std::end(s.get().functions)) function = s.get().functions.find(attr);
+                if(type != std::end(s.get().types))
                 {
-                    self.target = Document{it->second, name};
+                    self.target = Document{type->second, name};
                 }
-                else if(auto it = s.get().functions.find(name); it != std::end(s.get().functions))
+                else if(function != std::end(s.get().functions))
                 {
-                    self.target = Document{it->second, name};
+                    self.target = Document{function->second, name};
                 }
                 else
                 {
@@ -554,6 +585,8 @@ struct Handler
                         for(auto const &[name, e]: doc.get().types)
                         {
                             self.output.append("\n");
+                            if(doc.top)
+                                self.reference = member_reference(self.suite, *doc.top, name);
                             fn(Document(e, name));
                         }
                     }
@@ -563,6 +596,8 @@ struct Handler
                         for(auto const &[name, e]: doc.get().functions)
                         {
                             self.output.append("\n");
+                            if(doc.top)
+                                self.reference = member_reference(self.suite, *doc.top, name);
                             fn(Document(e, name));
                         }
                     }

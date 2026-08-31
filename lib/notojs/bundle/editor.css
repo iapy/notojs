@@ -74,6 +74,54 @@ nj-cell > div > div.preview div.nj-block li.nj-doc-reference::after {
     border-right: none !important;
     padding-right: 0.5em !important;
 }
+ul.CodeMirror-hints {
+    z-index: 20;
+    box-sizing: border-box;
+    min-width: 12em;
+    max-width: min(30em, calc(100vw - 16px));
+    max-height: min(calc(8.75em + 8px), 40vh);
+    margin-top: 4px;
+    padding: 3px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 0.35em;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    font-family: var(--nj-monospaced);
+    font-size: 0.8rem;
+    line-height: 1.35;
+    scrollbar-color: #ddd transparent;
+    scrollbar-width: thin;
+}
+li.CodeMirror-hint {
+    box-sizing: border-box;
+    display: flex;
+    gap: 1.5em;
+    padding: 0.2em 0.5em;
+    overflow: hidden;
+    border-radius: 0.25em;
+    color: #555;
+    text-overflow: ellipsis;
+    cursor: default;
+}
+li.CodeMirror-hint-active {
+    background: #f5f5f5;
+    color: #555;
+}
+.CodeMirror-hint-detail {
+    margin-left: auto;
+    color: darkgrey;
+    font-size: 0.9em;
+}
+ul.CodeMirror-hints::-webkit-scrollbar {
+    width: 8px;
+}
+ul.CodeMirror-hints::-webkit-scrollbar-thumb {
+    border: 2px solid #fff;
+    border-radius: 8px;
+    background: #ddd;
+}
 .CodeMirror-linewidget div.jump-to-output {
     cursor: pointer;
     padding: 0 4px;

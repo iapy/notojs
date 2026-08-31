@@ -9,7 +9,7 @@
 namespace notojs {
 namespace {
 
-JSValue digest(JSContext *ctx, JSValueConst self, int argc, JSValue *argv)
+JSValue digest(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv, int, JSValue *data)
 {
     std::string algo;
     if(argc < 2 || !bridge::String::check(ctx, argv))
@@ -49,7 +49,7 @@ JSValue digest(JSContext *ctx, JSValueConst self, int argc, JSValue *argv)
         return promise;
     }
 
-    bridge::Strong<bridge::Object> lib{ctx, JS_GetPropertyStr(ctx, self, "crypto")};
+    bridge::Object lib{ctx, data[0]};
     auto hash = lib.get<bridge::Lambda>("hash");
     if(!hash)
     {
@@ -99,8 +99,8 @@ JSValue init(JSContext *ctx, bool cleanup)
     JS_SetPropertyStr(ctx, impl, "randomUUID", JS_GetPropertyStr(ctx, crypto, "uuid"));
 
     JSValue subtle = JS_NewObject(ctx);
-    JS_DefinePropertyValueStr(ctx, subtle, "crypto", crypto, 0);
-    JS_SetPropertyStr(ctx, subtle, "digest", JS_NewCFunction(ctx, &digest, "digest", 2));
+    JS_SetPropertyStr(ctx, subtle, "digest", JS_NewCFunctionData(ctx, &digest, 2, 0, 1, &crypto));
+    JS_FreeValue(ctx, crypto);
     JS_DefinePropertyValueStr(ctx, impl, "subtle", subtle, JS_PROP_ENUMERABLE);
     JS_SetPropertyStr(ctx, glob, "crypto", impl);
     JS_FreeValue(ctx, glob);
