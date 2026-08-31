@@ -1,5 +1,6 @@
 #pragma once
 #include <notojs/detail/config.hpp>
+#include <notojs/detail/fsutil.hpp>
 #include <notojs/detail/jscode.hpp>
 
 #include <boost/beast.hpp>
@@ -29,8 +30,18 @@ public:
     std::optional<R> load(std::string const &path) const;
 
     std::optional<std::filesystem::path> lib(std::string const &name) const;
-
     boost::beast::http::status list(std::string &json) const;
+
+    template<typename W, bool E = false>
+    BOOST_FORCEINLINE void list(W &writer) const
+    {
+        detail::iterate(this->path / "lib", [&writer](auto &&path){
+            if(".js" != path.extension()) return;
+            else if constexpr (E) writer.string(path.filename().string());
+            else writer.string(path.stem().string());
+        });
+    }
+
     boost::beast::http::status eval(std::string &json, std::string const &path) const;
     boost::beast::http::status eval(std::string &json, std::string const &path, std::unordered_set<std::string> &) const;
     boost::beast::http::status load(std::string &json, std::string const &path) const;

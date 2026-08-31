@@ -429,32 +429,21 @@ boost::beast::http::status Folder::list(std::string &json) const
     writer.startObject();
     writer.startArray("notebooks");
 
-    for(auto const &entry : std::filesystem::directory_iterator(this->path))
-    {
-        auto const path = entry.path();
-        if(auto ext = path.extension(); ext == ".notojs")
-            writer.string(path.stem().u8string());
-    }
+    detail::iterate(this->path, [&writer](auto &&path){
+        if(".notojs" == path.extension()) writer.string(path.stem().u8string());
+    });
 
     writer.endArray();
     writer.startArray("applications");
 
-    for(auto const &entry : std::filesystem::directory_iterator(this->path / "app"))
-    {
-        auto const path = entry.path();
-        if(auto ext = path.extension(); ext == ".notojs")
-            writer.string(path.stem().u8string());
-    }
+    detail::iterate(this->path / "app", [&writer](auto &&path){
+        if(".notojs" == path.extension()) writer.string(path.stem().u8string());
+    });
 
     writer.endArray();
     writer.startArray("libraries");
 
-    for(auto const &entry : std::filesystem::directory_iterator(this->path / "lib"))
-    {
-        auto const path = entry.path();
-        if(auto ext = path.extension(); ext == ".js")
-            writer.string(path.stem().u8string());
-    }
+    list(writer);
 
     writer.endArray();
     writer.startArray("packages");

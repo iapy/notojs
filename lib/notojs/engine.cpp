@@ -8,6 +8,7 @@
 #include <global.hpp>
 #include <notodb.hpp>
 
+#include <notojs/detail/fsutil.hpp>
 #include <notojs/detail/module.hpp>
 #include <quickjs/quickjs-libc.h>
 #include <rapidjson/rapidjson.h>
@@ -689,6 +690,7 @@ void Engine::modules(
     response.set(boost::beast::http::field::content_type, "application/json");
     Writer w{response.body()};
     w.startObject();
+
     w.startArray("scripts");
     w.string("console");
     w.string("crypto");
@@ -705,6 +707,7 @@ void Engine::modules(
         tx.abort();
     } catch(std::runtime_error const &e) {}
     w.endArray();
+
     w.startArray("modules");
     get<Module>().list(w);
     try {
@@ -716,51 +719,16 @@ void Engine::modules(
         } while(cr.get(k, v, MDB_NEXT));
         tx.abort();
     } catch(std::runtime_error const &e) {}
-    if(jspath)
-    {
-        std::error_code ec;
-        for(std::filesystem::directory_iterator it{
-                *jspath,
-                std::filesystem::directory_options::skip_permission_denied,
-                ec}, end;
-            it != end;
-            it.increment(ec))
-        {
-            if(ec)
-            {
-                ec.clear();
-                continue;
-            }
-            if(it->path().extension() == ".js")
-                w.string(it->path().filename().string());
-        }
-    }
-    if(sopath)
-    {
-        std::error_code ec;
-        for(std::filesystem::directory_iterator it{
-                *sopath,
-                std::filesystem::directory_options::skip_permission_denied,
-                ec}, end;
-            it != end;
-            it.increment(ec))
-        {
-            if(ec)
-            {
-                ec.clear();
-                continue;
-            }
-
-            std::error_code file_ec;
-            if(it->is_regular_file(file_ec) &&
-               !file_ec &&
-               it->path().extension() == ".so")
-            {
-                w.string(it->path().filename().string());
-            }
-        }
-    }
+    get<Folder>().list<Writer, true>(w);
+    if(jspath) detail::iterate(*jspath, [&w](auto &&path){
+        if(".js" == path.extension()) w.string(path.filename().string());
+    });
+    if(sopath) detail::iterate(*sopath, [&w](auto &&path){
+        if(std::error_code ec; std::filesystem::is_regular_file(path, ec) && !ec && ".so" == path.extension())
+            w.string(path.filename().string());
+    });
     w.endArray();
+
     w.endObject();
     response.result(boost::beast::http::status::ok);
 }
