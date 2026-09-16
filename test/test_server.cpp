@@ -11,6 +11,8 @@ constexpr auto router = detail::router(
     detail::route("/text"),
     detail::route("/json"),
     detail::route("/json/bad"),
+    detail::route("/r/Notebook.notojs"),
+    detail::route("/r/Output.notojs"),
     detail::route("/redirect"),
     detail::route("/redirect/2"),
     detail::route("/redirect/https"),
@@ -83,6 +85,43 @@ void Handle::process(std::shared_ptr<Handle> self)
                 case boost::beast::http::verb::get:
                     self->response.set(boost::beast::http::field::content_type, "application/json");
                     self->response.body() = "[}";
+                    break;
+                default:
+                    self->response.result(boost::beast::http::status::method_not_allowed);
+                    break;
+                }
+                break;
+            case router["/r/Output.notojs"]:
+                self->response.set(boost::beast::http::field::content_type, "application/json");
+                if(self->parser.get().method() == boost::beast::http::verb::post)
+                    self->response.body() = self->parser.get().body();
+                else
+                    self->response.body() = R"JSON([
+                        "[{\"type\":\"notojs.Output\",\"data\":[[\"first\"]]}]",
+                        "[{\"type\":\"notojs.Output\",\"data\":[[\"second\"]]}]"
+                    ])JSON";
+                break;
+            case router["/r/Notebook.notojs"]:
+                switch(self->parser.get().method())
+                {
+                case boost::beast::http::verb::get:
+                case boost::beast::http::verb::post:
+                case boost::beast::http::verb::put:
+                    if("return=minimal" == self->parser.get()[boost::beast::http::field::prefer])
+                    {
+                        self->response.body().clear();
+                        self->response.erase(boost::beast::http::field::content_type);
+                    }
+                    else if("text/html" == self->parser.get()[boost::beast::http::field::accept])
+                    {
+                        self->response.set(boost::beast::http::field::content_type, "text/html");
+                        self->response.body() = "<html></html>";
+                    }
+                    else
+                    {
+                        self->response.set(boost::beast::http::field::content_type, "application/json");
+                        self->response.body() = "[]";
+                    }
                     break;
                 default:
                     self->response.result(boost::beast::http::status::method_not_allowed);

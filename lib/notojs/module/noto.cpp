@@ -2,11 +2,13 @@
 #include <notojs/detail/cellid.hpp>
 #include <notojs/global.hpp>
 #include <notojs/folder.hpp>
+#include <notojs/notojs.hpp>
 
 #include <boost/property_tree/json_parser.hpp>
 #include <rapidjson/document.h>
 #include <bridge.hpp>
 #include <global.hpp>
+#include <module.hpp>
 #include <fstream>
 
 namespace notojs {
@@ -73,20 +75,27 @@ JSClassExoticMethods noto::Config::exoticMethods = {
 
 JSCFunctionListEntry const noto::Config::funcs[] = {
     JS_CFUNC_DEF("toString", 0, &bridge::Function<&Config::toString>::invoke),
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<Config>::toJSON)
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Config::toJSON>::invoke)
 };
 
-struct Cell : bridge::Interface<Cell, std::pair<std::string, bridge::Array>>
+struct Cell : bridge::Interface<Cell, bridge::Object>
 {
+    using Base::Base;
+
     struct I : Base::I<I, IPrint>
     {
         using Base::Base;
 
         JSValue print(JSContext *ctx, bridge::Array output) const
         {
-            for(std::uint32_t j = 0; j < ref.second.size(); ++j)
+            auto name = ref.get<bridge::String>("name");
+            auto records = ref.get<bridge::Array>("data");
+            if(!name || !records) return JS_ThrowTypeError(ctx, "Invalid Cell name or data");
+            auto const id = static_cast<std::string>(*name);
+
+            for(std::uint32_t j = 0; j < records->size(); ++j)
             {
-                if(auto obj = ref.second.at<bridge::Object>(j))
+                if(auto obj = records->at<bridge::Object>(j))
                 {
                     if(auto type = obj->get<bridge::String>("type"); !type)
                     {
@@ -102,10 +111,10 @@ struct Cell : bridge::Interface<Cell, std::pair<std::string, bridge::Array>>
                                 {
                                     bridge::Array{ctx, output}.append(row->release());
                                 }
-                                else return JS_ThrowTypeError(ctx, "Invalid data at %s:%d:%d", ref.first.c_str(), j, k);
+                                else return JS_ThrowTypeError(ctx, "Invalid data at %s:%d:%d", id.c_str(), j, k);
                             }
                         }
-                        else return JS_ThrowTypeError(ctx, "Invalid data at %s:%d", ref.first.c_str(), j);
+                        else return JS_ThrowTypeError(ctx, "Invalid data at %s:%d", id.c_str(), j);
                     }
                     else if("notojs.Render" == types)
                     {
@@ -117,59 +126,93 @@ struct Cell : bridge::Interface<Cell, std::pair<std::string, bridge::Array>>
                                 {
                                     Global::Context::ptr(ctx)->renderers.insert(static_cast<std::string>(*r));
                                 }
-                                else return JS_ThrowTypeError(ctx, "Invalid data at %s:%d:%d", ref.first.c_str(), j, k);
+                                else return JS_ThrowTypeError(ctx, "Invalid data at %s:%d:%d", id.c_str(), j, k);
                             }
                         }
-                        else return JS_ThrowTypeError(ctx, "Ivalid data at %s:%d", ref.first.c_str(), j);
+                        else return JS_ThrowTypeError(ctx, "Ivalid data at %s:%d", id.c_str(), j);
                     }
-                    else return JS_ThrowTypeError(ctx, "Invalid output type [%s] at %s:%d", types.data(), ref.first.c_str(), j);
+                    else return JS_ThrowTypeError(ctx, "Invalid output type [%s] at %s:%d", types.data(), id.c_str(), j);
                 }
-                else return JS_ThrowTypeError(ctx, "Invalid type at %s:%d", ref.first.c_str(), j);
+                else return JS_ThrowTypeError(ctx, "Invalid type at %s:%d", id.c_str(), j);
             }
             return JS_UNDEFINED;
         }
     };
 
-    using Base::get;
-    using ctor = bridge::Unconstructable<Cell>;
     using impl = bridge::Implements<I>;
+    static constexpr bool constructible = false;
 };
 
-struct Output : bridge::Interface<Output, bridge::Array>
+struct Output : bridge::Interface<Output, bridge::Object>
 {
     using Base::Base;
 
-    JSValue length(JSContext *ctx) const
+    std::uint32_t size() const
     {
-        return bridge::Number{ctx, ref().size()};
+        auto length = get<bridge::Number>("length");
+        return length ? static_cast<std::int64_t>(*length) : 0;
     }
 
-    JSValue get_property(JSContext *ctx, const char *name) const
+    bool own_property(JSContext *ctx, char const *n, JSPropertyDescriptor *desc)
     {
-        if(!name || *name == '\0') return JS_UNDEFINED;
-
-        char *end;
-        std::uint32_t i = std::strtoul(name, &end, 10);
-        if(end == name || *end != '\0' || errno == ERANGE)
-            return JS_UNDEFINED;
-
-        if(auto c = ref().at<bridge::String>(i))
+        std::string key{"cell-"};
+        for(char const *p = n; *p; ++p)
         {
-            auto const json = static_cast<std::string_view>(*c);
-            if(bridge::Strong<void> j{ctx, JS_ParseJSON(ctx, json.data(), json.size(), name), false}; bridge::Error::check(ctx, j))
-            {
-                return j.release();
-            }
-            else if(!bridge::Array::check(ctx, j))
-            {
-                return JS_ThrowTypeError(ctx, "Expecting Array at index %s", name);
-            }
-            else
-            {
-                return Cell::from(ctx, {detail::cell_id(i), bridge::Array{ctx, j}}, j);
-            }
+            if(*p < '0' || *p > '9' || key.size() > 8 || '0' == key.back()) return false;
+            key.append(p, 1);
         }
-        else if(i < ref().size()) JS_ThrowTypeError(ctx, "Expecting String at index %s", name);
+        while(key.size() != 8) key.insert(5, "0");
+
+        JSAtom cell = JS_NewAtom(ctx, key.c_str());
+        if(!cell) return false;
+
+        int result = JS_GetOwnProperty(ctx, desc, value, cell);
+        JS_FreeAtom(ctx, cell);
+
+        if(result > 0 && desc) desc->flags &= ~JS_PROP_ENUMERABLE;
+        return result > 0;
+    }
+
+    struct Values
+    {
+        JSValue output;
+        std::uint32_t index;
+
+        JSValue get(JSContext *ctx) const
+        {
+            return JS_GetPropertyUint32(ctx, output, index);
+        }
+        Values &operator ++ ()
+        {
+            ++index;
+            return *this;
+        }
+        bool operator == (Values const &other) const
+        {
+            return index == other.index;
+        }
+    };
+
+    JSValue values(JSContext *ctx) const
+    {
+        return bridge::Iterator<Values>::make(ctx, value, Values{value, 0}, Values{value, size()});
+    }
+
+    JSValue each_1(JSContext *ctx, bridge::Lambda lambda) const
+    {
+        return each_2(ctx, lambda, bridge::Value{ctx, JS_UNDEFINED});
+    }
+
+    JSValue each_2(JSContext *ctx, bridge::Lambda lambda, bridge::Value self) const
+    {
+        auto const length = size();
+        for(std::uint32_t i = 0; i < length; ++i)
+        {
+            if(bridge::Strong<void> cell{ctx, JS_GetPropertyUint32(ctx, value, i), false}; JS_IsException(cell))
+                return cell.release();
+            else if(auto result = lambda(self, std::array<JSValue, 3>{cell, JS_NewUint32(ctx, i), value}); JS_IsException(result))
+                return result.release();
+        }
         return JS_UNDEFINED;
     }
 
@@ -179,53 +222,45 @@ struct Output : bridge::Interface<Output, bridge::Array>
 
         JSValue print(JSContext *ctx, bridge::Array output) const
         {
-            for(std::uint32_t i = 0; i < ref.size(); ++i)
+            Output source{ctx, ref};
+            std::uint32_t const length = source.size();
+            for(std::uint32_t i = 0; i < length; ++i)
             {
-                auto name = detail::cell_id(i);
-                if(auto v = ref.at<bridge::String>(i))
-                {
-                    auto const json = static_cast<std::string_view>(*v);
-                    if(bridge::Strong<void> j{ctx, JS_ParseJSON(ctx, json.data(), json.size(), name.c_str()), false}; bridge::Error::check(ctx, j))
-                    {
-                        return j.release();
-                    }
-                    else if(!bridge::Array::check(ctx, j))
-                    {
-                        return JS_ThrowTypeError(ctx, "Expecting Array at index %d", i);
-                    }
-                    else
-                    {
-                        Cell::Wrapped w{std::move(name), bridge::Array{ctx, j}};
-                        if(bridge::Strong<void> r{ctx, Cell::I{w}.print(ctx, output), false}; bridge::Error::check(ctx, r))
-                            return r.release();
-                    }
-                }
-                else return JS_ThrowTypeError(ctx, "Expecting String at index %d", i);
+                if(bridge::Strong<void> cell{ctx, JS_GetPropertyUint32(ctx, ref, i), false}; JS_IsException(cell))
+                    return cell.release();
+                else if(!Cell::check(ctx, +cell))
+                    return JS_ThrowTypeError(ctx, "Expecting Cell at index %u", i);
+                else if(bridge::Strong<void> result{ctx, Cell::I{ctx, cell}.print(ctx, output), false}; JS_IsException(result))
+                    return result.release();
             }
             return JS_UNDEFINED;
         }
     };
 
-    using Base::get;
-    using ctor = bridge::Unconstructable<Output>;
+    using each = bridge::Function<&Output::each_1, &Output::each_2>;
+    using priv = bridge::Private<bridge::Iterator<Values>>;
     using impl = bridge::Implements<I>;
+
+    static constexpr bool constructible = false;
     static JSClassExoticMethods exoticMethods;
     static JSCFunctionListEntry const funcs[];
 };
 
 JSClassExoticMethods Output::exoticMethods = {
-    .get_property = &bridge::get_property<Output>
+    .get_own_property =  &bridge::own_property<Output>,
 };
 
 JSCFunctionListEntry const Output::funcs[] = {
-    JS_CGETSET_DEF("length", &bridge::Getter<&Output::length>, NULL)
+    JS_CFUNC_DEF("values", 0, &bridge::Function<&Output::values>::invoke),
+    JS_CFUNC_DEF("[Symbol.iterator]", 0, &bridge::Function<&Output::values>::invoke),
+    JS_CFUNC_DEF("forEach", 1, &Output::each::invoke)
 };
 
 struct Notebook_
 {
     std::string const name;
 
-    JSValue saved(JSContext *ctx)
+    JSValue load(JSContext *ctx, bool html = false)
     {
         auto url = facade::URL::parse(("noto:/r/" + name + ".notojs").c_str());
         if(!url) return JS_ThrowInternalError(ctx, "Cannot parse URL");
@@ -235,6 +270,7 @@ struct Notebook_
             url->path(),
             11
         };
+        if(html) request.set(boost::beast::http::field::accept, "text/html");
 
         return facade::fetch(ctx, std::move(request), std::move(*url), &Notebook_::response);
     }
@@ -243,77 +279,145 @@ struct Notebook_
     {
         if(boost::beast::http::status::ok == response.result())
         {
-            bridge::Strong<void> result{ctx, JS_ParseJSON(ctx, response.body().data(), response.body().size(), "<output>"), false};
+            if(auto const type = response[boost::beast::http::field::content_type]; "application/json" == type)
+            {
+                bridge::Strong<void> result{ctx, JS_ParseJSON(ctx, response.body().data(), response.body().size(), "<output>"), false};
 
-            if(bridge::Error::check(ctx, +result)) return result.release();
-            if(bridge::Array::check(ctx, +result)) return Output::from(ctx, bridge::Array{ctx, result}, result);
+                if(JS_IsException(result)) return result.release();
+                if(!bridge::Array::check(ctx, +result)) return JS_ThrowTypeError(ctx, "Expecting Array");
 
-            return JS_ThrowTypeError(ctx, "Expecting Array");
+                bridge::Strong<void> output{ctx, Output::ctor(ctx), false};
+                if(JS_IsException(output)) return output.release();
+
+                bridge::Array cells{ctx, result};
+
+                auto const length = cells.size();
+                if(length > 1000) return JS_ThrowRangeError(ctx, "Too many cells for canonical cell IDs");
+
+                for(std::uint32_t i = 0; i < length; ++i)
+                {
+                    auto cell = cells.at<bridge::String>(i);
+                    if(!cell) return JS_ThrowTypeError(ctx, "Expecting String at %ul", i);
+
+                    auto const name = detail::cell_id(i);
+                    auto const json = static_cast<std::string_view>(*cell);
+
+                    bridge::Strong<void> data{ctx, JS_ParseJSON(ctx, json.data(), json.size(), name.c_str()), false};
+                    if(JS_IsException(data)) return data.release();
+
+                    if(!bridge::Array::check(ctx, +data)) return JS_ThrowTypeError(ctx, "Expecting Array at %ul", i);
+
+                    bridge::Strong<void> value{ctx, Cell::ctor(ctx), false};
+                    if(JS_IsException(value)) return value.release();
+
+                    if(JS_DefinePropertyValueStr(ctx, value, "name", JS_NewString(ctx, name.c_str()), JS_PROP_ENUMERABLE) < 0
+                        || JS_DefinePropertyValueStr(ctx, value, "data", data.release(), JS_PROP_ENUMERABLE) < 0)
+                        return JS_EXCEPTION;
+
+                    if(JS_DefinePropertyValueStr(ctx, output, name.c_str(), value.release(), JS_PROP_C_W_E) < 0) return JS_EXCEPTION;
+                }
+                if(JS_DefinePropertyValueStr(ctx, output, "length", JS_NewUint32(ctx, length), 0) < 0) return JS_EXCEPTION;
+                return output.release();
+            }
+            else if("text/html" == type)
+            {
+                return core::facade::html(ctx, response.body(), false);
+            }
+            return JS_NULL;
         }
         return JS_ThrowInternalError(ctx, "HTTP status code %d", response.result_int());
     }
 
     static JSValue print(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int, JSValue *output)
     {
-        return Output::I{Output::get(*argv)}.print(ctx, bridge::Array{ctx, *output});
+        return Output::I{ctx, *argv}.print(ctx, bridge::Array{ctx, *output});
     }
 };
 
 struct Notebook : bridge::Interface<Notebook, Notebook_>
 {
-    JSValue saved(JSContext *ctx)
+    struct Format : bridge::detail::Reference
     {
-        return ref().saved(ctx);
-    }
+        BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue *value)
+        {
+            if(HTML::ctor(ctx, *value)) return true;
 
-    template<boost::beast::http::verb verb>
-    JSValue execute_0(JSContext *ctx)
+            bridge::Strong<bridge::Object> glob(ctx, JS_GetGlobalObject(ctx));
+            auto json = glob.get<bridge::Object>("JSON");
+
+            return json
+                && JS_VALUE_GET_TAG(*value) == JS_TAG_OBJECT
+                && JS_VALUE_GET_PTR(*value) == JS_VALUE_GET_PTR(static_cast<JSValue>(*json));
+        }
+    };
+
+    struct ExecOptions : bridge::Struct<ExecOptions>
     {
-        auto url = facade::URL::parse(("noto:/r/" + ref().name + ".notojs").c_str());
-        if(!url) return JS_ThrowInternalError(ctx, "Cannot parse URL");
+        BRIDGE_DEFINE_STRUCT(ExecOptions);
+        static constexpr auto fields = bridge::fields(
+            bridge::field<bridge::Either<bridge::Null, Format>>("result"),
+            bridge::field<bridge::Value>("input"),
+            bridge::field<bridge::Boolean>("update")
+        );
+    };
 
-        boost::beast::http::request<boost::beast::http::string_body> request{verb, url->path(), 11};
-        return facade::fetch(ctx, std::move(request), std::move(*url), &Notebook_::response);
-    }
-
-    template<boost::beast::http::verb verb>
-    JSValue execute_1(JSContext *ctx, bridge::String input)
-    {
-        auto url = facade::URL::parse(("noto:/r/" + ref().name + ".notojs").c_str());
-        if(!url) return JS_ThrowInternalError(ctx, "Cannot parse URL");
-
-        boost::beast::http::request<boost::beast::http::string_body> request{verb, url->path(), 11};
-        request.body() = static_cast<std::string_view>(input);
-
-        return facade::fetch(ctx, std::move(request), std::move(*url), &Notebook_::response);
-    }
-
-    template<boost::beast::http::verb verb>
-    JSValue execute_2(JSContext *ctx, bridge::Value input)
+    JSValue exec_0(JSContext *ctx)
     {
         auto url = facade::URL::parse(("noto:/r/" + ref().name + ".notojs").c_str());
         if(!url) return JS_ThrowInternalError(ctx, "Cannot parse URL");
 
-        boost::beast::http::request<boost::beast::http::string_body> request{verb, url->path(), 11};
-        request.body() = static_cast<std::string_view>(input.json());
-        request.set(boost::beast::http::field::content_type, "application/json");
-
+        boost::beast::http::request<boost::beast::http::string_body> request{boost::beast::http::verb::post, url->path(), 11};
         return facade::fetch(ctx, std::move(request), std::move(*url), &Notebook_::response);
     }
 
-    using execute = bridge::Function
-    <
-        &Notebook::execute_0<boost::beast::http::verb::post>,
-        &Notebook::execute_1<boost::beast::http::verb::post>,
-        &Notebook::execute_2<boost::beast::http::verb::post>
-    >;
+    JSValue exec_1(JSContext *ctx, ExecOptions opts)
+    {
+        auto url = facade::URL::parse(("noto:/r/" + ref().name + ".notojs").c_str());
+        if(!url) return JS_ThrowInternalError(ctx, "Cannot parse URL");
 
-    using update = bridge::Function
-    <
-        &Notebook::execute_0<boost::beast::http::verb::put>,
-        &Notebook::execute_1<boost::beast::http::verb::put>,
-        &Notebook::execute_2<boost::beast::http::verb::put>
-    >;
+        auto verb = boost::beast::http::verb::post;
+        if(auto u = opts.get<bridge::Boolean>("update"); u && *u)
+            verb = boost::beast::http::verb::put;
+
+        boost::beast::http::request<boost::beast::http::string_body> request{verb, url->path(), 11};
+        if(auto s = opts.get<bridge::String>("input"))
+        {
+            request.body() = static_cast<std::string>(*s);
+        }
+        else if(auto v = opts.get<bridge::Value>("input"))
+        {
+            request.set(boost::beast::http::field::content_type, "application/json");
+            request.body() = static_cast<std::string>(v->json());
+        }
+        if(opts.get<bridge::Null>("result"))
+            request.set(boost::beast::http::field::prefer, "return=minimal");
+        else if(auto v = opts.get<bridge::Value>("result"); v && HTML::ctor(ctx, *v))
+            request.set(boost::beast::http::field::accept, "text/html");
+        return facade::fetch(ctx, std::move(request), std::move(*url), &Notebook_::response);
+    }
+
+    using exec = bridge::Function<&Notebook::exec_0, &Notebook::exec_1>;
+
+    struct LoadOptions : bridge::Struct<LoadOptions>
+    {
+        BRIDGE_DEFINE_STRUCT(LoadOptions);
+        static constexpr auto fields = bridge::fields(
+            bridge::field<Format>("result")
+        );
+    };
+
+    JSValue load_0(JSContext *ctx)
+    {
+        return ref().load(ctx);
+    }
+
+    JSValue load_1(JSContext *ctx, LoadOptions opts)
+    {
+        auto result = opts.get<bridge::Value>("result");
+        return ref().load(ctx, result && HTML::ctor(ctx, *result));
+    }
+
+    using load = bridge::Function<&Notebook::load_0, &Notebook::load_1>;
 
     struct I : Base::I<I, IPrint>
     {
@@ -321,7 +425,7 @@ struct Notebook : bridge::Interface<Notebook, Notebook_>
 
         JSValue print(JSContext *ctx, bridge::Array output) const
         {
-            return bridge::Strong<bridge::Promise>{ctx, ref.saved(ctx)}.wrap(
+            return bridge::Strong<bridge::Promise>{ctx, ref.load(ctx)}.wrap(
                 &Notebook_::print,
                 [](JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
                     return JS_Throw(ctx, JS_DupValue(ctx, argv[0]));
@@ -337,9 +441,8 @@ struct Notebook : bridge::Interface<Notebook, Notebook_>
 };
 
 JSCFunctionListEntry const Notebook::funcs[] = {
-    JS_CFUNC_DEF("saved", 0, &bridge::Function<&Notebook::saved>::invoke),
-    JS_CFUNC_DEF("update", 1, &Notebook::update::invoke),
-    JS_CFUNC_DEF("execute", 1, &Notebook::execute::invoke)
+    JS_CFUNC_DEF("exec", 0, &Notebook::exec::invoke),
+    JS_CFUNC_DEF("load", 0, &Notebook::load::invoke)
 };
 
 JSValue notebook(JSContext *ctx, bridge::String name)
@@ -380,8 +483,8 @@ JSValue packages_1(JSContext *ctx, bridge::String config)
 using packages = bridge::Function<&packages_0, &packages_1>;
 
 JSCFunctionListEntry const func[] = {
-    JS_CFUNC_DEF("application", 0, application::invoke),
-    JS_CFUNC_DEF("notebook", 0, &bridge::Function<&notebook>::invoke),
+    JS_CFUNC_DEF("application", 1, application::invoke),
+    JS_CFUNC_DEF("notebook", 1, &bridge::Function<&notebook>::invoke),
     JS_CFUNC_DEF("packages", 0, &packages::invoke)
 };
 

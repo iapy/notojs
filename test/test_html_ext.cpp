@@ -13,6 +13,7 @@ BOOST_AUTO_TEST_CASE(appendChild)
 import { assert, throws } from 'noto:assert';
 import { Document } from 'noto:dom';
 import { image, icon } from 'noto:core';
+import { svg } from 'core.so';
 
 const d = Document.html();
 
@@ -26,8 +27,7 @@ assert(() => 'svg' === s.nodeName);
 assert(() => i === d.body.childNodes[0]);
 assert(() => s === d.body.childNodes[1]);
 
-const a = await icon('ic/baseline-apple');
-a.data = a.data.substr(0, 5);
+const a = svg('<svg ');
 
 assert(() => throws(() => d.body.appendChild(a), 'SyntaxError'));
 assert(() => throws(() => d.body.appendChild(Document.html().body), 'WrongDocumentError'));
@@ -44,6 +44,7 @@ BOOST_AUTO_TEST_CASE(insertBefore)
 import { assert, throws } from 'noto:assert';
 import { Document } from 'noto:dom';
 import { image, icon } from 'noto:core';
+import { svg } from 'core.so';
 
 const d = Document.html();
 
@@ -58,8 +59,7 @@ assert(() => 'svg' === s.nodeName);
 assert(() => s === i.nextSibling);
 assert(() => div === s.nextSibling);
 
-const a = await icon('ic/baseline-apple');
-a.data = a.data.substr(0, 5);
+const a = svg('<svg ');
 
 assert(() => throws(() => d.body.insertBefore(a, div), 'SyntaxError'));
 assert(() => throws(() => d.body.insertBefore(a, d.body), 'NotFoundError'));
@@ -77,6 +77,7 @@ BOOST_AUTO_TEST_CASE(replaceChild)
 import { assert, throws } from 'noto:assert';
 import { window, Document } from 'noto:dom';
 import { image, icon, html } from 'noto:core';
+import { svg } from 'core.so';
 
 const d = Document.html();
 
@@ -103,8 +104,8 @@ assert(() => 'bold' == d.body.firstChild.firstChild.nodeValue);
 assert(() => 'I' == d.body.lastChild.nodeName);
 assert(() => 'italic' == d.body.lastChild.firstChild.nodeValue);
 
-ico.data = ico.data.substr(0, 5);
-assert(() => throws(() => d.body.replaceChild(ico, d.body.firstChild), 'SyntaxError'));
+const invalid = svg('<svg ');
+assert(() => throws(() => d.body.replaceChild(invalid, d.body.firstChild), 'SyntaxError'));
 assert(() => throws(() => d.body.replaceChild(html(''), d.body), 'NotFoundError'));
 assert(() => throws(() => d.body.replaceChild(html(''), Document.html().body), 'WrongDocumentError'));
     )JS");
@@ -417,6 +418,7 @@ BOOST_AUTO_TEST_CASE(replaceWith)
 import { assert, throws } from 'noto:assert';
 import { Document } from 'noto:dom';
 import { html, image, icon } from 'noto:core';
+import { svg } from 'core.so';
 
 const d = Document.html();
 const e = d.body.appendChild(d.createElement('div'));
@@ -442,8 +444,7 @@ assert(() => 'U' === s.nextSibling.nodeName);
 assert(() => 'underlined' === s.nextSibling.firstChild.nodeValue);
 assert(() => null === s.nextSibling.nextSibling);
 
-const a = await icon('ic/baseline-apple');
-a.data = a.data.substr(0, 5);
+const a = svg('<svg ');
 assert(() => throws(() => d.body.firstChild.replaceWith(a), 'SyntaxError'));
     )JS");
 
@@ -641,6 +642,7 @@ BOOST_AUTO_TEST_CASE(documentFragmentAppendChild)
 import { assert, throws } from 'noto:assert';
 import { Document } from 'noto:dom';
 import { image, icon } from 'noto:core';
+import { svg } from 'core.so';
 
 const d = Document.html();
 const f = d.createDocumentFragment();
@@ -666,8 +668,7 @@ assert(() => s === d.body.childNodes[1]);
 assert(() => i.isConnected);
 assert(() => s.isConnected);
 
-const a = await icon('ic/baseline-apple');
-a.data = a.data.substr(0, 5);
+const a = svg('<svg ');
 assert(() => throws(() => d.createDocumentFragment().appendChild(a), 'SyntaxError'));
     )JS");
 
@@ -682,6 +683,7 @@ BOOST_AUTO_TEST_CASE(documentFragmentInsertBefore)
 import { assert, throws } from 'noto:assert';
 import { Document } from 'noto:dom';
 import { image, icon } from 'noto:core';
+import { svg } from 'core.so';
 
 const d = Document.html();
 const f = d.createDocumentFragment();
@@ -702,8 +704,7 @@ const tail = f.insertBefore(image('https://imgs.xkcd.com/comics/ahead_stop.png')
 assert(() => 'IMG' === tail.nodeName);
 assert(() => tail === f.lastChild);
 
-const a = await icon('ic/baseline-apple');
-a.data = a.data.substr(0, 5);
+const a = svg('<svg ');
 assert(() => throws(() => f.insertBefore(a, div), 'SyntaxError'));
 assert(() => throws(() => f.insertBefore(a, d.body), 'NotFoundError'));
 assert(() => throws(() => f.insertBefore(a, Document.html().body), 'WrongDocumentError'));
@@ -720,6 +721,7 @@ BOOST_AUTO_TEST_CASE(documentFragmentReplaceChild)
 import { assert, throws } from 'noto:assert';
 import { Document } from 'noto:dom';
 import { html, image, icon } from 'noto:core';
+import { svg } from 'core.so';
 
 const d = Document.html();
 const f = d.createDocumentFragment();
@@ -748,8 +750,8 @@ assert(() => 'bold' === f.firstChild.firstChild.nodeValue);
 assert(() => 'I' === f.lastChild.nodeName);
 assert(() => 'italic' === f.lastChild.firstChild.nodeValue);
 
-ico.data = ico.data.substr(0, 5);
-assert(() => throws(() => f.replaceChild(ico, f.firstChild), 'SyntaxError'));
+const invalid = svg('<svg ');
+assert(() => throws(() => f.replaceChild(invalid, f.firstChild), 'SyntaxError'));
 assert(() => throws(() => f.replaceChild(html(''), d.body), 'NotFoundError'));
 assert(() => throws(() => f.replaceChild(html(''), Document.html().body), 'WrongDocumentError'));
     )JS");

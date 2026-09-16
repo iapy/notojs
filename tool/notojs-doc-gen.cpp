@@ -632,44 +632,6 @@ public:
     }
 };
 
-class ToJSONMatcher : Matcher<notojs::Module, CXXRecordDecl>
-{
-public:
-    ToJSONMatcher(notojs::Module *mod)
-    : Matcher(mod, {"type"}) {}
-
-    virtual void reg(MatchFinder &finder) override
-    {
-        finder.addMatcher(varDecl(
-            isDefinition(),
-            hasName("funcs"),
-            hasDeclContext(
-                cxxRecordDecl().bind(names[0])
-            ),
-            hasInitializer(initListExpr(
-                forEach(initListExpr(
-                    hasInit(0, stringLiteral().bind(names[1])),
-                    hasDescendant(designatedInitExpr(hasDescendant(
-                        declRefExpr(
-                            to(cxxMethodDecl(
-                                hasName("toJSON"),
-                                ofClass(hasName("bridge::JSON"))
-                            ))
-                        )
-                    )))
-                ))
-            ))
-        ), this);
-    }
-
-    virtual void run(MatchFinder::MatchResult const &result,
-        CXXRecordDecl const *type) override
-    {
-        VERIFY_NOT(c, !c.first || !c.second, model->find<notojs::Class>(type->getQualifiedNameAsString()));
-        c.second->methods["toJSON"].emplace_back();
-    }
-};
-
 int module_(ClangTool &Tool)
 {
     notojs::Module mod;
@@ -688,7 +650,6 @@ int module_(ClangTool &Tool)
     ValidatorMatcher validatorMatcher{&mod};
     ImplementsMatcher implementsMatcher{&mod};
     FunctionMatcher functionMatcher{&mod};
-    ToJSONMatcher toJSONMatcher{&mod};
 
     classMatcher.reg(finder);
     fieldMatcher.reg(finder);
@@ -703,7 +664,6 @@ int module_(ClangTool &Tool)
     validatorMatcher.reg(finder);
     implementsMatcher.reg(finder);
     functionMatcher.reg(finder);
-    toJSONMatcher.reg(finder);
 
     if(EXIT_SUCCESS == Tool.run(newFrontendActionFactory(&finder).get()))
     {

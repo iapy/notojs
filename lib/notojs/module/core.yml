@@ -1,6 +1,9 @@
 |-
   `noto:core` provides **NotoJS** rendering primitives and their factory functions.
-  Although rendering primitives provide constructors, using the factory functions is recommended.
+  Rendering primitives cannot be constructed with `new`; use the factory functions instead.
+  Their classes remain exported for `instanceof` checks and output-format selection.
+  Instances are immutable: their `data` property cannot be changed or deleted, and new properties cannot be added.
+  To change the content, create a new instance through a factory.
 
   ###### Exports
   - `class HTML`
@@ -86,69 +89,39 @@ also:
 ---
 class: HTML
 text: |-
-  Represents an HTML fragment.
+  Represents an HTML fragment. Create instances with `html()`; this class has no public constructor.
 
   When printed, inserts its content into the cell output.
 
   Throws `TypeError` when printed if this `HTML` object was constructed from `<html>`, `<head>`, `<title>`, or `<body>` elements of `HTMLDocument`.
 also:
   - noto:dom
-ctor:
-  args:
-    -
-      - Object
-  text: |-
-    Creates a new `HTML` object from a configuration object, or creates a copy of an existing `HTML` object.
-    The configuration object must have a `data` property of type `String` containing the HTML fragment.
+
 ---
 class: Image
 text: |-
-  Represents an image.
+  Represents an image. Create instances with `image()`; this class has no public constructor.
 
   When printed, inserts an `<img>` element into the cell output with `src` set to the instance `data`.
-ctor:
-  args:
-    -
-      - Object
-  text: |-
-    Creates a new `Image` object from a configuration object, or creates a copy of an existing `Image` object.
-    The configuration object must have a `data` property of type `String` containing the image URL.
+
 ---
 class: Markdown
 text: |-
-  Represents a Markdown document.
+  Represents a Markdown document. Create instances with `markdown()`; this class has no public constructor.
 
   When printed, inserts a Markdown block containing the instance content into the cell output.
-ctor:
-  args:
-    -
-      - Object
-  text: |-
-    Creates a new `Markdown` object from a configuration object, or creates a copy of an existing `Markdown` object.
-    The configuration object must have a `data` property of type `String` containing the Markdown content.
+
 ---
 class: SVG
 text: |-
-  Represents an SVG document.
+  Represents an SVG document. Create instances with `icon()` or `image()` using an SVG source;
+  this class has no public constructor.
 
   When printed, inserts an `<svg>` element into the cell output.
-ctor:
-  args:
-    -
-      - Object
-  text: |-
-    Creates a new `SVG` object from a configuration object, or creates a copy of an existing `SVG` object.
-    The configuration object must have a `data` property of type `String` containing the SVG content.
+
 ---
 class: XML
 text: |-
-  Represents an XML document.
+  Represents an XML document. Create instances with `xml()`; this class has no public constructor.
 
   When printed, inserts an XML code block into the cell output.
-ctor:
-  args:
-    -
-      - Object
-  text: |-
-    Creates a new `XML` object from a configuration object, or creates a copy of an existing `XML` object.
-    The configuration object must have a `data` property of type `String` containing the XML content.

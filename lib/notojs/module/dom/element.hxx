@@ -290,5 +290,5 @@ JSCFunctionListEntry const Element::funcs[] = {
 
     // Integration interface
     JS_CFUNC_DEF("toString", 0, &bridge::Function<&Element::toString>::invoke),
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<Element>::toJSON)
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Element::toJSON>::invoke)
 };

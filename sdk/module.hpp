@@ -10,6 +10,10 @@ namespace facade {
 JSValue html(JSContext *,
     std::string const &);
 
+JSValue html(JSContext *,
+    std::string const &,
+    bool json);
+
 JSValue image(JSContext *,
     boost::urls::url const &);
 
@@ -36,7 +40,7 @@ using namespace notojs::core::facade;
 
 namespace notojs::fs {
 
-struct IPath : bridge::Interface<IPath, void*>
+struct IPath : bridge::Interface<IPath>
 {
     virtual std::pair<std::filesystem::path, bool> native() const = 0;
     struct Static

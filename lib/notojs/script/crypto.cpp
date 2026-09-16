@@ -9,11 +9,9 @@
 namespace notojs {
 namespace {
 
-JSValue digest(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv, int, JSValue *data)
+JSValue digest(JSContext *ctx, bridge::Object lib, bridge::String algo, bridge::ArrayBuffer data)
 {
-    std::string algo;
-    if(argc < 2 || !bridge::String::check(ctx, argv))
-        return JS_ThrowTypeError(ctx, "No matching function overload found");
+    std::string algorithm;
 
     JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
     JSValue promise = JS_NewPromiseCapability(ctx, funcs);
@@ -24,15 +22,14 @@ JSValue digest(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv, int, 
         return promise;
     }
 
-    auto a = bridge::String{ctx, *argv};
-    if(auto const &n = static_cast<std::string_view const &>(a); "SHA-1" == n)
-        algo = "sha1";
+    if(auto const &n = static_cast<std::string_view const &>(algo); "SHA-1" == n)
+        algorithm = "sha1";
     else if("SHA-256" == n)
-        algo = "sha256";
+        algorithm = "sha256";
     else if("SHA-384" == n)
-        algo = "sha384";
+        algorithm = "sha384";
     else if("SHA-512" == n)
-        algo = "sha512";
+        algorithm = "sha512";
     else
     {
         JS_ThrowInternalError(ctx, "unsupported algorithm [%s]", n.data());
@@ -49,7 +46,6 @@ JSValue digest(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv, int, 
         return promise;
     }
 
-    bridge::Object lib{ctx, data[0]};
     auto hash = lib.get<bridge::Lambda>("hash");
     if(!hash)
     {
@@ -59,8 +55,8 @@ JSValue digest(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv, int, 
         return JS_ThrowTypeError(ctx, "crypto.hash is not a function");
     }
 
-    bridge::Strong<bridge::String> alg{ctx, bridge::String{ctx, std::move(algo)}};
-    auto ret = (*hash)(std::array<JSValue, 2>{alg, argv[1]});
+    bridge::Strong<bridge::String> alg{ctx, bridge::String{ctx, std::move(algorithm)}};
+    auto ret = (*hash)(std::array<JSValue, 2>{alg, data});
     JSValue settled;
 
     if(JS_IsException(*ret))
@@ -99,8 +95,9 @@ JSValue init(JSContext *ctx, bool cleanup)
     JS_SetPropertyStr(ctx, impl, "randomUUID", JS_GetPropertyStr(ctx, crypto, "uuid"));
 
     JSValue subtle = JS_NewObject(ctx);
-    JS_SetPropertyStr(ctx, subtle, "digest", JS_NewCFunctionData(ctx, &digest, 2, 0, 1, &crypto));
+    JS_SetPropertyStr(ctx, subtle, "digest", bridge::FunctionData<&digest>::bind(ctx, crypto));
     JS_FreeValue(ctx, crypto);
+
     JS_DefinePropertyValueStr(ctx, impl, "subtle", subtle, JS_PROP_ENUMERABLE);
     JS_SetPropertyStr(ctx, glob, "crypto", impl);
     JS_FreeValue(ctx, glob);

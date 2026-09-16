@@ -68,9 +68,10 @@ namespace {
 
 BOOST_FORCEINLINE void wrap(std::string &body, Engine const &engine, std::unordered_set<std::string> const &render)
 {
-    body.insert(0, "<script type=\"module\">Promise.all(");
+    body.insert(0, "<script type=\"module\">for(const type of Object.keys(window.Handlers))"
+        "if(type.startsWith('notojs.Render/'))window.Handlers[type]=window.verify(window.Handlers[type]);Promise.all(");
     for(auto const &r: render) engine.render(r.substr(r.rfind('/') + 1), body);
-    body.insert(0, "window.render=render;window.Handlers=Handlers;</script>");
+    body.insert(0, "window.render=render;window.Handlers=Handlers;window.verify=verify;</script>");
     body.insert(0, NOTOJS_JS.data(), NOTOJS_JS.size());
     body.insert(0, "div.nj-block{margin:auto}nj-view{margin-left:auto;margin-right:auto;max-width:var(--nj-max-editor-width)}nj-view>div.nj-block{margin:unset}</style></head><body class=\"nj-page\"><div class=\"nj-output\"></div></body><script type=\"module\">");
     body.insert(0, NOTOJS_CSS.data(), NOTOJS_CSS.size());

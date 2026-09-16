@@ -436,20 +436,20 @@ struct HTMLNodeMixin
         if(auto html = nodes.template get<HTML>(j); html)
         {
             html->fragment = nodes.prepared(j);
-            if(reference) (void)dom::lexbor::insertPrepared(node, *html, reference);
-            else (void)dom::lexbor::appendPrepared(node, *html);
+            if(reference) std::ignore = dom::lexbor::insertPrepared(node, *html, reference);
+            else std::ignore = dom::lexbor::appendPrepared(node, *html);
         }
         else if(auto image = nodes.template get<Image>(j); image)
         {
             image->fragment = nodes.prepared(j);
-            if(reference) (void)dom::lexbor::insertPrepared(node, *image, reference);
-            else (void)dom::lexbor::appendPrepared(node, *image);
+            if(reference) std::ignore = dom::lexbor::insertPrepared(node, *image, reference);
+            else std::ignore = dom::lexbor::appendPrepared(node, *image);
         }
         else if(auto svg = nodes.template get<SVG>(j); svg)
         {
             svg->fragment = nodes.prepared(j);
-            if(reference) (void)dom::lexbor::insertPrepared(node, *svg, reference);
-            else (void)dom::lexbor::appendPrepared(node, *svg);
+            if(reference) std::ignore = dom::lexbor::insertPrepared(node, *svg, reference);
+            else std::ignore = dom::lexbor::appendPrepared(node, *svg);
         }
         return std::nullopt;
     }
@@ -460,17 +460,17 @@ struct HTMLNodeMixin
         if(auto html = nodes.template get<HTML>(j); html)
         {
             html->fragment = nodes.prepared(j);
-            (void)dom::lexbor::appendPrepared(node, *html);
+            std::ignore = dom::lexbor::appendPrepared(node, *html);
         }
         else if(auto image = nodes.template get<Image>(j); image)
         {
             image->fragment = nodes.prepared(j);
-            (void)dom::lexbor::appendPrepared(node, *image);
+            std::ignore = dom::lexbor::appendPrepared(node, *image);
         }
         else if(auto svg = nodes.template get<SVG>(j); svg)
         {
             svg->fragment = nodes.prepared(j);
-            (void)dom::lexbor::appendPrepared(node, *svg);
+            std::ignore = dom::lexbor::appendPrepared(node, *svg);
         }
         return std::nullopt;
     }
@@ -483,17 +483,17 @@ struct HTMLNodeMixin
         if(auto html = nodes.template get<HTML>(j); html)
         {
             html->fragment = nodes.prepared(j);
-            (void)dom::lexbor::insertPrepared(node, *html, reference);
+            std::ignore = dom::lexbor::insertPrepared(node, *html, reference);
         }
         else if(auto image = nodes.template get<Image>(j); image)
         {
             image->fragment = nodes.prepared(j);
-            (void)dom::lexbor::insertPrepared(node, *image, reference);
+            std::ignore = dom::lexbor::insertPrepared(node, *image, reference);
         }
         else if(auto svg = nodes.template get<SVG>(j); svg)
         {
             svg->fragment = nodes.prepared(j);
-            (void)dom::lexbor::insertPrepared(node, *svg, reference);
+            std::ignore = dom::lexbor::insertPrepared(node, *svg, reference);
         }
         return std::nullopt;
     }

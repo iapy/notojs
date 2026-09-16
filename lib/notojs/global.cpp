@@ -33,6 +33,7 @@
 #include <condition_variable>
 #include <unordered_map>
 #include <unordered_set>
+#include <tuple>
 #include <list>
 
 namespace notojs {
@@ -405,7 +406,7 @@ JSCFunctionListEntry const Blob::funcs[] = {
     JS_CFUNC_DEF("text", 0, &bridge::Function<&Blob::text>::invoke),
     JS_CFUNC_DEF("slice", 0, &Blob::slice::invoke),
 
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<Blob>::toJSON)
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Blob::toJSON>::invoke)
 };
 
 struct File_ : Blob_
@@ -995,7 +996,7 @@ JSCFunctionListEntry const Headers::funcs[] = {
     JS_CFUNC_DEF("delete", 1, &bridge::Function<&Headers::remove>::invoke),
     JS_CFUNC_DEF("forEach", 1, &each::invoke),
 
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<Headers>::toJSON)
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Headers::toJSON>::invoke)
 };
 
 struct URLSearchParams : bridge::Interface<URLSearchParams, std::vector<std::pair<std::string, std::string>>>
@@ -1199,7 +1200,7 @@ JSCFunctionListEntry const URLSearchParams::funcs[] = {
     JS_CFUNC_DEF("sort", 0, &bridge::Function<&URLSearchParams::sort>::invoke),
     JS_CFUNC_DEF("values", 0, &bridge::Function<&URLSearchParams::values>::invoke),
 
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<URLSearchParams>::toJSON),
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&URLSearchParams::toJSON>::invoke),
     JS_CFUNC_DEF("toString", 0, &bridge::Function<&URLSearchParams::toString>::invoke),
     JS_CFUNC_DEF("[Symbol.toPrimitive]", 0, &bridge::Function<&URLSearchParams::toString>::invoke)
 };
@@ -1839,7 +1840,7 @@ JSCFunctionListEntry const URL::funcs[] = {
     JS_CGETSET_DEF("username", &bridge::Getter<&URL::get_username>, &bridge::Setter<&URL::set_username>),
     JS_CGETSET_DEF("password", &bridge::Getter<&URL::get_password>, &bridge::Setter<&URL::set_password>),
     JS_CFUNC_DEF("toString", 0, &bridge::Function<&URL::toString>::invoke),
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<URL>::toJSON)
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&URL::toJSON>::invoke)
 };
 
 JSCFunctionListEntry const URL::sfunc[] = {
@@ -2034,13 +2035,13 @@ struct Request : bridge::Interface<Request, Request_, ServerRequest>
     Request(HTTPString url, Config config)
     : Base(Request_(url))
     {
-        (void)set_config(config);
+        std::ignore = set_config(config);
     }
 
     Request(HTTPURL url, Config config)
     : Base(Request_(boost::urls::url{url.ref()}))
     {
-        (void)set_config(config);
+        std::ignore = set_config(config);
     }
 
     using ctor = bridge::Constructor
@@ -2276,7 +2277,7 @@ JSCFunctionListEntry const ServerResponse::funcs[] = {
     JS_CFUNC_DEF("json", 0, &bridge::Function<&Content<ServerResponse>::json>::invoke),
     JS_CFUNC_DEF("formData", 0, &bridge::Function<&Content<ServerResponse>::formData>::invoke),
 
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<ServerResponse>::toJSON)
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&ServerResponse::toJSON>::invoke)
 };
 
 struct Response_ : boost::beast::http::response<boost::beast::http::string_body>
@@ -3015,12 +3016,6 @@ JSValue print(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv)
     }
 }
 
-JSValue renderer(JSContext *ctx, bridge::String name)
-{
-    Global::Context::ptr(ctx)->renderers.insert(name);
-    return JS_DupValue(ctx, name);
-}
-
 JSValue proxy(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv)
 {
     bridge::String layout{ctx, argv[1]};
@@ -3047,10 +3042,10 @@ JSValue proxy(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv)
         return percent(&sv[b], &sv[sv.size()]) || (sv.size() == 1 && sv[0] == ':');
     })) return JS_ThrowTypeError(ctx, "Invalid layout: [%s]", sv.data());
 
-    (void)JS_DupValue(ctx, argv[1]);
+    std::ignore = JS_DupValue(ctx, argv[1]);
     return JS_NewCFunctionData(ctx, [](JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv, int, JSValueConst *array){
         return JS_Call(ctx, array[0], array[1], argc, argv);
-    }, 0, 0xDEADBEEF, 2, argv);
+    }, 0, 0, 2, argv);
 }
 
 struct Storage : bridge::Interface<Storage, DB::Storage>
@@ -3169,7 +3164,7 @@ JSCFunctionListEntry const Storage::funcs[] = {
     JS_CGETSET_DEF("length", &bridge::Getter<&Storage::get_length>, NULL)
 };
 
-struct TextEncoder : bridge::Interface<TextEncoder>
+struct TextEncoder : bridge::Interface<TextEncoder, bridge::Object>
 {
     static bool encode_(JSContext *ctx, JSValue source, std::vector<std::uint8_t> &output,
                        std::size_t capacity, std::size_t &read)
@@ -3283,6 +3278,7 @@ struct TextEncoder : bridge::Interface<TextEncoder>
         return result;
     }
 
+    using Base::Base;
     JSValue get_encoding(JSContext *ctx) const
     {
         return JS_NewString(ctx, "utf-8");
@@ -3351,7 +3347,6 @@ struct TextEncoder : bridge::Interface<TextEncoder>
     }
 
     using encode = bridge::Function<&TextEncoder::encode_0, &TextEncoder::encode_1>;
-    using ctor = bridge::Constructor<TextEncoder()>;
     static JSCFunctionListEntry const funcs[];
 };
 
@@ -3733,6 +3728,11 @@ JSValue notojs_init_mustache(JSContext *ctx)
     return JS_UNDEFINED;
 }
 
+JSValue md_(JSContext *ctx, bridge::String source)
+{
+    return Markdown::data(ctx, JS_DupValue(ctx, source));
+}
+
 JSValue pipe_(JSContext *ctx, bridge::Lambda lambda)
 {
     bridge::Strong<bridge::Object> glob{ctx, JS_GetGlobalObject(ctx)};
@@ -3804,9 +3804,10 @@ JSValue dollar_(JSContext *ctx, T t, bridge::Object c)
 }
 
 using dollar = bridge::Function<
+    &md_,
     &pipe_,
     &dollar_<HTML>,
-    &dollar_<__Markdown>,
+    &dollar_<Markdown>,
     &dollar_<bridge::String>
 >;
 
@@ -3856,18 +3857,17 @@ JSValue require_1(JSContext *ctx, bridge::String name)
 
 JSValue require_2(JSContext *ctx, bridge::String name, ScriptConfig config)
 {
-    auto const n = static_cast<std::string>(name);
-
     static std::unordered_map<std::string, JSValue(*)(JSContext *, ScriptConfig)> const scripts = {
 #define SCRIPT(name) {#name, &notojs_init_##name}
         SCRIPT(console),
-            SCRIPT(crypto),
+        SCRIPT(crypto),
         SCRIPT(dollar),
         SCRIPT(dom),
         SCRIPT(storage)
 #undef SCRIPT
     };
 
+    auto const n = static_cast<std::string>(name);
     if(auto it = scripts.find(n); it != std::end(scripts))
         return it->second(ctx, config);
 
@@ -3964,7 +3964,7 @@ JSValue script_(JSContext *ctx, JSValueConst self, int, JSValue *resp, int size,
     {
         handler.set("get", JS_NewCFunctionData(ctx, [](JSContext *ctx, JSValueConst, int argc, JSValueConst *argv, int, JSValue *data){
             return script_handler_<Context>(ctx, argv, data);
-        }, 2, bridge::Promise::MAGIC | 1, 1, data + 1));
+        }, 2, 1, 1, data + 1));
     }
     handler.set("set", JS_NewCFunction(ctx, [](JSContext *ctx, JSValueConst, int argc, JSValueConst *argv){
         bridge::Object obj{ctx, argv[0]};
@@ -4056,13 +4056,15 @@ Global::Global()
     Storage::init();
     TextDecoder::init();
     TextEncoder::init();
+    URLSearchParams::init();
+    URL::init();
+
     HTML::init();
     Image::init();
+    Markdown::init();
     SVG::init();
     XML::init();
-    URL::init();
-    URLSearchParams::init();
-    __Markdown::init();
+
     JS_NewClassID(&callback_id);
 }
 
@@ -4079,13 +4081,14 @@ void Global::init(JSRuntime *rt) const
     Storage::init(rt);
     TextDecoder::init(rt);
     TextEncoder::init(rt);
+    URLSearchParams::init(rt);
+    URL::init(rt);
+
     HTML::init(rt);
     Image::init(rt);
+    Markdown::init(rt);
     SVG::init(rt);
     XML::init(rt);
-    URL::init(rt);
-    URLSearchParams::init(rt);
-    __Markdown::init(rt);
 }
 
 std::unique_ptr<Global::Context> Global::make(JSContext *ctx, JSValue glob) const
@@ -4110,8 +4113,7 @@ std::unique_ptr<Global::Context> Global::make(JSContext *ctx, JSValue glob) cons
 
     if(fresh)
     {
-        JSValue d = JS_NewCFunction(ctx, &dollar::invoke, "$", 1);
-        JS_SetPropertyStr(ctx, glob, "$", d);
+        JS_SetPropertyStr(ctx, glob, "$", JS_NewCFunction(ctx, &dollar::invoke, "$", 1));
         JS_SetPropertyStr(ctx, glob, "atob", JS_NewCFunction(ctx, &bridge::Function<atob>::invoke, "atob", 1));
         JS_SetPropertyStr(ctx, glob, "btoa", JS_NewCFunction(ctx, &bridge::Function<btoa>::invoke, "btoa", 1));
         JS_SetPropertyStr(ctx, glob, "fetch", JS_NewCFunction(ctx, &fetch::invoke, "fetch", 1));
@@ -4119,8 +4121,6 @@ std::unique_ptr<Global::Context> Global::make(JSContext *ctx, JSValue glob) cons
         JSValue r = JS_NewCFunction(ctx, &require::invoke, "require", 1);
         JS_SetPropertyStr(ctx, r, "script", JS_NewCFunction(ctx, &script::invoke, "script", 1));
         JS_SetPropertyStr(ctx, glob, "require", r);
-
-        JS_SetPropertyStr(ctx, d, "__renderer", JS_NewCFunction(ctx, &bridge::Function<renderer>::invoke, NULL, 0));
 
         if(!jsapp)
         {
@@ -4137,13 +4137,14 @@ std::unique_ptr<Global::Context> Global::make(JSContext *ctx, JSValue glob) cons
         Storage::init(ctx, glob);
         TextDecoder::init(ctx, glob);
         TextEncoder::init(ctx, glob);
+        URLSearchParams::init(ctx, glob);
+        URL::init(ctx, glob);
+
         HTML::init(ctx);
         Image::init(ctx);
+        Markdown::init(ctx);
         SVG::init(ctx);
         XML::init(ctx);
-        URL::init(ctx, glob);
-        URLSearchParams::init(ctx, glob);
-        __Markdown::init(ctx, d);
     }
     return context;
 }
@@ -4251,7 +4252,8 @@ void Global::set_agent(std::string &&agent) const
 
 void Global::set_prefix(std::string &&prefix) const
 {
-    Request::HTTPString::prefix = std::move(prefix);
+    Request_::local = prefix.substr(prefix.rfind('/') + 1);
+    Request::HTTPString::prefix = prefix;
 }
 
 void Global::configure(detail::Config const &cfg)
@@ -4474,7 +4476,7 @@ JSValue facade::fetch(JSContext *ctx,
         },
         [](JSContext *ctx, JSValueConst, int argc, JSValueConst *argv)
         {
-            return JS_DupValue(ctx, argv[0]);
+            return JS_Throw(ctx, JS_DupValue(ctx, argv[0]));
         }, 1, &cb
     ).release();
     JS_FreeValue(ctx, cb);

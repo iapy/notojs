@@ -10,6 +10,7 @@
 #include <array>
 #include <fstream>
 #include <iterator>
+#include <tuple>
 
 namespace notojs {
 namespace {
@@ -241,7 +242,7 @@ std::pair<lmdb::txn, lmdb::dbi> DB::open(Access a, DB::Namespace ns, std::string
             lmdb::val k{name}, v;
             if(!db.get(tx, k, v))
             {
-                (void)lmdb::dbi::open(tx, name.c_str(), MDB_CREATE);
+                std::ignore = lmdb::dbi::open(tx, name.c_str(), MDB_CREATE);
                 tx.commit();
             }
             else
@@ -302,7 +303,7 @@ std::pair<lmdb::txn, std::vector<lmdb::dbi>> DB::open(Access a, DB::Namespace ns
                 lmdb::val k{name}, v;
                 if(!db.get(tx, k, v))
                 {
-                    (void)lmdb::dbi::open(tx, name.c_str(), MDB_CREATE);
+                    std::ignore = lmdb::dbi::open(tx, name.c_str(), MDB_CREATE);
                     commit = true;
                 }
             }

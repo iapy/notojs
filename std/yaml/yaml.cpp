@@ -215,7 +215,7 @@ JSValue stringify(JSContext *ctx, bridge::Value value)
     }
 }
 
-struct YAML : bridge::Interface<YAML>
+struct YAML : bridge::Interface<YAML, bridge::Object>
 {
     static constexpr bool constructible = false;
     static JSCFunctionListEntry const funcs[];

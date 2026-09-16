@@ -172,7 +172,7 @@ JSCFunctionListEntry const SVGElement::funcs[] = {
 
     // Integration interface
     JS_CFUNC_DEF("toString", 0, &bridge::Function<&HTMLElement::toString>::invoke),
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<HTMLElement>::toJSON)
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&HTMLElement::toJSON>::invoke)
 };
 
 #define SVGLENGTH_ATTRIBUTE(name) JS_CGETSET_DEF(#name, &bridge::Getter<(&SVGElement::attribute<SVGElement::attributes::name>)>, NULL)

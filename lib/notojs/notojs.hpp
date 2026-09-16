@@ -1,16 +1,21 @@
 #pragma once
-#include <bridge.hpp>
+#include <notojs/detail/bridge.hpp>
 
 namespace notojs {
 
-struct HTML : bridge::Interface<HTML>
+struct Content
+{
+    Content() = delete;
+    static JSValue make(JSContext *ctx, std::string_view, JSValue);
+};
+
+struct HTML : bridge::Content<HTML>
 {
     using Base::Base;
-    static constexpr bool constructible = false;
 
     void *fragment{nullptr};
 
-    struct Interface : bridge::Interface<Interface, void*>
+    struct Interface : bridge::Interface<Interface>
     {
         virtual bool json() const = 0;
         virtual std::string get() const = 0;
@@ -21,14 +26,13 @@ struct HTML : bridge::Interface<HTML>
     static JSCFunctionListEntry const funcs[1];
 };
 
-struct Image : bridge::Interface<Image>
+struct Image : bridge::Content<Image>
 {
     using Base::Base;
-    static constexpr bool constructible = false;
 
     void *fragment{nullptr};
 
-    struct Interface : bridge::Interface<Interface, void*>
+    struct Interface : bridge::Interface<Interface>
     {
         virtual std::string get() const = 0;
         virtual ~Interface() {}
@@ -38,23 +42,21 @@ struct Image : bridge::Interface<Image>
     static JSCFunctionListEntry const funcs[1];
 };
 
-struct __Markdown : bridge::Interface<__Markdown>
+struct Markdown : bridge::Content<Markdown>
 {
     using Base::Base;
-    static constexpr bool constructible = false;
 
     JSValue toJSON(JSContext *ctx) const;
     static JSCFunctionListEntry const funcs[1];
 };
 
-struct SVG : bridge::Interface<SVG>
+struct SVG : bridge::Content<SVG>
 {
     using Base::Base;
-    static constexpr bool constructible = false;
 
     void *fragment{nullptr};
 
-    struct Interface : bridge::Interface<Interface, void*>
+    struct Interface : bridge::Interface<Interface>
     {
         virtual std::string get() const = 0;
         virtual ~Interface() {}
@@ -65,12 +67,11 @@ struct SVG : bridge::Interface<SVG>
     static JSCFunctionListEntry const funcs[2];
 };
 
-struct XML : bridge::Interface<XML>
+struct XML : bridge::Content<XML>
 {
     using Base::Base;
-    static constexpr bool constructible = false;
 
-    struct Interface : bridge::Interface<Interface, void*>
+    struct Interface : bridge::Interface<Interface>
     {
         virtual std::string get() const = 0;
         virtual ~Interface() {}

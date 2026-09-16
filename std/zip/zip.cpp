@@ -401,7 +401,7 @@ JSCFunctionListEntry const Zip::funcs[] = {
     JS_CFUNC_DEF("remove", 1, &bridge::Function<&Zip::remove>::invoke),
     JS_CFUNC_DEF("write", 1, &Zip::write::invoke),
 
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<Zip>::toJSON)
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Zip::toJSON>::invoke)
 };
 
 JSValue zip(JSContext *ctx, noto::fs::Path path)

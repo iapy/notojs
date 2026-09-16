@@ -10,7 +10,7 @@
 
 namespace notojs {
 
-struct IBlob : bridge::Interface<IBlob, void*>
+struct IBlob : bridge::Interface<IBlob>
 {
     virtual std::string type() const = 0;
     virtual std::shared_ptr<std::vector<std::uint8_t>> copy() const = 0;
@@ -23,7 +23,7 @@ struct IBlob : bridge::Interface<IBlob, void*>
     virtual ~IBlob() {}
 };
 
-struct IFile : bridge::Interface<IFile, void*>
+struct IFile : bridge::Interface<IFile>
 {
     virtual std::string name() const = 0;
     virtual std::string type() const = 0;
@@ -38,7 +38,7 @@ struct IFile : bridge::Interface<IFile, void*>
     virtual ~IFile() {}
 };
 
-struct IURL : bridge::Interface<IURL, void*>
+struct IURL : bridge::Interface<IURL>
 {
     virtual std::string href() const = 0;
     struct Static
@@ -49,7 +49,7 @@ struct IURL : bridge::Interface<IURL, void*>
     virtual ~IURL() {}
 };
 
-struct IPrint : bridge::Interface<IPrint, void*>
+struct IPrint : bridge::Interface<IPrint>
 {
     virtual JSValue print(JSContext *ctx, bridge::Array) const = 0;
     virtual ~IPrint() {}

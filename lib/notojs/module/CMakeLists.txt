@@ -7,7 +7,8 @@ set(SRC
     doc.cpp
     dom.cpp
     fs.cpp
-    noto.cpp)
+    noto.cpp
+    render.cpp)
 
 add_library(module STATIC ${SRC})
 target_link_libraries(module ${QUICKJS_LIBRARY} yaml-cpp::yaml-cpp dom)

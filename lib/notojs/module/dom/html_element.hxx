@@ -742,7 +742,7 @@ JSCFunctionListEntry const HTMLElement::funcs[] = {
 
     // Integration interface
     JS_CFUNC_DEF("toString", 0, &bridge::Function<&HTMLElement::toString>::invoke),
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<HTMLElement>::toJSON)
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&HTMLElement::toJSON>::invoke)
 };
 
 #define HTML_ELEMENT_STUB(...) BOOST_PP_OVERLOAD(HTML_ELEMENT_STUB_, __VA_ARGS__)(__VA_ARGS__)

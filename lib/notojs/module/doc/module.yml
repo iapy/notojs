@@ -53,6 +53,11 @@ sign:
     args:
       - JSContext *
       - "const std::string &"
+  - type: JSValue
+    args:
+      - JSContext *
+      - "const std::string &"
+      - bool
 docs: noto::core::html
 text: |-
   Creates a printable `HTML` object from source text.

@@ -49,27 +49,76 @@ docs: Cell
 text: |-
   Represents the recorded output of one notebook cell.
 
-  A `Cell` is obtained by reading a numeric property from an `Output` object.
+  A `Cell` is obtained by reading a numeric index or a canonical cell name
+  (such as `cell-000`) from an `Output` object, or by iterating over it.
   When printed, it replays the cell's recorded output.
+
+  Each `Cell` is an object with read-only, enumerable `name` and `data`
+  properties. `name` is the canonical cell ID; `data` is the parsed array of
+  recorded output entries. The array contents remain mutable. Cells cannot
+  be constructed directly.
 impl:
   - IPrint
+ctor:
+  args:
+    -
+      []
+  docs: Cell.constructor
+  text: |-
+    Cell.constructor
 ---
 class: Output
 docs: Output
 text: |-
-  Represents a collection of notebook cell results.
+  Represents an array-like object containing notebook cell results. It is not
+  an `Array` and cannot be constructed directly.
 
-  Reading a numeric property returns the corresponding `Cell`, or `undefined`
-  if no cell exists at that index. When printed, an `Output` object renders all
-  of its cells in order.
+  Cells are stored under enumerable canonical names (`cell-000` through
+  `cell-999`). Numeric indices are non-enumerable aliases: `output[0]` and
+  `output['cell-000']` return the same `Cell`. Missing cells return `undefined`.
+  `Object.keys()` and `for...in` enumerate the canonical names; `for...of`
+  yields the cells in index order.
+
+  When printed, an `Output` object renders all of its cells in order. Cell JSON
+  is parsed when loading the response; malformed cells reject the load or
+  execution promise. Results containing more than 1000 cells are rejected
+  rather than wrapping canonical names.
 impl:
   - IPrint
-properties:
-  length:
-    getter: true
-    docs: Output.length
+ctor:
+  args:
+    -
+      []
+  docs: Output.constructor
+  text: |-
+    Output.constructor
+methods:
+  "[Symbol.iterator]":
+    args:
+      -
+        []
+    docs: Output.[Symbol.iterator]
     text: |-
-      Contains the number of cells in this `Output` object.
+      Equivalent to `values()`, enabling `for...of`, spread, and `Array.from()`.
+  forEach:
+    args:
+      -
+        - Function
+      -
+        - Function
+        - Any
+    docs: Output.forEach
+    text: |-
+      Calls the callback with `(cell, index, output)` for each cell in index
+      order. The optional second argument supplies `this` for the callback.
+      Returns `undefined`; callback exceptions stop iteration and propagate.
+  values:
+    args:
+      -
+        []
+    docs: Output.values
+    text: |-
+      Returns an iterator yielding each `Cell` in index order.
 ---
 class: Notebook
 docs: Notebook
@@ -81,56 +130,122 @@ text: |-
   loads and renders its saved output.
 impl:
   - IPrint
+defs:
+  - struct: ExecOptions
+    fields:
+      result:
+        type:
+          Any:
+            - "Null"
+            - Notebook::Format
+        docs: Notebook.ExecOptions.result
+        text: |-
+          Selects the result returned by `exec()`.
+
+          - `JSON` (default): resolves to an `Output` object.
+          - `HTML`, imported from `noto:core`: sends `Accept: text/html` and
+            resolves to an `HTML` object.
+          - `null`: sends `Prefer: return=minimal` and resolves to `null`
+            without returning notebook output.
+
+          Only these values are accepted. Pass the global `JSON` object or
+          the `HTML` constructor, not a string or an instance.
+      input:
+        type: Any
+        docs: Notebook.ExecOptions.input
+        text: |-
+          Supplies the request body, exposed to the notebook as the global
+          `input` value.
+
+          A `String` is sent unchanged. Any other value is serialized as JSON
+          and sent with `Content-Type: application/json`.
+          If omitted, no input is sent.
+      update:
+        type: Boolean
+        docs: Notebook.ExecOptions.update
+        text: |-
+          Controls whether the generated results are saved. Defaults to `false`.
+
+          - `false`: executes without saving results using `POST`.
+          - `true`: executes and saves the generated results using `PUT`.
+    docs: Notebook.ExecOptions
+    text: |-
+      Options passed as a plain object to `Notebook.exec()`.
+
+      All fields are optional. By default, executes without input or saving
+      results and returns an `Output` object.
+  - struct: LoadOptions
+    fields:
+      result:
+        type: Notebook::Format
+        docs: Notebook.LoadOptions.result
+        text: |-
+          Selects the result returned by `load()`.
+
+          - `JSON` (default): resolves to an `Output` object.
+          - `HTML`, imported from `noto:core`: sends `Accept: text/html` and
+            resolves to an `HTML` object.
+
+          Only these values are accepted. Pass the global `JSON` object or
+          the `HTML` constructor, not a string or an instance.
+          Unlike `exec()`, `load()` does not accept `null` as the result format.
+    docs: Notebook.LoadOptions
+    text: |-
+      Options passed as a plain object to `Notebook.load()`.
+
+      The `result` field is optional and defaults to `JSON`. Loading retrieves
+      saved results without executing the notebook; there are no `input` or
+      `update` options.
 methods:
-  execute:
+  exec:
     args:
       -
         []
       -
-        - String
-      -
-        - Any
-    docs: Notebook.execute
+        - Notebook.ExecOptions
+    docs: Notebook.exec
     text: |-
-      Executes the notebook without saving the generated results.
+      Executes the notebook with an optional options object.
 
-      Returns a `Promise` that resolves to an `Output` object.
+      Returns a `Promise` that resolves to the selected result type.
+      See `Notebook.ExecOptions` for available options and defaults.
 
-      - Without arguments, executes the notebook without input.
-      - With a `String`, sends the string as the input body.
-      - With any other value, serializes the value as JSON and sends it with
-        `Content-Type: application/json`.
+      ```js
+      import { notebook } from 'noto:noto';
+      import { HTML } from 'noto:core';
 
-      The request body is exposed to the notebook as the global `input` value.
-  saved:
+      const report = notebook('report');
+
+      const output = await report.exec();
+      const html = await report.exec({
+        input: { title: 'Report' },
+        result: HTML
+      });
+
+      await report.exec({ update: true, result: null });
+      const saved = await report.load();
+      ```
+  load:
     args:
       -
         []
-    docs: Notebook.saved
+      -
+        - Notebook.LoadOptions
+    docs: Notebook.load
     text: |-
-      Loads the notebook's saved cell results without executing it.
+      Loads the notebook's saved results without executing it, using a `GET`
+      request and an optional options object.
 
-      Returns a `Promise` that resolves to an `Output` object.
-  update:
-    args:
-      -
-        []
-      -
-        - String
-      -
-        - Any
-    docs: Notebook.update
-    text: |-
-      Executes the notebook and saves the generated results.
+      Returns a `Promise` that resolves to the selected result type.
+      See `Notebook.LoadOptions` for available options and defaults.
 
-      Returns a `Promise` that resolves to an `Output` object.
+      ```js
+      import { notebook } from 'noto:noto';
+      import { HTML } from 'noto:core';
 
-      - Without arguments, executes the notebook without input.
-      - With a `String`, sends the string as the input body.
-      - With any other value, serializes the value as JSON and sends it with
-        `Content-Type: application/json`.
-
-      The request body is exposed to the notebook as the global `input` value.
+      const saved = await notebook('report').load();
+      const html = await notebook('report').load({ result: HTML });
+      ```
 ---
 function: application
 args:

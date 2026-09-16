@@ -22,14 +22,28 @@ try {
     assert(() => e.code === 42);
 }
 
-for(const args of [[], [1], [{code: 42}]]) {
-    try {
-        Reflect.construct(TestError, args);
-        assert(() => false);
-    } catch(e) {
-        assert(() => e instanceof TypeError);
-        assert(() => !(e instanceof TestError));
-    }
+try {
+    Reflect.construct(TestError, []);
+    assert(() => false);
+} catch(e) {
+    assert(() => e instanceof TypeError);
+    assert(() => !(e instanceof TestError));
+}
+
+try {
+    Reflect.construct(TestError, [1]);
+    assert(() => false);
+} catch(e) {
+    assert(() => e instanceof TypeError);
+    assert(() => !(e instanceof TestError));
+}
+
+try {
+    Reflect.construct(TestError, [{code: 42}]);
+    assert(() => false);
+} catch(e) {
+    assert(() => e instanceof TypeError);
+    assert(() => !(e instanceof TestError));
 }
 
 class DerivedError extends TestError {}

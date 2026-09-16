@@ -10,7 +10,7 @@ The built-in renderer extensions are:
 - `charts.js` — chart output powered by Apache ECharts
 - `tables.js` — table output for arrays and objects
 
-### `tables.js`
+## `tables.js`
 
 `tables.js` renders JavaScript objects and arrays as HTML tables.
 
@@ -20,7 +20,7 @@ Import it with:
 import table from 'tables.js';
 ```
 
-#### Arrays of objects
+### Arrays of objects
 
 An array of objects becomes a table with one row per object. By default, column names are taken from the first object:
 
@@ -86,7 +86,7 @@ print(table([
 
 ### Column widths and alignment
 
-`table` is a proxy. Accessing a valid view property returns a table function with fixed column widths and optional alignment:
+`table` uses the regex overload of `render()` from `noto:render`. It returns a callable proxy: accessing a valid view property returns a table function with fixed column widths and optional alignment:
 
 ```javascript
 import table from 'tables.js';
@@ -203,7 +203,7 @@ Maps are supported by passing ECharts map registration data as `[name, data]` in
 
 ### Aspect ratio
 
-Both `chart` and `echart` are proxies. Access a `W/H` property to set the chart aspect ratio:
+Both `chart` and `echart` use the regex overload of `render()` from `noto:render`. Access a `W/H` property on either callable proxy to set the chart aspect ratio:
 
 ```javascript
 import { chart, echart } from 'charts.js';
@@ -220,24 +220,26 @@ print(echart['1/1']({
 
 The default aspect ratio is `4/3`. Invalid aspect-ratio properties throw `TypeError`.
 
-### How rendering works
+## How rendering works
 
-A server extension creates objects with a custom `type`:
-
-```javascript!noplay
-{
-  type: 'notojs.Render/charts.js',
-  data: { /* renderer data */ }
-}
-```
-
-The type is generated with:
+The native `noto:render` module exports `render` as both its default and a named export. It creates renderer functions, not output records directly:
 
 ```javascript!noplay
-$.__renderer('notojs.Render/charts.js')
+import render from 'noto:render';
+// Alternatively: import { render } from 'noto:render';
+
+const example = render('notojs.Render/example.js', data => data);
+const result = example({ message: 'Hello' });
 ```
 
-Calling `$.__renderer(name)` also records the renderer name in the current execution context. When notebook output is serialized, **NotoJS** includes a `notojs.Render` part listing the renderer bundles required by that output.
+Each call to the returned function invokes the callback and wraps its result in a content record:
+
+- `data` — the callback's return value
+- `type` — the renderer name passed to `render()`
+- `sign` — an automatically generated eight-character lowercase hexadecimal checksum
+- `view` — present only when called through a view property provided by the regex overload
+
+Creating a renderer function does not execute the callback. Each successful invocation records the renderer name in the current execution context. When notebook output is serialized, **NotoJS** includes a `notojs.Render` part listing the renderer bundles required by that output.
 
 In the browser, `notojs.js` sees the `notojs.Render` part, dynamically imports each renderer client bundle from:
 
@@ -245,11 +247,7 @@ In the browser, `notojs.js` sees the `notojs.Render` part, dynamically imports e
 /notojs.Render/:name
 ```
 
-and calls:
-
-```javascript!noplay
-register(window.Handlers)
-```
+and calls the client module's `register(handlers)` function with the renderer handler table.
 
 The renderer client registers a handler for its output type:
 
@@ -262,7 +260,19 @@ export function register(handlers) {
 }
 ```
 
-After registration, any printed object with the matching `type` is rendered by that handler.
+After registration, **NotoJS** wraps the handler with `verify()`. A printed record with the matching `type` reaches the specialized handler only if its `sign` matches. Missing or invalid signatures fall back to the default JSON renderer, `Handlers['.obj']`.
+
+### Content signatures
+
+Signatures use non-cryptographic 32-bit FNV-1a:
+
+- For string data, the checksum covers the UTF-8/WTF-8 bytes of `type + '\0' + data`.
+- For non-string data, including objects and arrays, it covers **only the type**. Object properties and array elements are not hashed.
+- Additional fields such as `view` are not included.
+
+Changing string data without regenerating its signature causes verification to fail. Changing object or array contents does not invalidate the signature. Records remain ordinary mutable objects; the signature does not freeze them.
+
+This is a content checksum, not authentication or sanitization. Anyone can recompute it, and a valid signature does not establish that HTML or extension data is safe to render.
 
 ### Loading renderer bundles
 
@@ -278,7 +288,7 @@ The browser loads it through:
 GET /notojs.Render/charts.js
 ```
 
-Standalone HTML export also embeds any renderer client bundles used by the notebook output, so exported reports can render charts and tables without the live editor.
+Standalone HTML export and server-generated HTML responses embed the renderer client bundles used by the notebook output, so reports can render charts and tables without the live editor. Both paths also wrap the registered extension handlers with `verify()` before rendering output.
 
 ## Writing a renderer extension
 
@@ -293,16 +303,17 @@ example.js/
 
 ### `server.js`
 
-The server module exports functions used by notebooks. These functions return typed objects. `$RENDERER` is injected at build time and expands to the renderer type name.
+The server module defines renderer functions using `render(name, callback)`. `$THIS` is injected into both server and client bundles at build time and expands to the renderer type name, such as `"notojs.Render/example.js"`.
 
 ```javascript!noplay
-export function example(data) {
-  return {
-    type: $.__renderer($RENDERER),
-    data
-  };
-}
+import render from 'noto:render';
+
+export const example = render($THIS, data => data);
 ```
+
+The callback receives the arguments and `this` from the returned function's invocation. Return the renderer's data, not a `{type, data, sign}` record: the native wrapper creates that record and its signature.
+
+Return JSON-serializable data synchronously. The wrapper does not await promises; an async callback's promise would itself become `data`. Prepare asynchronous data before calling the renderer.
 
 Notebook code imports and prints the server function result:
 
@@ -311,13 +322,43 @@ import { example } from 'example.js';
 print(example({ message: 'Hello' }));
 ```
 
+#### View properties: `render(name, regex, callback)`
+
+Pass a `RegExp` as the second argument to enable view-specific calls without writing a proxy yourself:
+
+```javascript!noplay
+import render from 'noto:render';
+
+export const example = render($THIS, /^(compact|wide)$/, data => data);
+```
+
+Notebook code can call the renderer with or without a view:
+
+```javascript!noplay
+import { example } from 'example.js';
+
+print(example({ message: 'Default view' }));
+print(example['compact']({ message: 'Compact view' }));
+print(example['wide']({ message: 'Wide view' }));
+```
+
+- A direct call returns a signed record without `view`.
+- Reading a matching property returns a function; it does not invoke the callback yet.
+- Calling that function forwards its arguments to the callback and adds the property name as `view` on the resulting record. It calls the underlying renderer as a plain function, without forwarding the caller's `this`.
+- Property matching uses `property.match(regex)`. Use `^` and `$` anchors if the entire property name must match.
+- Unmatched string properties throw `TypeError` with `render: invalid view <property>`. Symbol properties throw `TypeError` with `render: expected a string`.
+
+The proxy interprets property reads as view selection, including ordinary function properties such as `name` or `call`; they are not automatically forwarded to the target function.
+
+The built-in tables use `/^(\d+%|\*)([<>|])?(?: (\d+%|\*)([<>|])?)*$/` for column layouts. Charts use `/^\d+\/\d+$/` for aspect ratios. Both use this native overload rather than defining their own proxy helpers.
+
 ### `client.js`
 
-The client module exports `register(handlers)`. It receives the global renderer handler table and must assign a function for `$RENDERER`.
+The client module exports `register(handlers)`. It receives the renderer handler table and must assign a function for `$THIS`.
 
 ```javascript!noplay
 export function register(handlers) {
-  handlers[$RENDERER] = function(grid, part) {
+  handlers[$THIS] = function(grid, part) {
     const el = grid.get('html stacked');
     el.textContent = part.data.message;
   };
@@ -327,7 +368,9 @@ export function register(handlers) {
 The handler receives:
 
 - `grid` — output layout helper. Call `grid.get(classNames)` to allocate an output block.
-- `part` — the printed object, including `part.type`, `part.data`, and any extra fields such as `part.view`.
+- `part` — the printed record, including `part.type`, `part.data`, `part.sign`, and optional `part.view`.
+
+The handler decides how to interpret `part.view` and which default to use when it is absent. Register the plain handler; the standard **NotoJS** loading and HTML-generation paths apply signature verification.
 
 The class names passed to `grid.get()` become `nj-*` classes in the DOM. For example, `grid.get('html stacked')` creates a block with `nj-html nj-stacked` classes.
 
@@ -374,9 +417,9 @@ The bundler:
 
 1. reads `bundle.ini`
 2. downloads and caches `[sources]`
-3. bundles `client.js` with esbuild into `target/name.js/client.js`
-4. bundles `server.js` with esbuild into `target/name.js/server.js`
-5. injects `$RENDERER` as `"notojs.Render/name.js"` in both bundles
+3. bundles `client.js` with esbuild into `{target}/client.js`
+4. bundles `server.js` with esbuild into `{target}/server.js`, leaving `noto:render` as an external import resolved by the runtime
+5. injects `$THIS` as `"notojs.Render/name.js"` in both bundles, where `name.js` is the target directory name
 
 To add a new renderer to the project, create the renderer directory and add it to `CMakeLists.txt`:
 
@@ -413,9 +456,13 @@ print(example({ message: 'Hello' }));
 
 ## Failure behavior
 
-If the browser cannot load a renderer client bundle, ****NotoJS**** logs the failure and falls back to rendering the object as JSON. The notebook output still contains the original data, but the custom visual renderer is not available.
+If the browser cannot load a renderer client bundle, **NotoJS** logs the failure and falls back to rendering the object as JSON. The notebook output still contains the original data, but the custom visual renderer is not available.
 
-If the server module throws while creating the render object, the cell fails like any other JavaScript error.
+A missing or mismatched content signature also selects the default JSON renderer instead of invoking the custom handler.
+
+Invalid arguments to `render()` throw `TypeError`. The three-argument overload requires a `RegExp` and a callable callback. Invalid view properties throw when accessed, before the callback runs.
+
+Exceptions from a renderer callback or regex matching propagate unchanged to notebook code. They are not wrapped as content; if uncaught, the cell fails like any other JavaScript error.
 
 ###### See also
 - `doc('topic:packages')`

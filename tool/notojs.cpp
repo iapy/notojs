@@ -143,8 +143,13 @@ private:
 Type::Type(std::string const &name)
 : name{canonical_name(name)} {}
 
-std::string Type::canonical_name(std::string const &name)
+std::string Type::canonical_name(std::string const &qualified_name)
 {
+    std::string name = qualified_name;
+    constexpr char anonymous[] = "(anonymous namespace)::";
+    for(std::string::size_type pos = 0; (pos = name.find(anonymous, pos)) != std::string::npos;)
+        name.erase(pos, sizeof(anonymous) - 1);
+
     return name == "bridge::Value" || name == "bridge::Either"
         ? "Any"
         : name.rfind("bridge::")
@@ -501,10 +506,7 @@ std::shared_ptr<Type> Module::make(clang::QualType const &type, clang::ASTContex
                         if(clang::TemplateArgument::Type != args[0].getKind()) return false;
                         if(clang::TemplateArgument::Type != args[1].getKind()) return false;
 
-                        clang::QualType qt = args[1].getAsType().getCanonicalType();
-                        if(const auto *pt = qt->getAs<clang::PointerType>())
-                            return pt->getPointeeType().isCanonical() && pt->getPointeeType()->isVoidType();
-                        return false;
+                        return args[1].getAsType()->isVoidType();
                     }))
                     {
                         if("Interface" == args[0].getAsType()->getAsCXXRecordDecl()->getNameAsString())

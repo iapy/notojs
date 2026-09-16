@@ -100,5 +100,5 @@ JSCFunctionListEntry const XMLDocument::funcs[] = {
 
     // Integration interface
     JS_CFUNC_DEF("toString", 1, &bridge::Function<&XMLDocument::toString>::invoke),
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<XMLDocument>::toJSON)
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&XMLDocument::toJSON>::invoke)
 };

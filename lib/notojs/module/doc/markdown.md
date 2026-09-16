@@ -17,10 +17,10 @@ print(`Back in JavaScript: ${value}`);
 During preprocessing, the block is rewritten as a `Markdown` object and printed:
 
 ```javascript
-print(new $.__Markdown({data: `
-# Hello from Markdown
-`}));
+print($(`# Hello from Markdown`));
 ```
+
+`$(string)` is the Markdown factory used by the preprocessor. It accepts a primitive string and returns an immutable `Markdown` value without calling the disabled constructor. The examples show readable template literals; generated code uses escaped string literals, so quotes, backslashes, newlines, and `${...}` in Markdown remain literal text rather than JavaScript interpolation.
 
 ### Named Markdown values
 
@@ -36,9 +36,7 @@ print(hello);
 This preprocesses to a constant similar to:
 
 ```javascript
-const hello = new $.__Markdown({data: `
-# Markdown block
-`});
+const hello = $(`# Markdown block`);
 ```
 
 Prefix the name with `!` to export the value into global notebook scope:
@@ -52,9 +50,7 @@ Prefix the name with `!` to export the value into global notebook scope:
 This becomes:
 
 ```javascript
-export const hello = new $.__Markdown({data: `
-# Exported markdown block
-`});
+export const hello = $(`# Exported markdown block`);
 ```
 
 ### Code echo blocks
@@ -68,7 +64,7 @@ print(x);
 ]]>
 ```
 
-The preprocessor wraps the block in a fenced code block with `js!noplay`, so it is displayed without the run action.
+The preprocessor prints the source through `$()` as a fenced code block with `js!noplay`, so it is displayed without the run action. It then executes the original JavaScript unchanged, once.
 
 ### Slides
 
@@ -148,6 +144,8 @@ const a = 'Alice';
 const b = 'Bob';
 print(markdown(`Hello, ${a}! I'm ${b}.`));
 ```
+
+Use `$(string)` or the public `markdown()` factory to create Markdown values. The `Markdown` class remains exported from `noto:core` for `instanceof` checks, but `new Markdown(...)` rejects construction. Factory-created values are frozen; create a new value to change their content.
 
 ### Templating with Mustache
 

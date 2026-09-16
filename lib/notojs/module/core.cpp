@@ -129,7 +129,7 @@ JSValue icon(JSContext *ctx, bridge::String name)
 
 JSValue markdown(JSContext *ctx, bridge::String str)
 {
-    return __Markdown::data(ctx, JS_DupValue(ctx, str));
+    return Markdown::data(ctx, JS_DupValue(ctx, str));
 }
 
 JSValue html_0(JSContext *ctx, bridge::String str)
@@ -139,9 +139,7 @@ JSValue html_0(JSContext *ctx, bridge::String str)
 
 JSValue html_1(JSContext *ctx, HTML::Interface::Impl h)
 {
-    JSValue v = HTML::data(ctx, bridge::String(ctx, h->get()));
-    if(!h->json()) JS_DefinePropertyValueStr(ctx, v, ".json", JS_FALSE, JS_PROP_CONFIGURABLE);
-    return v;
+    return HTML::data(ctx, bridge::String(ctx, h->get()), h->json());
 }
 
 using html = bridge::Function<html_0, html_1>;
@@ -175,7 +173,7 @@ int init(JSContext *ctx, JSModuleDef *m)
 {
     HTML::alias(ctx, m);
     Image::alias(ctx, m);
-    __Markdown::alias(ctx, m, "Markdown");
+    Markdown::alias(ctx, m);
     SVG::alias(ctx, m);
     XML::alias(ctx, m);
     return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
@@ -195,7 +193,7 @@ JSModuleDef *notojs_init_core(JSContext *ctx, const char *name)
     JS_AddModuleExportList(ctx, mod, func, sizeof(func)/sizeof(func[0]));
     JS_AddModuleExport(ctx, mod, HTML::name());
     JS_AddModuleExport(ctx, mod, Image::name());
-    JS_AddModuleExport(ctx, mod, "Markdown");
+    JS_AddModuleExport(ctx, mod, Markdown::name());
     JS_AddModuleExport(ctx, mod, SVG::name());
     JS_AddModuleExport(ctx, mod, XML::name());
     return mod;
@@ -204,6 +202,11 @@ JSModuleDef *notojs_init_core(JSContext *ctx, const char *name)
 JSValue core::facade::html(JSContext *ctx, std::string const &data)
 {
     return HTML::data(ctx, bridge::String{ctx, data});
+}
+
+JSValue core::facade::html(JSContext *ctx, std::string const &data, bool json)
+{
+    return HTML::data(ctx, bridge::String{ctx, data}, json);
 }
 
 JSValue core::facade::image(JSContext *ctx, boost::urls::url const &url)
@@ -235,7 +238,7 @@ JSValue core::facade::image(JSContext *ctx, std::uint8_t const *data, std::size_
 
 JSValue core::facade::markdown(JSContext *ctx, std::string const &data)
 {
-    return __Markdown::data(ctx, bridge::String{ctx, data});
+    return Markdown::data(ctx, bridge::String{ctx, data});
 }
 
 JSValue core::facade::svg(JSContext *ctx, std::string const &data)

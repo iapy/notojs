@@ -589,15 +589,13 @@ void Engine::preprocess(std::string &code)
                 std::string snippet;
                 if(echo)
                 {
-                    snippet.append("print(new $.__Markdown(");
+                    snippet.append("print($(");
 
                     Writer writer{snippet};
-                    writer.startObject();
                     std::string js{"```js!noplay\n"};
                     js.append(&code[ms + 1], (me - ms > 1) ? me - ms - 2 : 0);
                     js.append("\n```");
-                    writer.string("data", js.c_str(), js.size());
-                    writer.endObject();
+                    writer.string(js.c_str(), js.size());
                     writer.Flush();
 
                     snippet.append("));");
@@ -614,25 +612,21 @@ void Engine::preprocess(std::string &code)
                         snippet.append("const ");
                         snippet.append(&code[vs], ve - vs);
                     }
-                    snippet.append(" = new $.__Markdown(");
+                    snippet.append(" = $(");
 
                     Writer writer{snippet};
-                    writer.startObject();
-                    writer.string("data", &code[ms + 1], (me - ms > 1) ? me - ms - 2 : 0);
-                    writer.endObject();
+                    writer.string(&code[ms + 1], (me - ms > 1) ? me - ms - 2 : 0);
                     writer.Flush();
 
                     snippet.append(");");
                 }
                 else
                 {
-                    if(code[vs] == ':') snippet.append("print[':'](new $.__Markdown(");
-                    else snippet.append("print(new $.__Markdown(");
+                    if(code[vs] == ':') snippet.append("print[':']($(");
+                    else snippet.append("print($(");
 
                     Writer writer{snippet};
-                    writer.startObject();
-                    writer.string("data", &code[ms + 1], (me - ms > 1) ? me - ms - 2 : 0);
-                    writer.endObject();
+                    writer.string(&code[ms + 1], (me - ms > 1) ? me - ms - 2 : 0);
                     writer.Flush();
 
                     snippet.append("));");
@@ -696,6 +690,7 @@ void Engine::modules(
     w.string("crypto");
     w.string("dollar");
     w.string("dom");
+    w.string("mustache");
     w.string("storage");
     try {
         auto [tx, db] = DB(get<Folder>().env()).pkgs();

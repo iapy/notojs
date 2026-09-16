@@ -253,6 +253,6 @@ JSCFunctionListEntry const HTMLDocument::funcs[] = {
 
     // Integration interface
     JS_CFUNC_DEF("toString", 1, &bridge::Function<&HTMLDocument::toString>::invoke),
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<HTMLDocument>::toJSON),
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&HTMLDocument::toJSON>::invoke),
     JS_CGETSET_DEF("_live", &bridge::Getter<&HTMLDocument::_live>, NULL)
 };

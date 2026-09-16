@@ -60,7 +60,7 @@ struct CSSStyleSheet : bridge::Interface<CSSStyleSheet, dom::CSSStyleSheet>
 
     JSValue replace(JSValue self, JSContext *ctx, bridge::String text)
     {
-        (void)replaceSync(ctx, text);
+        std::ignore = replaceSync(ctx, text);
 
         JSValue funcs[2] = {JS_UNDEFINED, JS_UNDEFINED};
         JSValue promise = JS_NewPromiseCapability(ctx, funcs);

@@ -52,7 +52,7 @@ protected:
 
     void db()
     {
-        (void)folder->set_path(CMAKE_CURRENT_BINARY_DIR);
+        folder->set_path(CMAKE_CURRENT_BINARY_DIR);
     }
 
     std::optional<std::reference_wrapper<rapidjson::GenericValue<rapidjson::UTF8<>> const>> get_output()
@@ -65,7 +65,7 @@ protected:
         for(auto const &out : document->GetArray())
         {
             if(out.HasMember("type")
-                && out["type"].IsString() 
+                && out["type"].IsString()
                 && strstr(out["type"].GetString(), "notojs.Output")
                 && out.HasMember("data")
             ) return out["data"];
@@ -83,7 +83,7 @@ protected:
         for(auto const &out : document->GetArray())
         {
             if(out.HasMember("type")
-                && out["type"].IsString() 
+                && out["type"].IsString()
                 && std::invoke([&]{
                     const char *type = out["type"].GetString();
                     return strlen(type) >= 5 && strstr(type + strlen(type) - 5, "Error");

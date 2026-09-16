@@ -20,6 +20,7 @@ file(GLOB SRC
     test_errors.cpp
     test_export.cpp
     test_extend.cpp
+    test_fdata.cpp
     test_fs.cpp
     test_getter.cpp
     test_global.cpp
@@ -32,10 +33,12 @@ file(GLOB SRC
     test_layout.cpp
     test_method.cpp
     test_mixin.cpp
+    test_noto.cpp
     test_notojs.cpp
     test_pipeline.cpp
     test_primitive.cpp
     test_printable.cpp
+    test_render.cpp
     test_router.cpp
     test_search.cpp
     test_server.cpp
@@ -101,6 +104,7 @@ test_library(core)
 test_library(custom)
 test_library(errors)
 test_library(extend)
+test_library(fdata)
 test_library(fs)
 test_library(getter)
 test_library(global)

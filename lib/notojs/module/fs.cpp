@@ -685,7 +685,7 @@ JSCFunctionListEntry const Path::funcs[] = {
     JS_CFUNC_DEF("relative", 1, &bridge::Function<&Path::relative>::invoke),
     JS_CFUNC_DEF("remove", 0, &Path::remove::invoke),
     JS_CFUNC_DEF("text", 0, &bridge::Function<&Path::text>::invoke),
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<Path>::toJSON),
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Path::toJSON>::invoke),
     JS_CFUNC_DEF("write", 1, &Path::write::invoke)
 };
 
@@ -695,7 +695,7 @@ JSValue path(JSContext *ctx, Path::Absolute p)
 }
 
 JSCFunctionListEntry func[] = {
-    JS_CFUNC_DEF("path", 0, bridge::Function<path>::invoke),
+    JS_CFUNC_DEF("path", 1, bridge::Function<path>::invoke),
 };
 
 int init(JSContext *ctx, JSModuleDef *m)

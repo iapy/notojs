@@ -27,4 +27,35 @@ assert(() => "D:foo" == get_name(new D("foo")));
     BOOST_TEST(get_error() == std::nullopt);
 }
 
+BOOST_AUTO_TEST_CASE(ObjectBacked)
+{
+    eval(R"JS(
+import { assert } from 'noto:assert';
+import { E, get_name } from 'interface.so';
+
+const value = new E({name: 'object'});
+assert(() => get_name(value) === 'object');
+value.name = 'updated';
+assert(() => get_name(value) === 'updated');
+assert(() => get_name(new E()) === '');
+
+let plainObjectError;
+try { get_name({name: 'plain'}); }
+catch (error) { plainObjectError = error; }
+assert(() => plainObjectError instanceof TypeError);
+
+let prototypeOnlyError;
+try { get_name(Object.create(E.prototype)); }
+catch (error) { prototypeOnlyError = error; }
+assert(() => prototypeOnlyError instanceof TypeError);
+
+let nullError;
+try { get_name(null); }
+catch (error) { nullError = error; }
+assert(() => nullError instanceof TypeError);
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

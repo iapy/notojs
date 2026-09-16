@@ -1,7 +1,7 @@
 #include <bridge.hpp>
 namespace {
 
-struct ITest : bridge::Interface<ITest, void*>
+struct ITest : bridge::Interface<ITest>
 {
     virtual std::string get_name() = 0;
     virtual ~ITest() {}
@@ -107,6 +107,24 @@ struct D : bridge::Interface<D, std::string, C>
     >;
 };
 
+struct E : bridge::Interface<E, bridge::Object>
+{
+    using Base::Base;
+
+    struct I : Base::I<I, ITest>
+    {
+        using Base::Base;
+
+        std::string get_name() override
+        {
+            auto name = ref.get<bridge::String>("name");
+            return name ? static_cast<std::string>(*name) : std::string{};
+        }
+    };
+
+    using impl = bridge::Implements<I>;
+};
+
 JSValue get_name(JSContext *ctx, ITest::Impl value)
 {
     return bridge::String(ctx, value->get_name());
@@ -122,6 +140,7 @@ int init(JSContext *ctx, JSModuleDef *m)
     B::init(ctx, m);
     C::init(ctx, m);
     D::init(ctx, m);
+    E::init(ctx, m);
     return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
 }
 
@@ -139,6 +158,7 @@ JSModuleDef *js_init_module(JSContext *ctx, const char *module_name)
     JS_AddModuleExport(ctx, mod, B::name());
     JS_AddModuleExport(ctx, mod, C::name());
     JS_AddModuleExport(ctx, mod, D::name());
+    JS_AddModuleExport(ctx, mod, E::name());
     return mod;
 }
 

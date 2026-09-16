@@ -425,7 +425,7 @@ int render(boost::property_tree::ptree const &pt, int argc, char **argv)
         "--legal-comments=none",
         "--minify-whitespace",
         "--format=esm",
-        "--define:$RENDERER=\"notojs.Render/" + target.filename().u8string() + "\"",
+        "--define:$THIS=\"notojs.Render/" + target.filename().u8string() + "\"",
     }, bp::process_stdio{{}, boost::filesystem::path(client), {}});
 
     auto const server = (target / "server.js");
@@ -439,7 +439,8 @@ int render(boost::property_tree::ptree const &pt, int argc, char **argv)
         "--legal-comments=none",
         "--minify-whitespace",
         "--format=esm",
-        "--define:$RENDERER=\"notojs.Render/" + target.filename().u8string() + "\"",
+        "--external:noto:render",
+        "--define:$THIS=\"notojs.Render/" + target.filename().u8string() + "\"",
     }, bp::process_stdio{{}, boost::filesystem::path(server), {}});
 
     clientp.wait();

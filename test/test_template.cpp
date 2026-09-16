@@ -19,11 +19,14 @@ BOOST_AUTO_TEST_CASE(Markdown)
 {
     eval(R"JS(
 import { assert } from 'noto:assert';
+import { Markdown } from 'noto:core';
 
-const raw = new $.__Markdown({data: 'name = {{ name }}'});
+const raw = $('name = {{ name }}');
 const txt = $(raw, {name: 'test'});
 
 assert(() => 'name = test' == txt.data);
+assert(() => txt instanceof Markdown);
+assert(() => Object.isFrozen(txt));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -43,8 +46,16 @@ BOOST_AUTO_TEST_CASE(Throws)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
+import { markdown } from 'noto:core';
 assert(() => throws(() => $('{{#a}}', {})));
-assert(() => throws(() => $($.__Markdown({}), {})));
+assert(() => {
+    try {
+        $(markdown({}), {});
+    } catch (error) {
+        return error instanceof TypeError;
+    }
+    return false;
+});
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);

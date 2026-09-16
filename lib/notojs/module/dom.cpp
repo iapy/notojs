@@ -168,8 +168,9 @@ JSValue Document::xml_1(JSContext *ctx, XML xml)
     return DOMException::throwSyntaxError(ctx, "Invalid SVG fragment");
 }
 
-struct Window : bridge::Interface<Window>
+struct Window : bridge::Interface<Window, bridge::Object>
 {
+    using Base::Base;
     JSValue getComputedStyle(JSContext *ctx, HTMLElement element)
     {
         return CSSStyleProperties::from(ctx, dom::CSSStyleProperties{
@@ -184,8 +185,9 @@ JSCFunctionListEntry const Window::funcs[] = {
     JS_CFUNC_DEF("getComputedStyle", 1, &bridge::Function<&Window::getComputedStyle>::invoke)
 };
 
-struct DOMParser : bridge::Interface<DOMParser>
+struct DOMParser : bridge::Interface<DOMParser, bridge::Object>
 {
+    using Base::Base;
     JSValue parseFromString(JSContext *ctx, bridge::String string, bridge::String type) const
     {
         auto const &t = static_cast<std::string_view const &>(type);

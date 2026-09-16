@@ -127,15 +127,27 @@ assert(() => null === d.firstChild.namespaceURI);
 assert(() => '' === d.firstChild.publicId);
 assert(() => '' === d.firstChild.systemId);
 
-const leafParents = [d.doctype, d.createTextNode('text'), d.createComment('comment')];
-for(const parent of leafParents)
-{
-    assert(() => throws(() => parent.appendChild(d.createElement('div')), 'HierarchyRequestError'));
-    assert(() => throws(() => parent.insertBefore(d.createElement('div'), null), 'HierarchyRequestError'));
-    assert(() => throws(() => parent.insertBefore(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
-    assert(() => throws(() => parent.replaceChild(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
-    assert(() => !parent.hasChildNodes());
-}
+const doctypeParent = d.doctype;
+const textParent = d.createTextNode('text');
+const commentParent = d.createComment('comment');
+
+assert(() => throws(() => doctypeParent.appendChild(d.createElement('div')), 'HierarchyRequestError'));
+assert(() => throws(() => doctypeParent.insertBefore(d.createElement('div'), null), 'HierarchyRequestError'));
+assert(() => throws(() => doctypeParent.insertBefore(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
+assert(() => throws(() => doctypeParent.replaceChild(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
+assert(() => !doctypeParent.hasChildNodes());
+
+assert(() => throws(() => textParent.appendChild(d.createElement('div')), 'HierarchyRequestError'));
+assert(() => throws(() => textParent.insertBefore(d.createElement('div'), null), 'HierarchyRequestError'));
+assert(() => throws(() => textParent.insertBefore(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
+assert(() => throws(() => textParent.replaceChild(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
+assert(() => !textParent.hasChildNodes());
+
+assert(() => throws(() => commentParent.appendChild(d.createElement('div')), 'HierarchyRequestError'));
+assert(() => throws(() => commentParent.insertBefore(d.createElement('div'), null), 'HierarchyRequestError'));
+assert(() => throws(() => commentParent.insertBefore(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
+assert(() => throws(() => commentParent.replaceChild(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
+assert(() => !commentParent.hasChildNodes());
 
 const root = d.documentElement;
 const text = d.createTextNode('document text');
@@ -216,8 +228,8 @@ import { Document } from 'noto:dom';
     assert(() => null === comment.parentNode);
     assert(() => null === secondRoot.parentNode);
     assert(() => children.length === d.childNodes.length);
-    for(let i = 0; i < children.length; ++i)
-        assert(() => children[i] === d.childNodes[i]);
+    assert(() => children[0] === d.childNodes[0]);
+    assert(() => children[1] === d.childNodes[1]);
 }
 
 {
@@ -276,8 +288,7 @@ import { Document } from 'noto:dom';
     assert(() => null === firstRoot.parentNode);
     assert(() => null === secondRoot.parentNode);
     assert(() => children.length === d.childNodes.length);
-    for(let i = 0; i < children.length; ++i)
-        assert(() => children[i] === d.childNodes[i]);
+    assert(() => children[0] === d.childNodes[0]);
 }
 
 {
@@ -286,8 +297,7 @@ import { Document } from 'noto:dom';
 
     assert(() => throws(() => d.replaceChildren('text'), 'HierarchyRequestError'));
     assert(() => children.length === d.childNodes.length);
-    for(let i = 0; i < children.length; ++i)
-        assert(() => children[i] === d.childNodes[i]);
+    assert(() => children[0] === d.childNodes[0]);
 }
 
 {
@@ -326,8 +336,8 @@ import { Document } from 'noto:dom';
     assert(() => null === firstRoot.parentNode);
     assert(() => null === secondRoot.parentNode);
     assert(() => children.length === d.childNodes.length);
-    for(let i = 0; i < children.length; ++i)
-        assert(() => children[i] === d.childNodes[i]);
+    assert(() => children[0] === d.childNodes[0]);
+    assert(() => children[1] === d.childNodes[1]);
 }
 
 {
@@ -348,8 +358,10 @@ import { Document } from 'noto:dom';
     const children = [...d.childNodes];
     assert(() => throws(() => root.before('text'), 'HierarchyRequestError'));
     assert(() => children.length === d.childNodes.length);
-    for(let i = 0; i < children.length; ++i)
-        assert(() => children[i] === d.childNodes[i]);
+    assert(() => children[0] === d.childNodes[0]);
+    assert(() => children[1] === d.childNodes[1]);
+    assert(() => children[2] === d.childNodes[2]);
+    assert(() => children[3] === d.childNodes[3]);
 }
 
 {
@@ -1833,34 +1845,67 @@ import { Document } from 'noto:dom';
 const d = Document.xml('<root/>');
 const other = Document.xml('<root/>');
 
-for(const method of ['append', 'prepend']) {
+append: {
     const target = d.createElement('target');
     const valid = d.createElement('valid');
     const foreign = other.createElement('foreign');
 
-    assert(() => throws(() => target[method](valid, foreign), 'WrongDocumentError'));
+    assert(() => throws(() => target.append(valid, foreign), 'WrongDocumentError'));
     assert(() => null === valid.parentNode);
     assert(() => !target.hasChildNodes());
 
     const cycleValid = d.createElement('cycle-valid');
-    assert(() => throws(() => target[method](cycleValid, target), 'HierarchyRequestError'));
+    assert(() => throws(() => target.append(cycleValid, target), 'HierarchyRequestError'));
     assert(() => null === cycleValid.parentNode);
     assert(() => !target.hasChildNodes());
 }
 
-for(const method of ['before', 'after']) {
+prepend: {
+    const target = d.createElement('target');
+    const valid = d.createElement('valid');
+    const foreign = other.createElement('foreign');
+
+    assert(() => throws(() => target.prepend(valid, foreign), 'WrongDocumentError'));
+    assert(() => null === valid.parentNode);
+    assert(() => !target.hasChildNodes());
+
+    const cycleValid = d.createElement('cycle-valid');
+    assert(() => throws(() => target.prepend(cycleValid, target), 'HierarchyRequestError'));
+    assert(() => null === cycleValid.parentNode);
+    assert(() => !target.hasChildNodes());
+}
+
+before: {
     const parent = d.createElement('parent');
     const target = parent.appendChild(d.createElement('target'));
     const valid = d.createElement('valid');
     const foreign = other.createElement('foreign');
 
-    assert(() => throws(() => target[method](valid, foreign), 'WrongDocumentError'));
+    assert(() => throws(() => target.before(valid, foreign), 'WrongDocumentError'));
     assert(() => null === valid.parentNode);
     assert(() => 1 === parent.childNodes.length);
     assert(() => target === parent.firstChild);
 
     const cycleValid = d.createElement('cycle-valid');
-    assert(() => throws(() => target[method](cycleValid, parent), 'HierarchyRequestError'));
+    assert(() => throws(() => target.before(cycleValid, parent), 'HierarchyRequestError'));
+    assert(() => null === cycleValid.parentNode);
+    assert(() => 1 === parent.childNodes.length);
+    assert(() => target === parent.firstChild);
+}
+
+after: {
+    const parent = d.createElement('parent');
+    const target = parent.appendChild(d.createElement('target'));
+    const valid = d.createElement('valid');
+    const foreign = other.createElement('foreign');
+
+    assert(() => throws(() => target.after(valid, foreign), 'WrongDocumentError'));
+    assert(() => null === valid.parentNode);
+    assert(() => 1 === parent.childNodes.length);
+    assert(() => target === parent.firstChild);
+
+    const cycleValid = d.createElement('cycle-valid');
+    assert(() => throws(() => target.after(cycleValid, parent), 'HierarchyRequestError'));
     assert(() => null === cycleValid.parentNode);
     assert(() => 1 === parent.childNodes.length);
     assert(() => target === parent.firstChild);
@@ -2061,10 +2106,14 @@ const d = Document.xml('<root><a/>foo<b/></root>');
 const c = [...d.documentElement.childNodes];
 
 assert(() => 3 === c.length);
-for(const n of c) assert(() => n.isConnected);
+assert(() => c[0].isConnected);
+assert(() => c[1].isConnected);
+assert(() => c[2].isConnected);
 
 d.documentElement.replaceChildren(d.createElement('c'), 'bar');
-for(const n of c) assert(() => !n.isConnected);
+assert(() => !c[0].isConnected);
+assert(() => !c[1].isConnected);
+assert(() => !c[2].isConnected);
 
 assert(() => 2 === d.documentElement.childNodes.length);
 assert(() => 'c' === d.documentElement.childNodes[0].tagName);

@@ -18,6 +18,7 @@
 #include <boost/url.hpp>
 
 #include <fstream>
+#include <tuple>
 
 namespace notojs {
 
@@ -164,7 +165,7 @@ std::thread Server::run(std::function<std::shared_ptr<boost::asio::ip::tcp::acce
 {
     return std::thread([this, server=std::move(server)]{
         auto socket = server(ioc);
-        (void)ioc.run();
+        std::ignore = ioc.run();
         socket->close();
     });
 }

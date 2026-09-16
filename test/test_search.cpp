@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <tuple>
 
 #include "test_engine.hpp"
 
@@ -28,14 +29,14 @@ BOOST_AUTO_TEST_CASE(Parser)
     using namespace notojs::parser;
 
     std::vector<std::pair<std::string, std::optional<std::string>>> result;
-    (void)Search<Handler>{result}.parse("a=1");
+    std::ignore = Search<Handler>{result}.parse("a=1");
 
     BOOST_TEST(1 == result.size());
     BOOST_TEST("a" == result[0].first);
     BOOST_TEST("1" == *result[0].second);
 
     result.clear();
-    (void)Search<Handler>{result}.parse("a=1&b=2");
+    std::ignore = Search<Handler>{result}.parse("a=1&b=2");
 
     BOOST_TEST(2 == result.size());
     BOOST_TEST("a" == result[0].first);
@@ -44,21 +45,21 @@ BOOST_AUTO_TEST_CASE(Parser)
     BOOST_TEST("2" == *result[1].second);
 
     result.clear();
-    (void)Search<Handler>{result}.parse("x=a+b");
+    std::ignore = Search<Handler>{result}.parse("x=a+b");
 
     BOOST_TEST(1 == result.size());
     BOOST_TEST("x" == result[0].first);
     BOOST_TEST("a b" == *result[0].second);
 
     result.clear();
-    (void)Search<Handler>{result}.parse("y=a%20b");
+    std::ignore = Search<Handler>{result}.parse("y=a%20b");
 
     BOOST_TEST(1 == result.size());
     BOOST_TEST("y" == result[0].first);
     BOOST_TEST("a b" == *result[0].second);
 
     result.clear();
-    (void)Search<Handler>{result}.parse("url=https%3a%2F%2Fgoogle.com");
+    std::ignore = Search<Handler>{result}.parse("url=https%3a%2F%2Fgoogle.com");
 
     BOOST_TEST(1 == result.size());
     BOOST_TEST("url" == result[0].first);

@@ -19,6 +19,7 @@
 #include <notojs/module/dom.hpp>
 #include <notojs/module/fs.hpp>
 #include <notojs/module/noto.hpp>
+#include <notojs/module/render.hpp>
 
 #include <lmdbxx/lmdb++.h>
 #include <notodb.hpp>
@@ -224,7 +225,8 @@ Module::Module()
     MODULE(doc),
     MODULE(dom),
     MODULE(fs),
-    MODULE(noto)
+    MODULE(noto),
+    MODULE(render)
 #undef MODULE
 }
 {

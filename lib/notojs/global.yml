@@ -1216,6 +1216,8 @@ methods:
 function: $
 args:
   -
+    - String
+  -
     - Function
   -
     - HTML
@@ -1227,12 +1229,14 @@ args:
     - Markdown
     - Object
 text: |-
-  Processes the current notebook input or applies a template, depending on the arguments.
+  Creates Markdown, processes the current notebook input, or applies a template, depending on the arguments.
+
+  When passed a single string, returns an immutable `Markdown` value containing that string.
 
   When passed a function as `arg0`, invokes it with the current `globalThis.input` value and stores the result back in `globalThis.input`.
   This is a building block for **NotoJS** pipelines.
 
-  Otherwise, applies a **Mustache** template to the given input.
+  When passed a template and a values object, applies a **Mustache** template to the given input.
 
   - `arg0` — template input
   - `arg1` — values object used for template substitution

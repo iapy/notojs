@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <functional>
 #include <optional>
+#include <utility>
 #include <variant>
 #include <cstdint>
 #include <vector>
@@ -30,6 +31,7 @@ struct Tail
     : val{argv}, ctx{ctx}, len{static_cast<std::size_t>(argc)} {}
 
     BOOST_FORCEINLINE std::size_t size() const { return len; }
+    BOOST_FORCEINLINE JSValue *data() const { return val; }
 
     template<typename T>
     BOOST_FORCEINLINE std::optional<T> get(std::size_t i) const
@@ -56,6 +58,7 @@ struct Tail<I, T>
     : val{argv}, ctx{ctx}, len{static_cast<std::size_t>(argc)} {}
 
     BOOST_FORCEINLINE std::size_t size() const { return len; }
+    BOOST_FORCEINLINE JSValue *data() const { return val; }
     BOOST_FORCEINLINE T operator [](std::size_t i) const { return T{ctx, *(val + i)}; }
 
 private:
@@ -90,6 +93,12 @@ template<typename ...Args, std::size_t ...Is>
 BOOST_FORCEINLINE bool check(JSContext *ctx, JSValueConst *argv, std::index_sequence<Is...>)
 {
     return true && ((Args::check(ctx, argv + Is)) && ...);
+}
+
+template<typename ...Args, std::size_t ...Is>
+BOOST_FORCEINLINE bool check(JSContext *ctx, JSValueConst *data, int magic, JSValueConst *argv, std::index_sequence<Is...>)
+{
+    return true && ((Args::check(ctx, Is < static_cast<std::size_t>(magic) ? data + Is : argv + (Is - magic))) && ...);
 }
 
 template<class, class = void>
@@ -181,62 +190,13 @@ BOOST_FORCEINLINE std::optional<std::string> valid(JSContext *ctx, JSValueConst 
     return true && ((Args::valid(ctx, argv + Is, error)) && ...) ? std::optional<std::string>{} : std::optional<std::string>(std::move(error));
 }
 
-template<auto f, typename ...Args>
-struct function_alt
+template<typename ...Args, std::size_t ...Is>
+BOOST_FORCEINLINE std::optional<std::string> valid(JSContext *ctx, JSValueConst *data, int magic, JSValueConst *argv, std::index_sequence<Is...>)
 {
-    using Is = std::make_index_sequence<sizeof ...(Args)>;
+    std::string error;
+    return true && ((Args::valid(ctx, Is < static_cast<std::size_t>(magic) ? data + Is : argv + (Is - magic), error)) && ...) ? std::optional<std::string>{} : std::optional<std::string>(std::move(error));
+}
 
-    BOOST_FORCEINLINE static bool check(JSContext *ctx, int argc, JSValueConst *argv)
-    {
-        return (argc == sizeof ...(Args)) && detail::check<Args...>(ctx, argv, Is{});
-    }
-
-    template<std::size_t ...Is>
-    BOOST_FORCEINLINE static JSValue invoke(JSContext *ctx, JSValue, JSValue *argv, std::index_sequence<Is...> is)
-    {
-        if(auto error = valid<Args...>(ctx, argv, is); error)
-            return JS_ThrowTypeError(ctx, "%s", error->c_str());
-        return f(ctx, Args(ctx, argv[Is])...);
-    }
-};
-
-template<auto f, typename ...Args>
-struct function_alt<f, JSValue*, Args...>
-{
-    using Is = std::make_index_sequence<sizeof ...(Args)>;
-
-    BOOST_FORCEINLINE static bool check(JSContext *ctx, int argc, JSValueConst *argv)
-    {
-        return (argc == sizeof ...(Args)) && detail::check<Args...>(ctx, argv, Is{});
-    }
-
-    template<std::size_t ...Is>
-    BOOST_FORCEINLINE static JSValue invoke(JSContext *ctx, JSValue, JSValue *argv, std::index_sequence<Is...> is)
-    {
-        if(auto error = valid<Args...>(ctx, argv, is); error)
-            return JS_ThrowTypeError(ctx, "%s", error->c_str());
-        return f(ctx, argv, Args(ctx, argv[Is])...);
-    }
-};
-
-template<auto f, typename ...Args>
-struct function_alt<f, JSValueConst, Args...>
-{
-    using Is = std::make_index_sequence<sizeof ...(Args)>;
-
-    BOOST_FORCEINLINE static bool check(JSContext *ctx, int argc, JSValueConst *argv)
-    {
-        return (argc == sizeof ...(Args)) && detail::check<Args...>(ctx, argv, Is{});
-    }
-
-    template<std::size_t ...Is>
-    BOOST_FORCEINLINE static JSValue invoke(JSContext *ctx, JSValue self, JSValue *argv, std::index_sequence<Is...> is)
-    {
-        if(auto error = valid<Args...>(ctx, argv, is); error)
-            return JS_ThrowTypeError(ctx, "%s", error->c_str());
-        return f(ctx, self, Args(ctx, argv[Is])...);
-    }
-};
 
 template<typename Target, typename ...Args, std::size_t ...Is>
 BOOST_FORCEINLINE Target construct(JSContext *ctx, JSValueConst *argv, std::index_sequence<Is...>)
@@ -255,7 +215,12 @@ struct getter<f> : std::true_type
 {
     BOOST_FORCEINLINE static JSValue invoke(JSContext *ctx, JSValueConst self)
     {
-        if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
+        if constexpr (!has_constructor<T>::value)
+        {
+            if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
+                return (T{ctx, self}.*f)(ctx);
+        }
+        else if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
             return (reinterpret_cast<T const *>(JS_GetOpaque(self, T::cid))->*f)(ctx);
         else if(auto it = T::upcast.find(cid); it != std::end(T::upcast))
             return (it->second(JS_GetOpaque(self, cid)).*f)(ctx);
@@ -268,7 +233,12 @@ struct getter<f> : std::true_type
 {
     BOOST_FORCEINLINE static JSValue invoke(JSContext *ctx, JSValueConst self)
     {
-        if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
+        if constexpr (!has_constructor<T>::value)
+        {
+            if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
+                return (T{ctx, self}.*f)(ctx, self);
+        }
+        else if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
             return (reinterpret_cast<T*>(JS_GetOpaque(self, T::cid))->*f)(ctx, self);
         else if(auto it = T::upcast.find(cid); it != std::end(T::upcast))
             return (it->second(JS_GetOpaque(self, cid)).*f)(ctx, self);
@@ -277,7 +247,7 @@ struct getter<f> : std::true_type
 };
 
 template<typename T, JSValue(*f)(T const &, JSContext *)>
-struct getter<f> : std::true_type
+struct getter<f> : std::bool_constant<has_constructor<T>::value>
 {
     BOOST_FORCEINLINE static JSValue invoke(JSContext *ctx, JSValueConst self)
     {
@@ -334,88 +304,220 @@ struct setter<f> : std::disjunction<std::is_same<void, R>, std::is_same<JSValue,
     }
 };
 
-template<auto>
-struct function : std::false_type {};
-
-template<typename ...Args, JSValue(*f)(JSContext *, Args...)>
-struct function<f> : std::true_type
+template<typename ...Args>
+struct function_args
 {
-    static constexpr int arity = sizeof...(Args);
-
-    BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue, int argc, JSValue *argv)
-    {
-        return function_alt<f, Args...>::check(ctx, argc, argv);
-    }
-
-    inline static JSValue invoke(JSContext *ctx, JSValue self, int argc, JSValue *argv)
-    {
-        return function_alt<f, Args...>::invoke(ctx, self, argv, typename function_alt<f, Args...>::Is{});
-    }
-};
-
-template<typename O, typename ...Args, JSValue(*f)(O &, JSContext *, Args...)>
-struct function<f> : has_constructor<O>
-{
+    using T = typename varargs<Args...>::type;
+    static constexpr int length = sizeof ...(Args) - !std::is_same_v<T, void>;
+    using Is = std::make_index_sequence<length>;
     static constexpr int arity = varargs<Args...>::arity;
 
-    BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue self, int argc, JSValue *argv)
+    BOOST_FORCEINLINE static bool check(JSContext *ctx, int argc, JSValue *argv)
     {
-        JSClassID const cid = JS_GetClassID(self);
-        if constexpr (std::is_same_v<typename varargs<Args...>::type, void>)
+        if constexpr (std::is_same_v<T, void>)
         {
-            return (O::cid == cid || O::upcast.find(cid) != std::end(O::upcast))
-                && argc == sizeof...(Args) && detail::check<Args...>(ctx, argv, std::make_index_sequence<sizeof ...(Args)>{});
+            return argc == sizeof...(Args) && detail::check<Args...>(ctx, argv, std::make_index_sequence<sizeof ...(Args)>{});
         }
         else
         {
-            return (O::cid == cid || O::upcast.find(cid) != std::end(O::upcast))
-                && argc >= sizeof...(Args) + varargs<Args...>::type::count - 1
+            return argc >= sizeof...(Args) + T::count - 1
                 && detail::check<Args...>(ctx, argv, std::make_index_sequence<sizeof ...(Args)>{})
                 && detail::varargs<Args...>::check(ctx, argc - sizeof...(Args) + 1, argv + sizeof...(Args) - 1)
             ;
         }
     }
 
-    inline static JSValue invoke(JSContext *ctx, JSValue self, int argc, JSValue *argv)
+    BOOST_FORCEINLINE static bool check(JSContext *ctx, int argc, JSValue *argv, int magic, JSValueConst *data)
     {
-        if constexpr (std::is_same_v<typename varargs<Args...>::type, void>)
-            return invoke_<typename varargs<Args...>::type>(ctx, self, argv, std::make_index_sequence<sizeof ...(Args)>{});
+        if(!check_count(argc, magic)) return false;
+        if(!check_(ctx, argv, magic, data, Is{})) return false;
+        if constexpr (std::is_same_v<T, void>)
+            return true;
         else
-            return invoke_<typename varargs<Args...>::type>(ctx, self, argc, argv, std::make_index_sequence<sizeof ...(Args) - 1>{});
+        {
+            int const offset = length - magic;
+            JSValue *tail = offset ? argv + offset : argv;
+            return T::check(ctx, tail) && detail::varargs<Args...>::check(ctx, argc - offset, tail);
+        }
+    }
+
+    BOOST_FORCEINLINE static std::optional<std::string> valid(JSContext *ctx, JSValueConst *argv)
+    {
+        return valid_(ctx, argv, Is{});
+    }
+
+    BOOST_FORCEINLINE static std::optional<std::string> valid(JSContext *ctx, int argc, JSValueConst *argv, int magic, JSValueConst *data)
+    {
+        if(!check_count(argc, magic)) return "No matching function overload found";
+        return valid_(ctx, argv, magic, data, Is{});
+    }
+
+    template<auto f, typename ...Prefix>
+    BOOST_FORCEINLINE static JSValue invoke(JSContext *ctx, int argc, JSValue *argv, Prefix&& ...prefix)
+    {
+        return invoke_<f>(ctx, argc, argv, Is{}, std::forward<Prefix>(prefix)...);
+    }
+
+    template<auto f, typename ...Prefix>
+    BOOST_FORCEINLINE static JSValue invoke_data(JSContext *ctx, int argc, JSValue *argv, int magic, JSValueConst *data, Prefix&& ...prefix)
+    {
+        if(!check_count(argc, magic))
+            return JS_ThrowTypeError(ctx, "No matching function overload found");
+        return invoke_data_<f>(ctx, argc, argv, magic, data, Is{}, std::forward<Prefix>(prefix)...);
     }
 
 private:
-    template<typename T, std::size_t ...Is>
-    BOOST_FORCEINLINE static auto invoke_(JSContext *ctx, JSValue self, JSValue *argv, std::index_sequence<Is...>)
-    -> typename std::enable_if<std::is_same_v<T, void>, JSValue>::type
+    BOOST_FORCEINLINE static bool check_count(int argc, int magic)
     {
-        if(JSClassID const cid = JS_GetClassID(self); O::cid == cid)
-        {
-            O &value = *reinterpret_cast<O*>(JS_GetOpaque(self, cid));
-            return f(value, ctx, Args(ctx, argv[Is])...);
-        }
+        if(magic < 0 || magic > length || argc < length - magic) return false;
+        if constexpr (std::is_same_v<T, void>)
+            return argc == length - magic;
+        else
+            return argc - (length - magic) >= T::count;
+    }
+
+    template<std::size_t ...Is>
+    BOOST_FORCEINLINE static bool check_(JSContext *ctx, JSValueConst *argv, int magic, JSValueConst *data, std::index_sequence<Is...> is)
+    {
+        return detail::check<typename varargs_nth<Is, Args...>::type...>(ctx, data, magic, argv, is);
+    }
+
+    template<std::size_t ...Is>
+    BOOST_FORCEINLINE static std::optional<std::string> valid_(JSContext *ctx, JSValueConst *argv, int magic, JSValueConst *data, std::index_sequence<Is...> is)
+    {
+        return detail::valid<typename varargs_nth<Is, Args...>::type...>(ctx, data, magic, argv, is);
+    }
+
+    template<auto f, std::size_t ...Is, typename ...Prefix>
+    BOOST_FORCEINLINE static JSValue invoke_data_(JSContext *ctx, int argc, JSValue *argv, int magic, JSValueConst *data, std::index_sequence<Is...>, Prefix&& ...prefix)
+    {
+        if constexpr (std::is_same_v<T, void>)
+            return f(std::forward<Prefix>(prefix)..., typename varargs_nth<Is, Args...>::type(ctx, Is < static_cast<std::size_t>(magic) ? data[Is] : argv[Is - magic])...);
         else
         {
-            O value = O::upcast.find(cid)->second(JS_GetOpaque(self, cid));
-            return f(value, ctx, Args(ctx, argv[Is])...);
+            int const offset = length - magic;
+            return f(std::forward<Prefix>(prefix)..., typename varargs_nth<Is, Args...>::type(ctx, Is < static_cast<std::size_t>(magic) ? data[Is] : argv[Is - magic])...,
+                    T{ctx, argc - offset, offset ? argv + offset : argv});
         }
     }
 
-    template<typename T, std::size_t ...Is>
-    BOOST_FORCEINLINE static auto invoke_(JSContext *ctx, JSValue self, int argc, JSValue *argv, std::index_sequence<Is...>)
-    -> typename std::enable_if<!std::is_same_v<T, void>, JSValue>::type
+    template<std::size_t ...Is>
+    BOOST_FORCEINLINE static std::optional<std::string> valid_(JSContext *ctx, JSValueConst *argv, std::index_sequence<Is...> is)
+    {
+        return detail::valid<typename varargs_nth<Is, Args...>::type...>(ctx, argv, is);
+    }
+
+    // Construct wrappers in the target call to preserve copy elision for nonmovable arguments.
+    template<auto f, std::size_t ...Is, typename ...Prefix>
+    BOOST_FORCEINLINE static JSValue invoke_(JSContext *ctx, int argc, JSValue *argv, std::index_sequence<Is...> is, Prefix&& ...prefix)
+    {
+        if constexpr (std::is_member_function_pointer_v<decltype(f)>)
+            return invoke_member<f>(ctx, argc, argv, is, std::forward<Prefix>(prefix)...);
+        else if constexpr (std::is_same_v<T, void>)
+            return f(std::forward<Prefix>(prefix)..., typename varargs_nth<Is, Args...>::type(ctx, argv[Is])...);
+        else
+            return f(std::forward<Prefix>(prefix)..., typename varargs_nth<Is, Args...>::type(ctx, argv[Is])...,
+                    T{ctx, argc - static_cast<int>(sizeof ...(Is)), argv + sizeof ...(Is)});
+    }
+
+    template<auto f, std::size_t ...Is, typename O, typename ...Prefix>
+    BOOST_FORCEINLINE static JSValue invoke_member(JSContext *ctx, int argc, JSValue *argv, std::index_sequence<Is...>, O&& object, Prefix&& ...prefix)
+    {
+        if constexpr (std::is_same_v<T, void>)
+            return (std::forward<O>(object).*f)(std::forward<Prefix>(prefix)..., typename varargs_nth<Is, Args...>::type(ctx, argv[Is])...);
+        else
+            return (std::forward<O>(object).*f)(std::forward<Prefix>(prefix)..., typename varargs_nth<Is, Args...>::type(ctx, argv[Is])...,
+                    T{ctx, argc - static_cast<int>(sizeof ...(Is)), argv + sizeof ...(Is)});
+    }
+};
+
+template<typename ...Args>
+using first_arg = typename varargs_nth<0, Args..., void>::type;
+
+template<auto, typename = void>
+struct function : std::false_type {};
+
+template<typename ...Args, JSValue(*f)(JSContext *, Args...)>
+struct function<f, std::enable_if_t
+<
+    !std::is_same_v<first_arg<Args...>, JSValue *>
+    && !std::is_same_v<first_arg<Args...>, JSValueConst>
+>> : std::true_type
+{
+    static constexpr int arity = function_args<Args...>::arity;
+
+    BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue, int argc, JSValue *argv)
+    {
+        return function_args<Args...>::check(ctx, argc, argv);
+    }
+
+    inline static JSValue invoke(JSContext *ctx, JSValue self, int argc, JSValue *argv)
+    {
+        if(auto error = function_args<Args...>::valid(ctx, argv); error)
+            return JS_ThrowTypeError(ctx, "%s", error->c_str());
+        return function_args<Args...>::template invoke<f>(ctx, argc, argv, ctx);
+    }
+};
+
+template<typename ...Args, JSValue(*f)(JSContext *, JSValue *, Args...)>
+struct function<f> : std::true_type
+{
+    static constexpr int arity = function_args<Args...>::arity;
+
+    BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue, int argc, JSValue *argv)
+    {
+        return function_args<Args...>::check(ctx, argc, argv);
+    }
+
+    inline static JSValue invoke(JSContext *ctx, JSValue self, int argc, JSValue *argv)
+    {
+        if(auto error = function_args<Args...>::valid(ctx, argv); error)
+            return JS_ThrowTypeError(ctx, "%s", error->c_str());
+        return function_args<Args...>::template invoke<f>(ctx, argc, argv, ctx, argv);
+    }
+};
+
+template<typename ...Args, JSValue(*f)(JSContext *, JSValueConst, Args...)>
+struct function<f> : std::true_type
+{
+    static constexpr int arity = function_args<Args...>::arity;
+
+    BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue, int argc, JSValue *argv)
+    {
+        return function_args<Args...>::check(ctx, argc, argv);
+    }
+
+    inline static JSValue invoke(JSContext *ctx, JSValue self, int argc, JSValue *argv)
+    {
+        if(auto error = function_args<Args...>::valid(ctx, argv); error)
+            return JS_ThrowTypeError(ctx, "%s", error->c_str());
+        return function_args<Args...>::template invoke<f>(ctx, argc, argv, ctx, self);
+    }
+};
+
+template<typename O, typename ...Args, JSValue(*f)(O &, JSContext *, Args...)>
+struct function<f> : std::bool_constant<has_constructor<O>::value>
+{
+    static constexpr int arity = function_args<Args...>::arity;
+
+    BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue self, int argc, JSValue *argv)
+    {
+        JSClassID const cid = JS_GetClassID(self);
+        return (O::cid == cid || O::upcast.find(cid) != std::end(O::upcast))
+            && function_args<Args...>::check(ctx, argc, argv);
+    }
+
+    inline static JSValue invoke(JSContext *ctx, JSValue self, int argc, JSValue *argv)
     {
         if(JSClassID const cid = JS_GetClassID(self); O::cid == cid)
         {
             O &value = *reinterpret_cast<O*>(JS_GetOpaque(self, cid));
-            return f(value, ctx, typename varargs_nth<Is, Args...>::type(ctx, argv[Is])...,
-                    typename varargs<Args...>::type{ctx, argc - static_cast<int>(sizeof ...(Args) - 1), argv + sizeof ...(Args) - 1});
+            return function_args<Args...>::template invoke<f>(ctx, argc, argv, value, ctx);
         }
         else
         {
             O value = O::upcast.find(cid)->second(JS_GetOpaque(self, cid));
-            return f(value, ctx, typename varargs_nth<Is, Args...>::type(ctx, argv[Is])...,
-                    typename varargs<Args...>::type{ctx, argc - static_cast<int>(sizeof ...(Args) - 1), argv + sizeof ...(Args) - 1});
+            return function_args<Args...>::template invoke<f>(ctx, argc, argv, value, ctx);
         }
     }
 };
@@ -423,115 +525,57 @@ private:
 template<typename O, typename ...Args, JSValue(O::*f)(JSContext *, Args...)>
 struct function<f> : std::true_type
 {
-    static constexpr int arity = varargs<Args...>::arity;
+    static constexpr int arity = function_args<Args...>::arity;
 
     BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue self, int argc, JSValue *argv)
     {
         JSClassID const cid = JS_GetClassID(self);
-        if constexpr (std::is_same_v<typename varargs<Args...>::type, void>)
-        {
-            return (O::cid == cid || O::upcast.find(cid) != std::end(O::upcast))
-                && argc == sizeof...(Args) && detail::check<Args...>(ctx, argv, std::make_index_sequence<sizeof ...(Args)>{});
-        }
+        if constexpr (!has_constructor<O>::value)
+            return O::cid == cid && function_args<Args...>::check(ctx, argc, argv);
         else
-        {
             return (O::cid == cid || O::upcast.find(cid) != std::end(O::upcast))
-                && argc >= sizeof...(Args) + varargs<Args...>::type::count - 1
-                && detail::check<Args...>(ctx, argv, std::make_index_sequence<sizeof ...(Args)>{})
-                && detail::varargs<Args...>::check(ctx, argc - sizeof...(Args) + 1, argv + sizeof...(Args) - 1)
-            ;
-        }
+                && function_args<Args...>::check(ctx, argc, argv);
     }
 
     inline static JSValue invoke(JSContext *ctx, JSValue self, int argc, JSValue *argv)
     {
-        if constexpr (std::is_same_v<typename varargs<Args...>::type, void>)
-            return invoke_<typename varargs<Args...>::type>(ctx, self, argv, std::make_index_sequence<sizeof ...(Args)>{});
+        if constexpr (!has_constructor<O>::value)
+            return function_args<Args...>::template invoke<f>(ctx, argc, argv, O{ctx, self}, ctx);
+        else if(JSClassID const cid = JS_GetClassID(self); O::cid == cid)
+            return function_args<Args...>::template invoke<f>(ctx, argc, argv, *reinterpret_cast<O*>(JS_GetOpaque(self, cid)), ctx);
         else
-            return invoke_<typename varargs<Args...>::type>(ctx, self, argc, argv, std::make_index_sequence<sizeof ...(Args) - 1>{});
-    }
-
-private:
-    template<typename T, std::size_t ...Is>
-    BOOST_FORCEINLINE static auto invoke_(JSContext *ctx, JSValue self, JSValue *argv, std::index_sequence<Is...>)
-    -> typename std::enable_if<std::is_same_v<T, void>, JSValue>::type
-    {
-        if(JSClassID const cid = JS_GetClassID(self); O::cid == cid)
-            return (reinterpret_cast<O*>(JS_GetOpaque(self, cid))->*f)(ctx, Args(ctx, argv[Is])...);
-        else
-            return (O::upcast.find(cid)->second(JS_GetOpaque(self, cid)).*f)(ctx, Args(ctx, argv[Is])...);
-    }
-
-    template<typename T, std::size_t ...Is>
-    BOOST_FORCEINLINE static auto invoke_(JSContext *ctx, JSValue self, int argc, JSValue *argv, std::index_sequence<Is...>)
-    -> typename std::enable_if<!std::is_same_v<T, void>, JSValue>::type
-    {
-        if(JSClassID const cid = JS_GetClassID(self); O::cid == cid)
-            return (reinterpret_cast<O*>(JS_GetOpaque(self, cid))->*f)(ctx, typename varargs_nth<Is, Args...>::type(ctx, argv[Is])...,
-                    typename varargs<Args...>::type{ctx, argc - static_cast<int>(sizeof ...(Args) - 1), argv + sizeof ...(Args) - 1});
-        else
-            return (O::upcast.find(cid)->second(JS_GetOpaque(self, cid)).*f)(ctx, typename varargs_nth<Is, Args...>::type(ctx, argv[Is])...,
-                    typename varargs<Args...>::type{ctx, argc - static_cast<int>(sizeof ...(Args) - 1), argv + sizeof ...(Args) - 1});
+            return function_args<Args...>::template invoke<f>(ctx, argc, argv, O::upcast.find(cid)->second(JS_GetOpaque(self, cid)), ctx);
     }
 };
 
 template<typename O, typename ...Args, JSValue(O::*f)(JSContext *, Args...) const>
 struct function<f> : std::true_type
 {
-    static constexpr int arity = varargs<Args...>::arity;
+    static constexpr int arity = function_args<Args...>::arity;
 
     BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue self, int argc, JSValue *argv)
     {
         JSClassID const cid = JS_GetClassID(self);
-        if constexpr (std::is_same_v<typename varargs<Args...>::type, void>)
-        {
-            return (O::cid == cid || O::upcast.find(cid) != std::end(O::upcast))
-                && argc == sizeof...(Args) && detail::check<Args...>(ctx, argv, std::make_index_sequence<sizeof ...(Args)>{});
-        }
+        if constexpr (!has_constructor<O>::value)
+            return O::cid == cid && function_args<Args...>::check(ctx, argc, argv);
         else
-        {
             return (O::cid == cid || O::upcast.find(cid) != std::end(O::upcast))
-                && argc >= sizeof...(Args) + varargs<Args...>::type::count - 1
-                && detail::check<Args...>(ctx, argv, std::make_index_sequence<sizeof ...(Args)>{})
-                && detail::varargs<Args...>::check(ctx, argc - sizeof...(Args) + 1, argv + sizeof...(Args) - 1)
-            ;
-        }
+                && function_args<Args...>::check(ctx, argc, argv);
     }
 
     inline static JSValue invoke(JSContext *ctx, JSValue self, int argc, JSValue *argv)
     {
-        if constexpr (std::is_same_v<typename varargs<Args...>::type, void>)
-            return invoke_<typename varargs<Args...>::type>(ctx, self, argv, std::make_index_sequence<sizeof ...(Args)>{});
+        if constexpr (!has_constructor<O>::value)
+            return function_args<Args...>::template invoke<f>(ctx, argc, argv, O{ctx, self}, ctx);
+        else if(JSClassID const cid = JS_GetClassID(self); O::cid == cid)
+            return function_args<Args...>::template invoke<f>(ctx, argc, argv, *reinterpret_cast<O const *>(JS_GetOpaque(self, cid)), ctx);
         else
-            return invoke_<typename varargs<Args...>::type>(ctx, self, argc, argv, std::make_index_sequence<sizeof ...(Args) - 1>{});
-    }
-
-private:
-    template<typename T, std::size_t ...Is>
-    BOOST_FORCEINLINE static auto invoke_(JSContext *ctx, JSValue self, JSValue *argv, std::index_sequence<Is...>)
-    -> typename std::enable_if<std::is_same_v<T, void>, JSValue>::type
-    {
-        if(JSClassID const cid = JS_GetClassID(self); O::cid == cid)
-            return (reinterpret_cast<O const *>(JS_GetOpaque(self, cid))->*f)(ctx, Args(ctx, argv[Is])...);
-        else
-            return (O::upcast.find(cid)->second(JS_GetOpaque(self, cid)).*f)(ctx, Args(ctx, argv[Is])...);
-    }
-
-    template<typename T, std::size_t ...Is>
-    BOOST_FORCEINLINE static auto invoke_(JSContext *ctx, JSValue self, int argc, JSValue *argv, std::index_sequence<Is...>)
-    -> typename std::enable_if<!std::is_same_v<T, void>, JSValue>::type
-    {
-        if(JSClassID const cid = JS_GetClassID(self); O::cid == cid)
-            return (reinterpret_cast<O const *>(JS_GetOpaque(self, cid))->*f)(ctx, typename varargs_nth<Is, Args...>::type(ctx, argv[Is])...,
-                    typename varargs<Args...>::type{ctx, argc - static_cast<int>(sizeof ...(Args) - 1), argv + sizeof ...(Args) - 1});
-        else
-            return (O::upcast.find(cid)->second(JS_GetOpaque(self, cid)).*f)(ctx, typename varargs_nth<Is, Args...>::type(ctx, argv[Is])...,
-                    typename varargs<Args...>::type{ctx, argc - static_cast<int>(sizeof ...(Args) - 1), argv + sizeof ...(Args) - 1});
+            return function_args<Args...>::template invoke<f>(ctx, argc, argv, O::upcast.find(cid)->second(JS_GetOpaque(self, cid)), ctx);
     }
 };
 
 template<typename O, typename ...Args, JSValue(O::*f)(JSValue, JSContext *, Args...)>
-struct function<f> : std::true_type
+struct function<f> : std::bool_constant<has_constructor<O>::value>
 {
     static constexpr int arity = sizeof...(Args);
 
@@ -558,7 +602,7 @@ private:
 };
 
 template<typename O, typename ...Args, JSValue(O::*f)(JSValue, JSContext *, Args...) const>
-struct function<f> : std::true_type
+struct function<f> : std::bool_constant<has_constructor<O>::value>
 {
     static constexpr int arity = sizeof...(Args);
 
@@ -584,31 +628,44 @@ private:
     }
 };
 
-template<auto>
+template<auto, typename = void>
 struct function_data : std::false_type {};
 
-template<typename ...Args, JSValue(*f)(JSContext *, JSValueConst *, Args...)>
+template<typename ...Args, JSValue(*f)(JSContext *, Args...)>
+struct function_data<f, std::enable_if_t<!std::is_same_v<first_arg<Args...>, JSValueConst>>> : std::true_type
+{
+    static constexpr int arity = function_args<Args...>::arity;
+    static constexpr int length = function_args<Args...>::length;
+
+    BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue, int argc, JSValue *argv, int magic, JSValueConst *data)
+    {
+        return function_args<Args...>::check(ctx, argc, argv, magic, data);
+    }
+
+    inline static JSValue invoke(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv, int magic, JSValueConst *data)
+    {
+        if(auto error = function_args<Args...>::valid(ctx, argc, argv, magic, data); error)
+            return JS_ThrowTypeError(ctx, "%s", error->c_str());
+        return function_args<Args...>::template invoke_data<f>(ctx, argc, argv, magic, data, ctx);
+    }
+};
+
+template<typename ...Args, JSValue(*f)(JSContext *, JSValueConst, Args...)>
 struct function_data<f> : std::true_type
 {
-    static constexpr int arity = sizeof...(Args);
+    static constexpr int arity = function_args<Args...>::arity;
+    static constexpr int length = function_args<Args...>::length;
 
-    BOOST_FORCEINLINE static bool check(JSContext *ctx, int argc, JSValue *argv)
+    BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue, int argc, JSValue *argv, int magic, JSValueConst *data)
     {
-        return argc == sizeof...(Args) && detail::check<Args...>(ctx, argv, std::make_index_sequence<sizeof ...(Args)>{});
+        return function_args<Args...>::check(ctx, argc, argv, magic, data);
     }
 
-    inline static JSValue invoke(JSContext *ctx, JSValue *argv, JSValueConst *data)
+    inline static JSValue invoke(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv, int magic, JSValueConst *data)
     {
-        if(auto error = valid<Args...>(ctx, argv, std::make_index_sequence<sizeof ...(Args)>{}); error)
+        if(auto error = function_args<Args...>::valid(ctx, argc, argv, magic, data); error)
             return JS_ThrowTypeError(ctx, "%s", error->c_str());
-        return invoke(ctx, argv, data, std::make_index_sequence<sizeof ...(Args)>{});
-    }
-
-private:
-    template<std::size_t ...Is>
-    BOOST_FORCEINLINE static JSValue invoke(JSContext *ctx, JSValue *argv, JSValueConst *data, std::index_sequence<Is...>)
-    {
-        return f(ctx, data, Args(ctx, argv[Is])...);
+        return function_args<Args...>::template invoke_data<f>(ctx, argc, argv, magic, data, ctx, self);
     }
 };
 
@@ -1396,14 +1453,11 @@ struct Promise : detail::Reference
         return {ctx, p};
     }
 
-    static constexpr int MAGIC = 0x789A0000;
-    static constexpr int AMASK = 0x0000FFFF;
-
     BOOST_FORCEINLINE Strong<Promise> wrap(JSCFunctionData f1, JSCFunction f2, int argc, JSValueConst *argv)
     {
         JSAtom atom = JS_NewAtom(ctx, "then");
         JSValue fns[2] = {
-            JS_NewCFunctionData(ctx, f1, 1, MAGIC | argc, argc, argv),
+            JS_NewCFunctionData(ctx, f1, 1, argc, argc, argv),
             JS_NewCFunction(ctx, f2, "reject", 1)
         };
         JSValue p = JS_Invoke(ctx, value, atom, 2, fns);
@@ -1546,6 +1600,9 @@ struct Function
     {
         return invoke_internal(ctx, self, std::min(argc, arity()), argv);
     }
+private:
+    template<auto, auto...>
+    friend struct Function;
 
     BOOST_FORCEINLINE static JSValue invoke_internal(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv)
     {
@@ -1566,15 +1623,41 @@ struct FunctionData
             return detail::function_data<F>::arity;
     }
 
-    static JSValue invoke(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv, int d_id, JSValueConst *data)
+    static constexpr int length()
     {
-        return invoke_internal(ctx, self, std::min(argc, arity()), argv, d_id, data);
+        if constexpr (sizeof...(Fs))
+            return std::max(detail::function_data<F>::length, FunctionData<Fs...>::length());
+        else
+            return detail::function_data<F>::length;
     }
 
-    inline static JSValue invoke_internal(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv, int d_id, JSValueConst *data)
+    template<typename ...Args>
+    static JSValue bind(JSContext *ctx, Args const &...args)
     {
-        if(detail::function_data<F>::check(ctx, argc, argv)) return detail::function_data<F>::invoke(ctx, argv, data);
-        if constexpr (sizeof...(Fs)) return FunctionData<Fs...>::invoke(ctx, self, argc, argv, d_id, data);
+        static_assert(sizeof...(Args) <= length(), "Too many captured arguments");
+        constexpr int count = sizeof...(Args);
+
+        std::array<JSValue, count> data{static_cast<JSValue>(args)...};
+        return JS_NewCFunctionData(ctx, &invoke, length() - count, count, count, data.data());
+    }
+
+    static JSValue invoke(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv, int magic, JSValueConst *data)
+    {
+        if(magic < 0 || magic > length() || argc < 0)
+            return JS_ThrowTypeError(ctx, "No matching function overload found");
+        if constexpr (arity() != std::numeric_limits<int>::max())
+            argc = std::min(argc, length() - magic);
+        return invoke_internal(ctx, self, argc, argv, magic, data);
+    }
+
+private:
+    template<auto, auto...>
+    friend struct FunctionData;
+
+    BOOST_FORCEINLINE static JSValue invoke_internal(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv, int magic, JSValueConst *data)
+    {
+        if(detail::function_data<F>::check(ctx, self, argc, argv, magic, data)) return detail::function_data<F>::invoke(ctx, self, argc, argv, magic, data);
+        if constexpr (sizeof...(Fs)) return FunctionData<Fs...>::invoke_internal(ctx, self, argc, argv, magic, data);
         return JS_ThrowTypeError(ctx, "No matching function overload found");
     }
 };
@@ -1628,8 +1711,11 @@ struct Implements<Head, Tail...>
     template<typename U>
     static constexpr void register_upcast()
     {
-        if(!Head::Base::upcast.count(U::cid)) Head::Base::upcast[U::cid] = [](void *ptr) -> std::unique_ptr<typename Head::Ifac> {
-            return std::make_unique<Head>(static_cast<typename U::Wrapped &>(reinterpret_cast<U*>(ptr)->ref()));
+        if(!Head::Base::upcast.count(U::cid)) Head::Base::upcast[U::cid] = [](JSContext *ctx, JSValue value) -> std::unique_ptr<typename Head::Ifac> {
+            if constexpr (std::is_base_of_v<Object, U>)
+                return std::make_unique<Head>(ctx, value);
+            else
+                return std::make_unique<Head>(static_cast<typename U::Wrapped &>(reinterpret_cast<U*>(JS_GetOpaque(value, U::cid))->ref()));
         };
         Implements<Tail...>::template register_upcast<U>();
     }
@@ -1724,7 +1810,11 @@ int own_properties(JSContext *ctx, JSPropertyEnum **ptab, uint32_t *plen, JSValu
     *ptab = nullptr;
     *plen = 0;
 
-    auto const names = reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->own_properties();
+    std::vector<std::string> names;
+    if constexpr (!detail::has_constructor<Impl>::value)
+        Impl{ctx, self}.own_properties().swap(names);
+    else
+        reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->own_properties().swap(names);
     if(names.empty()) return 0;
 
     JSPropertyEnum *tab = static_cast<JSPropertyEnum *>(js_mallocz(ctx, sizeof(JSPropertyEnum) * names.size()));
@@ -1755,7 +1845,10 @@ int own_property(JSContext *ctx, JSPropertyDescriptor *desc, JSValueConst self, 
     int result = -1;
     if(const char *name = JS_AtomToCString(ctx, prop); name)
     {
-        result = reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->own_property(ctx, name, desc) ? 1 : 0;
+        if constexpr (!detail::has_constructor<Impl>::value)
+            result = Impl{ctx, self}.own_property(ctx, name, desc) ? 1 : 0;
+        else
+            result = reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->own_property(ctx, name, desc) ? 1 : 0;
         JS_FreeCString(ctx, name);
     }
     return result;
@@ -1781,7 +1874,10 @@ int set_property(JSContext *ctx, JSValueConst self, JSAtom prop, JSValueConst va
         }
         else
         {
-            reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->set_property(ctx, name, value);
+            if constexpr (!detail::has_constructor<Impl>::value)
+                result = Impl{ctx, self}.set_property(ctx, name, value);
+            else
+                reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->set_property(ctx, name, value);
             result = 1;
         }
         JS_FreeCString(ctx, name);
@@ -2125,10 +2221,12 @@ void Interface<Impl, Native_, Extends_>::alias(JSContext *ctx, JSValue target, c
 }
 
 template<typename Impl>
-struct Interface<Impl, void, void> : Object
+struct Interface<Impl, Object, void> : Object
 {
     using Object::Object;
-    using Base = Interface<Impl, void, void>;
+    using Base = Interface<Impl, Object, void>;
+    using impl = Implements<>;
+    using priv = Private<>;
 
     BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue *value)
     {
@@ -2136,23 +2234,31 @@ struct Interface<Impl, void, void> : Object
     }
 
     static JSCFunctionListEntry const funcs[];
+    static constexpr bool constructible = true;
 
     static JSClassID cid;
     static JSClassDef def;
-    static thread_local std::unordered_map<JSClassID, std::function<Impl(void*)>> upcast;
 
     static void init();
     static void init(JSRuntime *);
     static void init(JSContext *);
     static void init(JSContext *, JSValue);
     static void init(JSContext *, JSModuleDef *);
-    static void alias(JSContext *, JSModuleDef *, const char *name = nullptr);
 
     static char const *name();
-    static JSValue ctor(JSContext *);
-    static JSValue ctor(JSContext *, Object obj);
-    static JSValue data(JSContext *, JSValue data);
-    static constexpr bool constructible = true;
+    static JSValue ctor(JSContext *ctx);
+    static JSValue ctor(JSContext *ctx, Object &&);
+
+    template<typename Im, typename If>
+    struct I : If
+    {
+    public:
+        I(JSContext *ctx, JSValue value): ref{ctx, value} {}
+        using Base = I<Im, If>;
+
+    protected:
+        Object ref;
+    };
 
 private:
     Interface() = delete;
@@ -2160,54 +2266,54 @@ private:
 
 private:
     static JSValue make(JSContext *);
-    static JSValue make(JSContext *ctx, JSValueConst clazz, int argc, JSValueConst *argv);
+    static JSValue ctor(JSContext *ctx, JSValueConst clazz, int argc, JSValueConst *argv);
 };
 
 template<typename Impl>
-JSClassID Interface<Impl, void, void>::cid;
+JSClassID Interface<Impl, Object, void>::cid;
 
 template<typename Impl>
-thread_local JSValue Interface<Impl, void, void>::proto = JS_UNDEFINED;
+thread_local JSValue Interface<Impl, Object, void>::proto = JS_UNDEFINED;
 
 template<typename Impl>
-thread_local std::unordered_map<JSClassID, std::function<Impl(void*)>> Interface<Impl, void, void>::upcast;
-
-template<typename Impl>
-JSClassDef Interface<Impl, void, void>::def = {
-    .class_name = Interface<Impl, void, void>::name(),
-    .finalizer = NULL
+JSClassDef Interface<Impl, Object, void>::def = {
+    .class_name = Interface<Impl, Object, void>::name(),
+    .finalizer = NULL,
+    .exotic = detail::get_exotic<Impl>::get()
 };
 
 template<typename Impl>
-JSCFunctionListEntry const Interface<Impl, void, void>::funcs[] = {};
+JSCFunctionListEntry const Interface<Impl, Object, void>::funcs[] = {};
 
 template<typename Impl>
-char const *Interface<Impl, void, void>::name()
+char const *Interface<Impl, Object, void>::name()
 {
     static std::string name = boost::core::demangle(typeid(Impl).name());
     return name.c_str() + name.rfind(':') + 1;
 }
 
 template<typename Impl>
-void Interface<Impl, void, void>::init()
+void Interface<Impl, Object, void>::init()
 {
     JS_NewClassID(&cid);
+    Impl::priv::template init<Base>();
 }
 
 template<typename Impl>
-void Interface<Impl, void, void>::init(JSRuntime *rt)
+void Interface<Impl, Object, void>::init(JSRuntime *rt)
 {
-    JS_NewClass(rt, cid, &Interface<Impl, void, void>::def);
+    JS_NewClass(rt, cid, &Interface<Impl, Object, void>::def);
+    Impl::priv::init(rt);
 }
 
 template<typename Impl>
-void Interface<Impl, void, void>::init(JSContext *ctx, JSValue glob)
+void Interface<Impl, Object, void>::init(JSContext *ctx, JSValue glob)
 {
     JS_SetPropertyStr(ctx, glob, name(), make(ctx));
 }
 
 template<typename Impl>
-void Interface<Impl, void, void>::init(JSContext *ctx)
+void Interface<Impl, Object, void>::init(JSContext *ctx)
 {
 #ifndef NOTOJS_INTERNAL_MODULE
     init();
@@ -2217,7 +2323,7 @@ void Interface<Impl, void, void>::init(JSContext *ctx)
 }
 
 template<typename Impl>
-void Interface<Impl, void, void>::init(JSContext *ctx, JSModuleDef *glob)
+void Interface<Impl, Object, void>::init(JSContext *ctx, JSModuleDef *glob)
 {
 #ifndef NOTOJS_INTERNAL_MODULE
     init();
@@ -2227,57 +2333,69 @@ void Interface<Impl, void, void>::init(JSContext *ctx, JSModuleDef *glob)
 }
 
 template<typename Impl>
-void Interface<Impl, void, void>::alias(JSContext *ctx, JSModuleDef *glob, const char *name)
+JSValue Interface<Impl, Object, void>::make(JSContext *ctx)
 {
-    JS_SetModuleExport(ctx, glob, name ? name : Interface<Impl, void, void>::name(), JS_GetPropertyStr(ctx, proto, "constructor"));
-}
+    Impl::impl::template register_upcast<Base>();
 
-template<typename Impl>
-JSValue Interface<Impl, void, void>::make(JSContext *ctx, JSValueConst clazz, int argc, JSValueConst *argv)
-{
-    if constexpr (Impl::constructible)
-        if(0 == argc) return Interface<Impl, void, void>::ctor(ctx);
-    if(1 == argc && Object::check(ctx, argv))
-    {
-        if(auto p = Object{ctx, argv[0]}.get<String>("data"))
-        {
-            JSValue self = Interface<Impl, void, void>::ctor(ctx);
-            JS_SetPropertyStr(ctx, self, "data", p->release());
-            return self;
-        }
-    }
-    return JS_ThrowTypeError(ctx, "%s: no matching constructor found", Interface<Impl>::name());
-}
-
-template<typename Impl>
-JSValue Interface<Impl, void, void>::data(JSContext *ctx, JSValue data)
-{
-    JSValue self = Interface<Impl, void, void>::ctor(ctx);
-    JS_SetPropertyStr(ctx, self, "data", data);
-    return self;
-}
-
-template<typename Impl>
-JSValue Interface<Impl, void, void>::make(JSContext *ctx)
-{
     proto = JS_NewObject(ctx);
     JS_SetPropertyFunctionList(ctx, proto, Impl::funcs, sizeof(Impl::funcs)/sizeof(Impl::funcs[0]));
 
-    JSValue ctor = JS_NewCFunction2(ctx, &make, name(), 1, JS_CFUNC_constructor, 0);
-    JS_SetConstructor(ctx, ctor, proto);
+    JSValue ctor = std::invoke([ctx]{
+        if constexpr (Impl::constructible)
+            return JS_NewCFunction2(ctx, &Interface<Impl, Object, void>::ctor, name(), 1, JS_CFUNC_constructor, 0);
+        else
+            return JS_NewCFunction2(ctx, &Unconstructable<Impl>::invoke, name(), 1, JS_CFUNC_constructor, 0);
+    });
 
+    JS_SetConstructor(ctx, ctor, proto);
     JS_SetClassProto(ctx, cid, proto);
+    Impl::priv::make(ctx);
     return ctor;
 }
 
 template<typename Impl>
-JSValue Interface<Impl, void, void>::ctor(JSContext *ctx)
+JSValue Interface<Impl, Object, void>::ctor(JSContext *ctx)
 {
-    return JS_NewObjectProtoClass(ctx, Impl::proto, Impl::cid);
+    return ctor(ctx, JS_UNDEFINED, 0, NULL);
+}
+
+template<typename Impl>
+JSValue Interface<Impl, Object, void>::ctor(JSContext *ctx, Object &&copy)
+{
+    return ctor(ctx, JS_UNDEFINED, 1, +copy);
+}
+
+template<typename Impl>
+JSValue Interface<Impl, Object, void>::ctor(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv)
+{
+    if(0 == argc) return JS_NewObjectProtoClass(ctx, Impl::proto, Impl::cid);
+    if(1 == argc && Object::check(ctx, argv))
+    {
+        bridge::Strong<void> res{ctx, JS_NewObjectProtoClass(ctx, Impl::proto, Impl::cid), false};
+        if(JS_IsException(res)) return res.release();
+
+        JSPropertyEnum *properties = nullptr;
+        std::uint32_t count = 0;
+        if(JS_GetOwnPropertyNames(ctx, &properties, &count, argv[0], JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK | JS_GPN_ENUM_ONLY) < 0)
+            return JS_EXCEPTION;
+
+        for(std::uint32_t i = 0; i < count; ++i)
+        {
+            JSValue value = JS_GetProperty(ctx, argv[0], properties[i].atom);
+            if(JS_IsException(value) || JS_DefinePropertyValue(ctx, res, properties[i].atom, value, JS_PROP_C_W_E) < 0)
+            {
+                JS_FreePropertyEnum(ctx, properties, count);
+                return JS_EXCEPTION;
+            }
+        }
+        JS_FreePropertyEnum(ctx, properties, count);
+        return res.release();
+    }
+    return JS_ThrowTypeError(ctx, "%s: no matching constructor found", name());
 }
 
 template<typename If>
-struct Interface<If, void*, void>
+struct Interface<If, void, void>
 {
     using Ifac = If;
     struct Impl : If::Static
@@ -2288,7 +2406,7 @@ struct Interface<If, void*, void>
         Impl(JSContext *ctx, JSValue val)
         {
             JSClassID const cid = JS_GetClassID(val);
-            value = upcast[cid](JS_GetOpaque(val, cid));
+            value = upcast[cid](ctx, val);
         }
         BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue *value)
         {
@@ -2304,11 +2422,11 @@ struct Interface<If, void*, void>
     };
 
     struct Static {};
-    static std::unordered_map<JSClassID, std::function<std::unique_ptr<If>(void*)>> upcast;
+    static std::unordered_map<JSClassID, std::function<std::unique_ptr<If>(JSContext*, JSValue)>> upcast;
 };
 
 template<typename If>
-std::unordered_map<JSClassID, std::function<std::unique_ptr<If>(void*)>> Interface<If, void*, void>::upcast;
+std::unordered_map<JSClassID, std::function<std::unique_ptr<If>(JSContext*, JSValue)>> Interface<If, void, void>::upcast;
 
 template<typename Impl>
 class Exception
@@ -2457,6 +2575,8 @@ public:
 
 public:
     static void free(JSRuntime *, JSValue);
+    static void mark(JSRuntime *, JSValueConst, JS_MarkFunc *);
+
     static JSCFunctionListEntry const funcs[];
 
     BOOST_FORCEINLINE static JSValue make(JSContext *ctx, JSValue owner, Wrapped &&i, Wrapped &&e)
@@ -2495,7 +2615,8 @@ thread_local JSValue Iterator<Wrapped>::proto = JS_UNDEFINED;
 template<typename Wrapped>
 JSClassDef Iterator<Wrapped>::def = {
     .class_name = nullptr,
-    .finalizer = Iterator<Wrapped>::free
+    .finalizer = Iterator<Wrapped>::free,
+    .gc_mark = Iterator<Wrapped>::mark
 };
 
 template<typename Wrapped>
@@ -2516,7 +2637,13 @@ JSValue Iterator<Wrapped>::next(JSContext *ctx, JSValueConst self, int, JSValueC
     }
     else
     {
-        JS_SetPropertyStr(ctx, obj, "value", s->i.get(ctx));
+        JSValue value = s->i.get(ctx);
+        if(JS_IsException(value))
+        {
+            JS_FreeValue(ctx, obj);
+            return value;
+        }
+        JS_SetPropertyStr(ctx, obj, "value", value);
         JS_SetPropertyStr(ctx, obj, "done", JS_NewBool(ctx, 0));
         ++s->i;
     }
@@ -2532,31 +2659,19 @@ JSValue Iterator<Wrapped>::sym(JSContext *ctx, JSValueConst self, int, JSValueCo
 template<typename Wrapped>
 void Iterator<Wrapped>::free(JSRuntime *rt, JSValue self)
 {
-    delete get(self);
+    if(auto *ptr = get(self))
+    {
+        JSValue owner = ptr->owner.release();
+        delete ptr;
+        JS_FreeValueRT(rt, owner);
+    }
 }
 
-template<typename Impl>
-struct JSON
+template<typename Wrapped>
+void Iterator<Wrapped>::mark(JSRuntime *rt, JSValueConst self, JS_MarkFunc *mark_func)
 {
-    JSON() = delete;
-    static JSValue toJSON(JSContext *, JSValueConst, int argcc = 0, JSValueConst *argv = NULL);
-};
-
-template<typename Impl>
-JSValue JSON<Impl>::toJSON(JSContext *ctx, JSValueConst self, int, JSValueConst *)
-{
-    if constexpr (detail::has_constructor<Impl>::value)
-    {
-        if(JSClassID const cid = JS_GetClassID(self); Impl::cid == cid)
-            return reinterpret_cast<Impl const *>(JS_GetOpaque(self, cid))->toJSON(ctx);
-        else if(auto it = Impl::upcast.find(cid); it != std::end(Impl::upcast))
-            return it->second(JS_GetOpaque(self, cid)).Impl::toJSON(ctx);
-        return JS_NULL;
-    }
-    else
-    {
-        return Impl{ctx, self}.toJSON(ctx);
-    }
+    if(auto *ptr = get(self))
+        JS_MarkValue(rt, ptr->owner, mark_func);
 }
 
 } // namespace bridge

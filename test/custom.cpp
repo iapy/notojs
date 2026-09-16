@@ -3,12 +3,11 @@
 namespace {
 using namespace std::string_view_literals;
 
-struct Custom : bridge::Interface<Custom>
+struct Custom : bridge::Interface<Custom, bridge::Object>
 {
-    using Base = bridge::Interface<Custom>;
     using Base::Base;
 
-    JSValue toJSON(JSContext *ctx)
+    JSValue toJSON(JSContext *ctx) const
     {
         bridge::Object json{ctx};
         json.set("type", bridge::String(ctx, "Custom"sv));
@@ -20,7 +19,7 @@ struct Custom : bridge::Interface<Custom>
 };
 
 JSCFunctionListEntry const Custom::funcs[] = {
-    JS_CFUNC_DEF("toJSON", 0, &bridge::JSON<Custom>::toJSON),
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Custom::toJSON>::invoke)
 };
 
 JSValue consume_0(JSContext *ctx, Custom c)
@@ -30,12 +29,14 @@ JSValue consume_0(JSContext *ctx, Custom c)
 
 JSValue factory_0(JSContext *ctx)
 {
-    return Custom::data(ctx, bridge::String{ctx, "default"sv});
+    return Custom::ctor(ctx);
 }
 
 JSValue factory_1(JSContext *ctx, bridge::String data)
 {
-    return Custom::data(ctx, JS_DupValue(ctx, data));
+    bridge::Strong<bridge::Object> obj{ctx, bridge::Object{ctx}};
+    obj.set("data", JS_DupValue(ctx, data));
+    return Custom::ctor(ctx, std::move(obj));
 }
 
 using consume = bridge::Function<&consume_0>;

@@ -1039,8 +1039,8 @@ JSValue doc_0(JSContext *ctx)
     }
 
     return output.empty()
-        ? __Markdown::data(ctx, bridge::String(ctx, std::string{"#### Suite not installed\n"}))
-        : __Markdown::data(ctx, bridge::String(ctx, std::move(output)));
+        ? Markdown::data(ctx, bridge::String(ctx, std::string{"#### Suite not installed\n"}))
+        : Markdown::data(ctx, bridge::String(ctx, std::move(output)));
 }
 
 JSValue doc_1(JSContext *ctx, bridge::String str)
@@ -1054,8 +1054,8 @@ JSValue doc_1(JSContext *ctx, bridge::String str)
     }
 
     return output.empty()
-        ? __Markdown::data(ctx, bridge::String(ctx, std::string{"#### Not found\n"}))
-        : __Markdown::data(ctx, bridge::String(ctx, std::move(output)));
+        ? Markdown::data(ctx, bridge::String(ctx, std::string{"#### Not found\n"}))
+        : Markdown::data(ctx, bridge::String(ctx, std::move(output)));
 }
 
 using docf = bridge::Function<&doc_0, &doc_1>;
