@@ -5,11 +5,72 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(NOTOJS_BUILD_DIR "" CACHE STRING "NotoJS build dir")
-set(CLANG_RESOURCE_DIR "/opt/homebrew/opt/llvm/lib/clang/22" CACHE STRING "CLang resource dir")
-set(XCODE_SDK_PATH "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk" CACHE STRING "XCode SDK path")
+# Prefer normal discovery, including explicit LLVM_DIR/CMAKE_PREFIX_PATH.
+find_package(LLVM QUIET CONFIG)
+
+if(NOT LLVM_FOUND AND APPLE)
+    find_program(HOMEBREW_EXECUTABLE NAMES brew REQUIRED)
+    execute_process(
+        COMMAND "${HOMEBREW_EXECUTABLE}" --prefix llvm
+        OUTPUT_VARIABLE HOMEBREW_LLVM_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY
+    )
+    list(APPEND CMAKE_PREFIX_PATH "${HOMEBREW_LLVM_PREFIX}")
+endif()
 
 find_package(LLVM REQUIRED CONFIG)
-find_package(Clang REQUIRED CONFIG)
+find_package(Clang REQUIRED CONFIG
+    HINTS "${LLVM_INSTALL_PREFIX}/lib/cmake/clang"
+)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBGIT2 REQUIRED IMPORTED_TARGET libgit2)
+
+set(CLANG_RESOURCE_DIR "" CACHE PATH "Clang resource directory")
+
+if(NOT CLANG_RESOURCE_DIR)
+    # Match the resource headers to the LLVM installation used for linking.
+    find_program(NOTOJS_CLANG_EXECUTABLE
+        NAMES clang
+        PATHS "${LLVM_TOOLS_BINARY_DIR}"
+        NO_DEFAULT_PATH
+        REQUIRED
+    )
+    execute_process(
+        COMMAND "${NOTOJS_CLANG_EXECUTABLE}" -print-resource-dir
+        OUTPUT_VARIABLE CLANG_RESOURCE_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY
+    )
+endif()
+
+set(NOTOJS_DOC_CLANG_ARGS
+    "--extra-arg-before=-resource-dir=${CLANG_RESOURCE_DIR}"
+)
+
+if(APPLE)
+    set(XCODE_SDK_PATH "" CACHE PATH "macOS SDK path")
+
+    if(NOT XCODE_SDK_PATH)
+        if(CMAKE_OSX_SYSROOT AND IS_DIRECTORY "${CMAKE_OSX_SYSROOT}")
+            set(XCODE_SDK_PATH "${CMAKE_OSX_SYSROOT}")
+        else()
+            find_program(XCRUN_EXECUTABLE NAMES xcrun REQUIRED)
+            execute_process(
+                COMMAND "${XCRUN_EXECUTABLE}" --sdk macosx --show-sdk-path
+                OUTPUT_VARIABLE XCODE_SDK_PATH
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                COMMAND_ERROR_IS_FATAL ANY
+            )
+        endif()
+    endif()
+
+    list(APPEND NOTOJS_DOC_CLANG_ARGS
+        "--extra-arg-before=-isysroot"
+        "--extra-arg-before=${XCODE_SDK_PATH}"
+    )
+endif()
 
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 message(STATUS "Using ClangConfig.cmake in: ${Clang_DIR}")
@@ -26,6 +87,9 @@ target_include_directories(notojs PRIVATE
   ${PROJECT_SOURCE_DIR}
 )
 
+add_executable(notojs-release notojs-release.cpp)
+target_link_libraries(notojs-release PRIVATE PkgConfig::LIBGIT2)
+
 add_executable(notojs-doc-gen notojs-doc-gen.cpp)
 target_include_directories(notojs-doc-gen PRIVATE
   ${LLVM_INCLUDE_DIRS}
@@ -38,7 +102,7 @@ target_compile_definitions(notojs-doc-gen PRIVATE
 )
 
 target_link_libraries(notojs-doc-gen PRIVATE clang-cpp LLVM notojs yaml-cpp::yaml-cpp)
-add_custom_target(generate)
+add_custom_target(doc-gen)
 
 macro(doc source)
     get_filename_component(source_name ${source} NAME_WE)
@@ -54,17 +118,14 @@ macro(doc source)
     add_custom_command(
         OUTPUT ${target}
         COMMAND $<TARGET_FILE:notojs-doc-gen>
-            --extra-arg-before=-resource-dir
-            --extra-arg-before=${CLANG_RESOURCE_DIR}
-            --extra-arg-before=-isysroot
-            --extra-arg-before=${XCODE_SDK_PATH}
+            ${NOTOJS_DOC_CLANG_ARGS}
             -p ${NOTOJS_BUILD_DIR} ${source}
             --output ${target}
         DEPENDS $<TARGET_FILE:notojs-doc-gen> ${source}
         VERBATIM)
 
     add_custom_target(${source_name}.${source_type} DEPENDS ${target})
-    add_dependencies(generate ${source_name}.${source_type})
+    add_dependencies(doc-gen ${source_name}.${source_type})
 endmacro()
 
 doc(${NOTOJS_DIR}/lib/notojs/global.cpp)

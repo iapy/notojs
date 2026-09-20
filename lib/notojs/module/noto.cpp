@@ -78,6 +78,40 @@ JSCFunctionListEntry const noto::Config::funcs[] = {
     JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Config::toJSON>::invoke)
 };
 
+struct Version : bridge::Interface<Version, std::string>
+{
+    JSValue toString(JSContext *ctx)
+    {
+        return bridge::String(ctx, ref());
+    }
+
+    JSValue major(JSContext *ctx) const
+    {
+        return bridge::Number{ctx, std::atoi(ref().c_str())};
+    }
+
+    JSValue minor(JSContext *ctx) const
+    {
+        return bridge::Number{ctx, std::atoi(ref().c_str() + ref().find_first_of('.') + 1)};
+    }
+
+    JSValue patch(JSContext *ctx) const
+    {
+        return bridge::Number{ctx, std::atoi(ref().c_str() + ref().find_last_of('.') + 1)};
+    }
+
+    using ctor = bridge::Unconstructable<Version>;
+    static JSCFunctionListEntry const funcs[];
+};
+
+JSCFunctionListEntry const Version::funcs[] = {
+    JS_CGETSET_DEF("major", &bridge::Getter<&Version::major>, NULL),
+    JS_CGETSET_DEF("minor", &bridge::Getter<&Version::minor>, NULL),
+    JS_CGETSET_DEF("patch", &bridge::Getter<&Version::patch>, NULL),
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Version::toString>::invoke),
+    JS_CFUNC_DEF("toString", 0, &bridge::Function<&Version::toString>::invoke),
+};
+
 struct Cell : bridge::Interface<Cell, bridge::Object>
 {
     using Base::Base;
@@ -496,8 +530,10 @@ int init(JSContext *ctx, JSModuleDef *m)
         JS_SetModuleExport(ctx, m, "config", noto::Config::from(ctx, ""));
     }
     Notebook::init(ctx, m);
+    Version::init(ctx, m);
     Output::init(ctx, m);
     Cell::init(ctx, m);
+    JS_SetModuleExport(ctx, m, "version", Version::from(ctx, NOTOJS_VERSION));
     return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
 }
 
@@ -507,6 +543,7 @@ void notojs_init_noto()
 {
     if(cfg) noto::Config::init();
     Notebook::init();
+    Version::init();
     Output::init();
     Cell::init();
 }
@@ -515,6 +552,7 @@ void notojs_init_noto(JSRuntime *rt)
 {
     if(cfg) noto::Config::init(rt);
     Notebook::init(rt);
+    Version::init(rt);
     Output::init(rt);
     Cell::init(rt);
 }
@@ -531,8 +569,10 @@ JSModuleDef *notojs_init_noto(JSContext *ctx, const char *name)
 
     JS_AddModuleExportList(ctx, mod, func, sizeof(func)/sizeof(func[0]));
     if(cfg) JS_AddModuleExport(ctx, mod, "config");
+    JS_AddModuleExport(ctx, mod, "version");
     JS_AddModuleExport(ctx, mod, noto::Config::name());
     JS_AddModuleExport(ctx, mod, Notebook::name());
+    JS_AddModuleExport(ctx, mod, Version::name());
     JS_AddModuleExport(ctx, mod, Output::name());
     JS_AddModuleExport(ctx, mod, Cell::name());
     return mod;

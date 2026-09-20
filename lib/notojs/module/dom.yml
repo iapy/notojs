@@ -701,7 +701,7 @@ methods:
   getNamedItem:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: NamedNodeMap.getNamedItem
     text: |-
       Returns the `Attr` node whose name matches `arg0` or `null` if no such node exists.
@@ -715,7 +715,7 @@ methods:
   removeNamedItem:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: NamedNodeMap.removeNamedItem
     text: |-
       Removes and returns the `Attr` node whose name matches `arg0`.
@@ -761,7 +761,7 @@ methods:
   getNamedItem:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: HTMLNamedNodeMap.getNamedItem
     text: |-
       Returns the `Attr` node whose name matches `arg0` or `null` if no such node exists.
@@ -785,7 +785,7 @@ methods:
   removeNamedItem:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: HTMLNamedNodeMap.removeNamedItem
     text: |-
       Removes and returns the `Attr` node whose name matches `arg0`.
@@ -1541,14 +1541,14 @@ methods:
   getAttribute:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: Element.getAttribute
     text: |-
       Returns the value of the specified attribute or `null` if the attribute does not exist.
   getAttributeNode:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: Element.getAttributeNode
     text: |-
       Returns the specified attribute of `this` `Element`, as an `Attr` node or null if attribute does not exist.
@@ -1564,7 +1564,7 @@ methods:
   hasAttribute:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: Element.hasAttribute
     text: |-
       Returns `true` if `this` `Element` has an attribute `arg0` or `false` otherwise.
@@ -1653,7 +1653,7 @@ methods:
   removeAttribute:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: Element.removeAttribute
     text: |-
       Removes the attribute named `arg0`.
@@ -1689,7 +1689,7 @@ methods:
   setAttribute:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
         - Any
     docs: Element.setAttribute
     text: |-
@@ -1723,9 +1723,9 @@ methods:
   toggleAttribute:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
         - Boolean
     docs: Element.toggleAttribute
     text: |-
@@ -2406,7 +2406,7 @@ methods:
   getAttributeNode:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: HTMLElement.getAttributeNode
     text: |-
       Returns the specified attribute of `this` `HTMLElement`, as an `Attr` node or `null` if the attribute does not exist.
@@ -2583,7 +2583,7 @@ methods:
         - String
       -
         - String
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: HTMLElement.removeAttributeNS
     text: |-
       Removes the specified namespaced attribute.
@@ -3991,7 +3991,7 @@ methods:
   getAttributeNode:
     args:
       -
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: SVGElement.getAttributeNode
     text: |-
       Reflects the `<>` element's `getAttributeNode` attribute.
@@ -4140,7 +4140,7 @@ methods:
         - String
       -
         - String
-        - (anonymous namespace)::Attr::Name
+        - Attr::Name
     docs: SVGElement.removeAttributeNS
     text: |-
       Reflects the `<>` element's `removeAttributeNS` attribute.

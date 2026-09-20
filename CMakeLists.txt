@@ -27,6 +27,7 @@ endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/sdk ${CMAKE_SOURCE_DIR}/lib ${Boost_INCLUDE_DIRS})
 set(CMAKE_CXX_FLAGS_RELEASE "-O2" CACHE STRING "Release flags" FORCE)
+include(${PROJECT_SOURCE_DIR}/app/version.cmake)
 
 add_subdirectory(app)
 add_subdirectory(ext)

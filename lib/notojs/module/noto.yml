@@ -1,10 +1,12 @@
 |-
-  `noto:noto` provides access to the **NotoJS** runtime configuration, notebook
-  execution, application URLs, and package resolver configuration.
+  `noto:noto` provides access to the **NotoJS** runtime configuration and version,
+  notebook execution, application URLs, and package resolver configuration.
 
   ###### Exports
   - `config`
+  - `version`
   - `class Config`
+  - `class Version`
   - `class Cell`
   - `class Output`
   - `class Notebook`
@@ -43,6 +45,59 @@ methods:
 
       This method is available only on the top-level `config` object. Throws
       `TypeError` when called on a nested configuration section.
+---
+class: Version
+docs: Version
+text: |-
+  Represents the version of the running **NotoJS** runtime.
+
+  The current version is exported as `version`. Its read-only `major`, `minor`,
+  and `patch` properties expose the numeric components of the version string.
+  `Version` objects cannot be constructed directly.
+
+  ```js
+  import { version } from 'noto:noto';
+
+  const text = version.toString();
+  const { major, minor, patch } = version;
+  const json = JSON.stringify({ version });
+  ```
+properties:
+  major:
+    getter: true
+    docs: Version.major
+    text: |-
+      Returns the major version component as a `Number`. This property is read-only.
+  minor:
+    getter: true
+    docs: Version.minor
+    text: |-
+      Returns the minor version component as a `Number`. This property is read-only.
+  patch:
+    getter: true
+    docs: Version.patch
+    text: |-
+      Returns the patch version component as a `Number`. This property is read-only.
+methods:
+  toJSON:
+    args:
+      -
+        []
+    docs: Version.toJSON
+    text: |-
+      Returns the runtime version as a `String`, equivalent to `toString()`.
+
+      Called automatically by `JSON.stringify()`. The version is serialized as
+      a string, not an object containing the individual version components.
+  toString:
+    args:
+      -
+        []
+    docs: Version.toString
+    text: |-
+      Returns the full runtime version string, such as `"0.4.0"`.
+
+      This is the version embedded when **NotoJS** was built.
 ---
 class: Cell
 docs: Cell

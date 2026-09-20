@@ -21,10 +21,18 @@ bool Config::kernel(int argc, char **argv)
 
 int Config::main(int argc, char **argv)
 {
-    if(!kernel_ && argc != 2)
+    if(!kernel_)
     {
-        std::cerr << "Usage: " << argv[0] << " config [--kernel]\n";
-        return EXIT_FAILURE;
+        if(argc != 2)
+        {
+            std::cerr << "Usage: " << argv[0] << " --version|config [--kernel]\n";
+            return EXIT_FAILURE;
+        }
+        else if(!strcmp(argv[1], "--version"))
+        {
+            std::cerr << NOTOJS_VERSION << '\n';
+            return EXIT_SUCCESS;
+        }
     }
 
     config = std::filesystem::absolute(argv[1]);

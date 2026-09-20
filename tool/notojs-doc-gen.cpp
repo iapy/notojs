@@ -204,11 +204,10 @@ public:
             forEachDescendant(
                 typeAliasDecl(
                     hasName("ctor"),
-                    hasTypeLoc(
-                        loc(templateSpecializationType(
-                            hasDeclaration(
-                                namedDecl(hasName("bridge::Constructor"))
-                            ))))
+                    // Qualified aliases have an ElaboratedType wrapper before Clang 22.
+                    hasType(hasUnqualifiedDesugaredType(recordType(
+                        hasDeclaration(namedDecl(hasName("bridge::Constructor")))
+                    )))
                 ).bind(names[1]))
         ).bind(names[0]), this);
     }
@@ -260,11 +259,9 @@ public:
             forEachDescendant(
                 typeAliasDecl(
                     hasName("ctor"),
-                    hasTypeLoc(
-                        loc(templateSpecializationType(
-                            hasDeclaration(
-                                namedDecl(hasName("bridge::Unconstructable"))
-                            ))))
+                    hasType(hasUnqualifiedDesugaredType(recordType(
+                        hasDeclaration(namedDecl(hasName("bridge::Unconstructable")))
+                    )))
                 ))
         ).bind(names[0]), this);
     }
@@ -542,11 +539,9 @@ public:
             forEachDescendant(
                 typeAliasDecl(
                     hasName("impl"),
-                    hasTypeLoc(
-                        loc(templateSpecializationType(
-                            hasDeclaration(
-                                namedDecl(hasName("bridge::Implements"))
-                            ))))
+                    hasType(hasUnqualifiedDesugaredType(recordType(
+                        hasDeclaration(namedDecl(hasName("bridge::Implements")))
+                    )))
                 ).bind(names[1]))
         ).bind(names[0]), this);
     }
@@ -808,9 +803,6 @@ int main(int argc, const char** argv)
 
     Tool.appendArgumentsAdjuster(
         clang::tooling::getInsertArgumentAdjuster("-Wno-everything"));
-
-    Tool.appendArgumentsAdjuster(
-        clang::tooling::getInsertArgumentAdjuster("-stdlib=libc++"));
 
     const auto& sources = OptionsParser.getSourcePathList();
     if(1 != sources.size())
