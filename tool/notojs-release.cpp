@@ -314,6 +314,12 @@ void release(char const *path, std::size_t component)
     auto const previous = version[2].str();
     auto const github = find_github_branch(repo.get());
     require_new_tag(repo.get(), "refs/tags/v" + next);
+
+    std::cout << "Release v" << next << "? " << std::flush;
+    std::string confirmation;
+    if(!std::getline(std::cin, confirmation) || confirmation != "yes")
+        throw std::runtime_error("Release cancelled: confirmation must be exactly 'yes'");
+
     contents.replace(version.position(2), version.length(2), next);
 
     std::ofstream output(file, std::ios::binary | std::ios::trunc);

@@ -391,16 +391,17 @@ struct Database : bridge::Interface<Database, std::vector<std::string>>
     struct Name : bridge::String
     {
         using bridge::String::String;
-        bool valid(std::string &message)
+        static bool check(JSContext *ctx, JSValue *value)
         {
-            auto const &data = static_cast<std::string_view const &>(*this);
-            message = data;
+            if(!bridge::String::check(ctx, value)) return false;
+            Name name(ctx, *value);
+            auto const &data = static_cast<std::string_view const &>(name);
 
             if(data.empty()) return false;
             if(data[0] == ':') return false;
             for(std::size_t i = 0; i < data.size(); ++i)
             {
-                if(!std::isalpha(data[i]) && (data[i] != ':' || data[i - 1] == ':' || i == (data.size() - 1)))
+                if(!std::isalpha(static_cast<unsigned char>(data[i])) && (data[i] != ':' || data[i - 1] == ':' || i == (data.size() - 1)))
                     return false;
             }
             return data.substr(0,4) != "sys:";
@@ -482,7 +483,12 @@ struct System : bridge::Interface<System, std::pair<DB::Namespace, std::string>>
     struct Name : bridge::String
     {
         using bridge::String::String;
-        std::optional<DB::Namespace> valid(std::string &message)
+        static bool check(JSContext *ctx, JSValue *value)
+        {
+            return bridge::String::check(ctx, value) && Name(ctx, *value).type().has_value();
+        }
+
+        std::optional<DB::Namespace> type() const
         {
             auto const prefix = static_cast<std::string_view const &>(*this).substr(0,4);
             if("sys:" == prefix) return DB::SYS;
@@ -843,31 +849,22 @@ JSValue backup(JSContext *ctx, fs::facade::Path path)
     return JS_UNDEFINED;
 }
 
-JSValue open(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv)
+JSValue open_0(JSContext *ctx, System::Name name)
 {
-    std::string message;
-    std::vector<std::string> names;
-    for(int i = 0; i < argc; ++i)
-    {
-        if(!i && 1 == argc && System::Name::check(ctx, argv)) {
-            auto name = System::Name(ctx, *argv);
-            if(auto type = name.valid(message)) {
-                if("sys:errorlog" == static_cast<std::string_view const &>(name))
-                    return ErrorLog::from(ctx, {*type, static_cast<std::string>(name).substr(4)});
-                else if("sys:httpdata" == static_cast<std::string_view const &>(name))
-                    return HTTPData::from(ctx, {*type, static_cast<std::string>(name).substr(4)});
-                return System::from(ctx, {*type, static_cast<std::string>(name).substr(4)});
-            }
-        }
-        if(!Database::Name::check(ctx, argv + i))
-            return JS_ThrowTypeError(ctx, "No matching function overload found");
-        if(auto name = Database::Name(ctx, argv[i]); !name.valid(message))
-            return JS_ThrowTypeError(ctx, "Invalid database name: [%s]", message.c_str());
-        else names.push_back(static_cast<std::string>(name));
-    }
-    if(names.empty())
-        return JS_ThrowTypeError(ctx, "No matching function overload found");
+    auto const type = *name.type();
+    if("sys:errorlog" == static_cast<std::string_view const &>(name))
+        return ErrorLog::from(ctx, {type, static_cast<std::string>(name).substr(4)});
+    if("sys:httpdata" == static_cast<std::string_view const &>(name))
+        return HTTPData::from(ctx, {type, static_cast<std::string>(name).substr(4)});
+    return System::from(ctx, {type, static_cast<std::string>(name).substr(4)});
+}
 
+JSValue open_1(JSContext *ctx, bridge::Tail<1, Database::Name> args)
+{
+    std::vector<std::string> names;
+    names.reserve(args.size());
+    for(std::size_t i = 0; i < args.size(); ++i)
+        names.push_back(static_cast<std::string>(args[i]));
     return Database::from(ctx, std::move(names));
 }
 
@@ -889,20 +886,22 @@ JSValue stat(JSContext *ctx)
     return mkstat(ctx, res);
 }
 
+using open = bridge::Function<open_0, open_1>;
+
 JSCFunctionListEntry func[] = {
     JS_CFUNC_DEF("backup", 1, &bridge::Function<backup>::invoke),
     JS_CFUNC_DEF("info", 0, &bridge::Function<info>::invoke),
-    JS_CFUNC_DEF("open", 1, &open),
+    JS_CFUNC_DEF("open", 1, &open::invoke),
     JS_CFUNC_DEF("stat", 0, &bridge::Function<stat>::invoke)
 };
 
 int init(JSContext *ctx, JSModuleDef *m)
 {
     DBException::init(ctx, m);
-    Database::init(ctx);
-    System::init(ctx);
-    ErrorLog::init(ctx);
-    HTTPData::init(ctx);
+    Database::init(ctx, m);
+    System::init(ctx, m);
+    ErrorLog::init(ctx, m);
+    HTTPData::init(ctx, m);
     Handle::init(ctx);
     return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
 }
@@ -937,6 +936,10 @@ JSModuleDef *notojs_init_db(JSContext *ctx, const char *name)
     if(!mod) return NULL;
 
     JS_AddModuleExportList(ctx, mod, func, sizeof(func)/sizeof(func[0]));
+    JS_AddModuleExport(ctx, mod, Database::name());
+    JS_AddModuleExport(ctx, mod, System::name());
+    JS_AddModuleExport(ctx, mod, ErrorLog::name());
+    JS_AddModuleExport(ctx, mod, HTTPData::name());
     return mod;
 }
 

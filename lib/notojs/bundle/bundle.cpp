@@ -17,6 +17,7 @@
 #include <fstream>
 #include <sstream>
 #include <thread>
+#include <vector>
 #include <regex>
 #include <map>
 #include <set>
@@ -26,6 +27,7 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+std::map<std::string, std::string> ALIASES;
 std::map<std::string, std::string> RESOURCES;
 std::map<std::string, std::string> const TYPES = {{"truetype", ".ttf"}};
 #endif
@@ -185,6 +187,9 @@ int server(boost::property_tree::ptree const &pt, int argc, char **argv)
     for(auto const &[name, node]: pt.get_child("sources"))
         RESOURCES[name] = node.get_value<std::string>();
 
+    for(auto const &[name, node]: pt.get_child("aliases"))
+        ALIASES[name] = node.get_value<std::string>();;
+
     std::ofstream output(BINARY_DIR / "bundle.cpp");
     output << "#include <string_view>\n";
     output << "#include <string>\n";
@@ -336,12 +341,19 @@ int server(boost::property_tree::ptree const &pt, int argc, char **argv)
             else
             {
                 std::filesystem::copy(path, BINARY_DIR / fn, std::filesystem::copy_options::overwrite_existing);
+                auto args = std::vector<std::string>{
+                    (BINARY_DIR / fn).u8string(),
+                    "--legal-comments=none",
+                    "--bundle",
+                    "--format=esm",
+                    "--minify-syntax",
+                    "--minify-whitespace"
+                };
+                for(auto const &[name, target]: ALIASES)
+                    args.push_back("--alias:" + name + "=./" + target);
+
                 boost::asio::readable_pipe pipe{worker.ctx()};
-                bp::process proc(
-                    worker.ctx(),
-                    (BINARY_DIR / "esbuild").u8string(),
-                    {(BINARY_DIR / fn).u8string(), "--legal-comments=none", "--bundle", "--format=esm", "--alias:acorn=./acorn.js", "--minify-syntax", "--minify-whitespace"},
-                    bp::process_stdio{{}, pipe, {}});
+                bp::process proc(worker.ctx(), (BINARY_DIR / "esbuild").u8string(), args, bp::process_stdio{{}, pipe, {}});
 
                 while (true)
                 {

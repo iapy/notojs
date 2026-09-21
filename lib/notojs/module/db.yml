@@ -183,7 +183,9 @@ defs:
     base: String
     docs: Database.Name
     text: |-
-      Valid database name. Must contain only English letters or `:`, and must not start with `:` or contain `::`.
+      Valid user database name. Must contain only English letters or `:`, must not
+      start or end with `:`, and must not contain `::`. Empty names and names
+      beginning with the reserved `sys:` prefix are rejected.
 properties:
   length:
     getter: true
@@ -236,7 +238,8 @@ defs:
     base: String
     docs: System.Name
     text: |-
-      Used internally, not documented.
+      A system database name beginning with `sys:` or `var:`. Passed as the sole
+      argument to `open()` to select a system database.
 properties:
   stat:
     getter: true
@@ -377,17 +380,21 @@ text: |-
 function: open
 args:
   -
+    - System.Name
+  -
     - Tail:
         - 1
-        - String
+        - Database.Name
+docs: open
 text: |-
-  Creates a `Database` instance.
+  Opens a system database or one or more user databases.
 
-  Accepts a variable number of arguments, each a string representing a database name.
-
-  - If the first argument starts with `sys:` or `var:`, it must be the only argument. In this case, `open` returns:
+  - With one `System.Name` (a string beginning with `sys:` or `var:`), returns:
     - `ErrorLog` for `sys:errorlog`
     - `HTTPData` for `sys:httpdata`
-    - `System` for any other value
-  - Otherwise, all arguments are treated as database names in the `usr:` namespace, validated against `Database.Name`,
-  and `open` returns a `Database` instance.
+    - `System` for any other system database name
+  - Otherwise, accepts one or more `Database.Name` strings in the `usr:` namespace
+    and returns a `Database` instance. Its `length` is the number of names supplied.
+
+  Throws `TypeError` if called without arguments, with non-string arguments, or
+  with an invalid user database name.

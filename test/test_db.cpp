@@ -5,6 +5,56 @@
 
 BOOST_FIXTURE_TEST_SUITE(DB, notojs::testing::Fixture)
 
+BOOST_AUTO_TEST_CASE(ExportedClassesAreNotConstructible)
+{
+    db();
+
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+import { Database, System, ErrorLog, HTTPData } from 'noto:db';
+
+for(const [Type, message] of [
+    [Database, 'Database: no constructor'],
+    [System, 'System: no constructor'],
+    [ErrorLog, 'ErrorLog: no constructor'],
+    [HTTPData, 'HTTPData: no constructor']
+]) {
+    assert(() => throws(() => new Type(), message));
+    assert(() => throws(() => new Type('test'), message));
+    assert(() => throws(() => new Type(1), message));
+    assert(() => throws(() => new Type({}), message));
+}
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(OpenOverloads)
+{
+    db();
+
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+import { open, ErrorLog, HTTPData, System } from 'noto:db';
+
+assert(() => open.length === 1);
+assert(() => open('test').length === 1);
+assert(() => open('test:a', 'test:b', 'test:c').length === 3);
+assert(() => open('sys:errorlog') instanceof ErrorLog);
+assert(() => open('sys:httpdata') instanceof HTTPData);
+assert(() => open('sys:other') instanceof System);
+assert(() => open('var:test') instanceof System);
+assert(() => throws(() => open('test', 1), 'No matching function overload found'));
+assert(() => throws(() => open(null), 'No matching function overload found'));
+assert(() => throws(() => open('test', 'bad::name'), 'No matching function overload found'));
+assert(() => throws(() => open('test', 'sys:errorlog'), 'No matching function overload found'));
+assert(() => throws(() => open('sys:errorlog', 'test'), 'No matching function overload found'));
+assert(() => throws(() => open('sys:errorlog', 'sys:httpdata'), 'No matching function overload found'));
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
 BOOST_AUTO_TEST_CASE(CRUD)
 {
     db();
@@ -15,11 +65,11 @@ import { open } from 'noto:db';
 
 assert(() => throws(() => open(), 'No matching function overload found'));
 assert(() => throws(() => open(1), 'No matching function overload found'));
-assert(() => throws(() => open(''), 'Invalid database name: []'));
-assert(() => throws(() => open(':'), 'Invalid database name: [:]'));
-assert(() => throws(() => open('a::b'), 'Invalid database name: [a::b]'));
-assert(() => throws(() => open('a:b:'), 'Invalid database name: [a:b:]'));
-assert(() => throws(() => open('sys:a', 'b'), 'Invalid database name: [sys:a]'));
+assert(() => throws(() => open(''), 'No matching function overload found'));
+assert(() => throws(() => open(':'), 'No matching function overload found'));
+assert(() => throws(() => open('a::b'), 'No matching function overload found'));
+assert(() => throws(() => open('a:b:'), 'No matching function overload found'));
+assert(() => throws(() => open('sys:a', 'b'), 'No matching function overload found'));
 
 const db = open('test:a', 'test:b');
 assert(() => 2 == db.length);
@@ -72,7 +122,7 @@ db.ro((a, b) => {
 
 db.rw((a, b) => {
     a.set(1, 'foo');
-    b.set(-1, [1,2,3]); 
+    b.set(-1, [1,2,3]);
 });
 
 db.ro((a, b) => {
@@ -433,4 +483,3 @@ db.drop();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-
