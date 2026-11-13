@@ -12,7 +12,6 @@
 
 namespace notojs {
 
-class Config;
 class Folder;
 class Module;
 class Server;
@@ -20,6 +19,9 @@ class SocketBase;
 
 class Global : public Requires<Folder, Module, Server>
 {
+    void configure(detail::Config const &);
+    friend class Config;
+
 public:
     struct Context
     {
@@ -58,13 +60,10 @@ public:
 
     std::unique_ptr<Context> make(JSContext *, JSValue) const;
 
-    void set_agent(std::string &&agent) const;
-    void set_prefix(std::string &&prefix) const;
-
-    static void set_handle(JSContext *ctx, SocketBase &socket);
-private:
-    void configure(detail::Config const &);
-    friend class Config;
+    static void get_context(JSContext *ctx, JSValue &);
+    static void set_context(JSContext *ctx, JSValue);
+    static void set_context(JSContext *ctx, SocketBase &socket);
+    static void set_context(JSContext *ctx, std::string const &, JSValue);
 };
 
 } // namespace notojs

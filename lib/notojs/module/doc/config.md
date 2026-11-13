@@ -40,7 +40,7 @@ suite = /path/to/libdoc.so
   - `agent` — optional user-agent value used by HTTP requests.
   - `prefix` — optional URL prefix for relative `fetch` requests. If omitted, NotoJS uses `http://{server.bind}`.
 - `[folder]`
-  - `path` — required workspace directory. NotoJS creates `app` and `lib` directories inside it if they do not exist.
+  - `path` — optional absolute workspace directory. Defaults to `NotoJS` under the current user's home directory. NotoJS creates the workspace and its `app` and `lib` directories if they do not exist.
   - `lmdb` — optional LMDB map size, for example `250mb` or `2gb`. Default is `10mb`.
 - `[server]`
   - `autocomplete` — optional script URL loaded as a module in the notebook window to provide autocomplete. 
@@ -50,16 +50,13 @@ suite = /path/to/libdoc.so
   - `script` — optional script URL inserted into the notebook window.
   - `log` — optional server log path.
 - `[plugin]`
-  - `path` — directory containing plugin shared libraries. Defaults to `/usr/local/lib/notojs/plugins`.
-- `[plugin.NAME]`
+  - `path` — optional directory containing plugin shared libraries. If omitted, no server plugins are loaded. The generated configuration sets it to `{prefix}/lib/notojs/plugin`.
+- `[plugin:NAME]`
   - Enables a plugin named `NAME`. NotoJS loads `{plugin.path}/NAME.so` and calls its `notojs_plugin` entry point.
 - `[module:doc]`
   - `suite` — optional documentation suite shared library used by `noto:doc`.
-- `[timers]`
-  - Entries schedule `.notojs` notebooks to run periodically. Keys must use `Nm` format where `N` divides 60, for example `5m = cleanup.notojs`.
 
 ###### See also
 - `doc('topic:api:cpp')`
 - `doc('topic:api:http')`
 - `doc('topic:lmdb')`
-- `doc('topic:timers')`

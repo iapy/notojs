@@ -49,12 +49,9 @@ struct Values
         std::ostream &stream;
     };
 
-    template<typename T, std::size_t I, std::size_t ...Is>
-    static void write(rapidjson::Writer<Values::Writer> &w, T const &tuple, std::index_sequence<I, Is...>)
+    template<typename U>
+    static void write(rapidjson::Writer<Values::Writer> &w, U const &value)
     {
-        auto const &value = std::get<I>(tuple);
-        using U = std::decay_t<decltype(value)>;
-
         if constexpr (std::is_same_v<U, std::thread::id>)
         {
             static std::hash<std::thread::id> hash;
@@ -70,10 +67,12 @@ struct Values
         }
         if constexpr (std::is_integral_v<U>)
         {
-            if constexpr (std::is_unsigned_v<U>)
-                w.Uint64(value);
-            else
+            if constexpr (std::is_same_v<U, bool>)
+                w.Bool(value);
+            else if constexpr (std::is_signed_v<U>)
                 w.Int64(value);
+            else
+                w.Uint64(value);
         }
         if constexpr (std::is_floating_point_v<U>)
         {
@@ -95,6 +94,12 @@ struct Values
             auto const s = value.u8string();
             w.String(s.c_str(), s.size());
         }
+    }
+
+    template<typename T, std::size_t I, std::size_t ...Is>
+    static void write(rapidjson::Writer<Values::Writer> &w, T const &tuple, std::index_sequence<I, Is...>)
+    {
+        write(w, std::get<I>(tuple));
         if constexpr (sizeof...(Is))
         {
             write(w, tuple, std::index_sequence<Is...>{});

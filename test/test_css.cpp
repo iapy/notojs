@@ -527,7 +527,7 @@ BOOST_AUTO_TEST_CASE(styleSheetMutation)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const document = Document.html();
 const style = document.head.appendChild(document.createElement('style'));
@@ -540,14 +540,14 @@ const rules = sheet.cssRules;
 
 assert(() => 1 === rules.length);
 assert(() => 'red' === computed.color);
-assert(() => throws(() => sheet.deleteRule(-1), 'IndexSizeError'));
-assert(() => throws(() => sheet.deleteRule(rules.length), 'IndexSizeError'));
-assert(() => throws(() => sheet.insertRule('.mutation {}', -1), 'IndexSizeError'));
-assert(() => throws(() => sheet.insertRule('.mutation {}', rules.length + 1), 'IndexSizeError'));
+assert(throws(() => sheet.deleteRule(-1), DOMException, 'IndexSizeError'));
+assert(throws(() => sheet.deleteRule(rules.length), DOMException, 'IndexSizeError'));
+assert(throws(() => sheet.insertRule('.mutation {}', -1), DOMException, 'IndexSizeError'));
+assert(throws(() => sheet.insertRule('.mutation {}', rules.length + 1), DOMException, 'IndexSizeError'));
 
 const original = style.textContent;
-assert(() => throws(() => sheet.insertRule(''), 'SyntaxError'));
-assert(() => throws(() => sheet.insertRule('.one {} .two {}'), 'SyntaxError'));
+assert(throws(() => sheet.insertRule(''), DOMException, 'SyntaxError'));
+assert(throws(() => sheet.insertRule('.one {} .two {}'), DOMException, 'SyntaxError'));
 assert(() => original === style.textContent);
 assert(() => 1 === rules.length);
 assert(() => 'red' === computed.color);

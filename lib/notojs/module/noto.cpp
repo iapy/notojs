@@ -1,15 +1,16 @@
 #include <notojs/module/noto.hpp>
 #include <notojs/detail/cellid.hpp>
+#include <notojs/detail/header.hpp>
 #include <notojs/global.hpp>
 #include <notojs/folder.hpp>
 #include <notojs/notojs.hpp>
+#include <notojs/server.hpp>
 
 #include <boost/property_tree/json_parser.hpp>
 #include <rapidjson/document.h>
 #include <bridge.hpp>
 #include <global.hpp>
 #include <module.hpp>
-#include <fstream>
 
 namespace notojs {
 namespace {
@@ -78,45 +79,11 @@ JSCFunctionListEntry const noto::Config::funcs[] = {
     JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Config::toJSON>::invoke)
 };
 
-struct Version : bridge::Interface<Version, std::string>
-{
-    JSValue toString(JSContext *ctx)
-    {
-        return bridge::String(ctx, ref());
-    }
-
-    JSValue major(JSContext *ctx) const
-    {
-        return bridge::Number{ctx, std::atoi(ref().c_str())};
-    }
-
-    JSValue minor(JSContext *ctx) const
-    {
-        return bridge::Number{ctx, std::atoi(ref().c_str() + ref().find_first_of('.') + 1)};
-    }
-
-    JSValue patch(JSContext *ctx) const
-    {
-        return bridge::Number{ctx, std::atoi(ref().c_str() + ref().find_last_of('.') + 1)};
-    }
-
-    using ctor = bridge::Unconstructable<Version>;
-    static JSCFunctionListEntry const funcs[];
-};
-
-JSCFunctionListEntry const Version::funcs[] = {
-    JS_CGETSET_DEF("major", &bridge::Getter<&Version::major>, NULL),
-    JS_CGETSET_DEF("minor", &bridge::Getter<&Version::minor>, NULL),
-    JS_CGETSET_DEF("patch", &bridge::Getter<&Version::patch>, NULL),
-    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Version::toString>::invoke),
-    JS_CFUNC_DEF("toString", 0, &bridge::Function<&Version::toString>::invoke),
-};
-
 struct Cell : bridge::Interface<Cell, bridge::Object>
 {
     using Base::Base;
 
-    struct I : Base::I<I, IPrint>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::Print>
     {
         using Base::Base;
 
@@ -250,7 +217,7 @@ struct Output : bridge::Interface<Output, bridge::Object>
         return JS_UNDEFINED;
     }
 
-    struct I : Base::I<I, IPrint>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::Print>
     {
         using Base::Base;
 
@@ -296,7 +263,7 @@ struct Notebook_
 
     JSValue load(JSContext *ctx, bool html = false)
     {
-        auto url = facade::URL::parse(("noto:/r/" + name + ".notojs").c_str());
+        auto url = NOTOJS_VERSION_NS::URL::parse(("noto:/r/" + name + ".notojs").c_str());
         if(!url) return JS_ThrowInternalError(ctx, "Cannot parse URL");
 
         boost::beast::http::request<boost::beast::http::string_body> request{
@@ -304,9 +271,12 @@ struct Notebook_
             url->path(),
             11
         };
-        if(html) request.set(boost::beast::http::field::accept, "text/html");
+        request.set(boost::beast::http::field::accept, html
+            ? "text/html"
+            : "application/json"
+        );
 
-        return facade::fetch(ctx, std::move(request), std::move(*url), &Notebook_::response);
+        return NOTOJS_VERSION_NS::fetch(ctx, std::move(request), std::move(*url), &Notebook_::response);
     }
 
     static JSValue response(JSContext *ctx, JSValue resp, boost::beast::http::response<boost::beast::http::string_body> const &response)
@@ -355,7 +325,7 @@ struct Notebook_
             }
             else if("text/html" == type)
             {
-                return core::facade::html(ctx, response.body(), false);
+                return NOTOJS_VERSION_NS::core::HTML::make(ctx, response.body(), false);
             }
             return JS_NULL;
         }
@@ -370,6 +340,11 @@ struct Notebook_
 
 struct Notebook : bridge::Interface<Notebook, Notebook_>
 {
+    JSValue get_name(JSContext *ctx) const
+    {
+        return bridge::String(ctx, ref().name);
+    }
+
     struct Format : bridge::detail::Reference
     {
         BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue *value)
@@ -390,23 +365,25 @@ struct Notebook : bridge::Interface<Notebook, Notebook_>
         BRIDGE_DEFINE_STRUCT(ExecOptions);
         static constexpr auto fields = bridge::fields(
             bridge::field<bridge::Either<bridge::Null, Format>>("result"),
-            bridge::field<bridge::Value>("input"),
+            bridge::field<bridge::Value>("context"),
             bridge::field<bridge::Boolean>("update")
         );
     };
 
     JSValue exec_0(JSContext *ctx)
     {
-        auto url = facade::URL::parse(("noto:/r/" + ref().name + ".notojs").c_str());
+        auto url = NOTOJS_VERSION_NS::URL::parse(("noto:/r/" + ref().name + ".notojs").c_str());
         if(!url) return JS_ThrowInternalError(ctx, "Cannot parse URL");
 
         boost::beast::http::request<boost::beast::http::string_body> request{boost::beast::http::verb::post, url->path(), 11};
-        return facade::fetch(ctx, std::move(request), std::move(*url), &Notebook_::response);
+        request.set(boost::beast::http::field::accept, "application/json");
+        request.set(detail::WHEN_BUSY, "new-thread");
+        return NOTOJS_VERSION_NS::fetch(ctx, std::move(request), std::move(*url), &Notebook_::response);
     }
 
     JSValue exec_1(JSContext *ctx, ExecOptions opts)
     {
-        auto url = facade::URL::parse(("noto:/r/" + ref().name + ".notojs").c_str());
+        auto url = NOTOJS_VERSION_NS::URL::parse(("noto:/r/" + ref().name + ".notojs").c_str());
         if(!url) return JS_ThrowInternalError(ctx, "Cannot parse URL");
 
         auto verb = boost::beast::http::verb::post;
@@ -414,11 +391,11 @@ struct Notebook : bridge::Interface<Notebook, Notebook_>
             verb = boost::beast::http::verb::put;
 
         boost::beast::http::request<boost::beast::http::string_body> request{verb, url->path(), 11};
-        if(auto s = opts.get<bridge::String>("input"))
+        if(auto s = opts.get<bridge::String>("context"))
         {
             request.body() = static_cast<std::string>(*s);
         }
-        else if(auto v = opts.get<bridge::Value>("input"))
+        else if(auto v = opts.get<bridge::Value>("context"))
         {
             request.set(boost::beast::http::field::content_type, "application/json");
             request.body() = static_cast<std::string>(v->json());
@@ -427,7 +404,10 @@ struct Notebook : bridge::Interface<Notebook, Notebook_>
             request.set(boost::beast::http::field::prefer, "return=minimal");
         else if(auto v = opts.get<bridge::Value>("result"); v && HTML::ctor(ctx, *v))
             request.set(boost::beast::http::field::accept, "text/html");
-        return facade::fetch(ctx, std::move(request), std::move(*url), &Notebook_::response);
+        else
+            request.set(boost::beast::http::field::accept, "application/json");
+        request.set(detail::WHEN_BUSY, "new-thread");
+        return NOTOJS_VERSION_NS::fetch(ctx, std::move(request), std::move(*url), &Notebook_::response);
     }
 
     using exec = bridge::Function<&Notebook::exec_0, &Notebook::exec_1>;
@@ -453,7 +433,7 @@ struct Notebook : bridge::Interface<Notebook, Notebook_>
 
     using load = bridge::Function<&Notebook::load_0, &Notebook::load_1>;
 
-    struct I : Base::I<I, IPrint>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::Print>
     {
         using Base::Base;
 
@@ -475,8 +455,46 @@ struct Notebook : bridge::Interface<Notebook, Notebook_>
 };
 
 JSCFunctionListEntry const Notebook::funcs[] = {
+    JS_CGETSET_DEF("name", &bridge::Getter<&Notebook::get_name>, NULL),
     JS_CFUNC_DEF("exec", 0, &Notebook::exec::invoke),
     JS_CFUNC_DEF("load", 0, &Notebook::load::invoke)
+};
+
+struct Self : bridge::Interface<Self, bridge::Object>
+{
+    using Base::Base;
+    JSValue get_context(JSContext *ctx) const
+    {
+        JSValue value = JS_UNDEFINED;
+        Global::get_context(ctx, value);
+        return value;
+    }
+
+    void set_context(JSContext *ctx, bridge::Value value)
+    {
+        Global::set_context(ctx, value);
+    }
+
+    JSValue get_name(JSContext *ctx) const
+    {
+        JSValue glob = JS_GetGlobalObject(ctx);
+        JSValue sym = JS_NewSymbol(ctx, "notojs.self.name", true);
+        JSAtom atom = JS_ValueToAtom(ctx, sym);
+        JSValue name = JS_GetProperty(ctx, glob, atom);
+        JS_FreeAtom(ctx, atom);
+        JS_FreeValue(ctx, sym);
+        JS_FreeValue(ctx, glob);
+        return name;
+    }
+
+    static constexpr bool constructible = false;
+    static JSCFunctionListEntry const funcs[];
+    using esab = Notebook;
+};
+
+JSCFunctionListEntry const Self::funcs[] = {
+    JS_CGETSET_DEF("context", &bridge::Getter<&Self::get_context>, &bridge::Setter<&Self::set_context>),
+    JS_CGETSET_DEF("name", &bridge::Getter<&Self::get_name>, NULL)
 };
 
 JSValue notebook(JSContext *ctx, bridge::String name)
@@ -528,11 +546,21 @@ int init(JSContext *ctx, JSModuleDef *m)
     {
         noto::Config::init(ctx, m);
         JS_SetModuleExport(ctx, m, "config", noto::Config::from(ctx, ""));
+        JS_SetModuleExport(ctx, m, "server", cfg->server ? JS_TRUE : JS_FALSE);
+        if(!cfg->server) JS_SetModuleExport(ctx, m, "kernel", JS_NewInt64(ctx, ::getpid()));
     }
+    else
+    {
+        JS_SetModuleExport(ctx, m, "server", JS_FALSE);
+    }
+
     Notebook::init(ctx, m);
-    Version::init(ctx, m);
+    Version::alias(ctx, m);
     Output::init(ctx, m);
     Cell::init(ctx, m);
+    Self::init(ctx);
+
+    JS_SetModuleExport(ctx, m, "default", Self::ctor(ctx));
     JS_SetModuleExport(ctx, m, "version", Version::from(ctx, NOTOJS_VERSION));
     return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
 }
@@ -543,18 +571,18 @@ void notojs_init_noto()
 {
     if(cfg) noto::Config::init();
     Notebook::init();
-    Version::init();
     Output::init();
     Cell::init();
+    Self::init();
 }
 
 void notojs_init_noto(JSRuntime *rt)
 {
     if(cfg) noto::Config::init(rt);
     Notebook::init(rt);
-    Version::init(rt);
     Output::init(rt);
     Cell::init(rt);
+    Self::init(rt);
 }
 
 void notojs_init_noto(detail::Config const &cfg)
@@ -568,8 +596,14 @@ JSModuleDef *notojs_init_noto(JSContext *ctx, const char *name)
     if(!mod) return NULL;
 
     JS_AddModuleExportList(ctx, mod, func, sizeof(func)/sizeof(func[0]));
-    if(cfg) JS_AddModuleExport(ctx, mod, "config");
+    if(cfg)
+    {
+        JS_AddModuleExport(ctx, mod, "config");
+        if(!cfg->server) JS_AddModuleExport(ctx, mod, "kernel");
+    }
+    JS_AddModuleExport(ctx, mod, "server");
     JS_AddModuleExport(ctx, mod, "version");
+    JS_AddModuleExport(ctx, mod, "default");
     JS_AddModuleExport(ctx, mod, noto::Config::name());
     JS_AddModuleExport(ctx, mod, Notebook::name());
     JS_AddModuleExport(ctx, mod, Version::name());

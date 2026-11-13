@@ -182,10 +182,10 @@ struct SVGSVGElement : bridge::Interface<SVGSVGElement, dom::SVGElement, SVGElem
     SVGSVGElement(JSContext *ctx, JSValue self) : Base{ctx, self} {}
     SVGSVGElement(std::reference_wrapper<dom::HTMLElement> &&rw) : Base(std::move(rw)) {}
 
-    struct I : Base::I<I, SVG::Interface>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::core::SVG>
     {
         using Base::Base;
-        std::string get() const override
+        std::string data() const override
         {
             return ref.toString();
         }

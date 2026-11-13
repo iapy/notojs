@@ -22,10 +22,8 @@
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
 
-#include <iostream>
 #include <thread>
 #include <chrono>
-#include <utility>
 
 namespace notojs {
 
@@ -219,29 +217,54 @@ private:
 
 } // namespace
 
-void Router::jsexec(std::shared_ptr<Handle> handle, Engine const &engine, boost::asio::thread_pool &pool, detail::Textcode &&code, Flag flag) const
+template<typename F>
+void Router::enqueue(std::shared_ptr<Handle> handle, boost::asio::thread_pool &pool, F &&fn)
 {
-    boost::asio::post(pool, [this, flag, handle, &engine, code=std::move(code)]() mutable {
+    auto const threads = boost::asio::query(pool.get_executor(), boost::asio::execution::occupancy);
+    auto const created = created_threads_.fetch_add(1, std::memory_order_relaxed) + 1;
+    auto const outstanding = outstanding_jobs_.fetch_add(1, std::memory_order_relaxed) + 1;
+    if(outstanding > threads && created < (threads << 2) && std::invoke([&handle]{
+        auto const it = handle->parser.get().find(detail::WHEN_BUSY);
+        return it != handle->parser.get().end() && "new-thread" == it->value();
+    }))
+    {
+        outstanding_jobs_.fetch_sub(1, std::memory_order_relaxed);
+        std::thread([this, fn=std::move(fn)]() mutable {
+            boost::asio::post(*get<Server>().disk, [t=std::this_thread::get_id()]{
+                std::clog << "Forked" << notojs::values(t);
+            });
+            fn();
+            created_threads_.fetch_sub(1, std::memory_order_relaxed);
+            boost::asio::post(*get<Server>().disk, [t=std::this_thread::get_id()]{
+                std::clog << "Killed" << notojs::values(t);
+            });
+        }).detach();
+    }
+    else
+    {
+        created_threads_.fetch_sub(1, std::memory_order_relaxed);
+        boost::asio::post(pool, [this, fn=std::move(fn)]() mutable {
+            fn();
+            outstanding_jobs_.fetch_sub(1, std::memory_order_relaxed);
+        });
+    }
+}
+
+void Router::jsexec(std::shared_ptr<Handle> handle, Engine const &engine, boost::asio::thread_pool &pool, detail::Textcode &&code, std::string &&name, Flag flag)
+{
+    enqueue(handle, pool, [this, flag, handle, &engine, code=std::move(code), name=std::move(name)]() mutable {
         auto const ts = std::chrono::system_clock::now();
         bridge::Context ctx{engine.get_context()};
 
-        auto const it = handle->parser.get().find(boost::beast::http::field::prefer);
-        flag.skip = it != handle->parser.get().end() && "return=minimal" == it->value();
-
         if(auto const &body = handle->parser.get().body(); !body.empty())
         {
-            JSValue glob = JS_GetGlobalObject(ctx.get());
             if(auto it = handle->parser.get().find(boost::beast::http::field::content_type);
                 it != handle->parser.get().end() && "application/json" == it->value())
-            {
-                JS_SetPropertyStr(ctx.get(), glob, "input", JS_ParseJSON(ctx.get(), body.c_str(), body.size(), "<input>"));
-            }
+                Global::set_context(ctx.get(), name, JS_ParseJSON(ctx.get(), body.c_str(), body.size(), "<context>"));
             else
-            {
-                JS_SetPropertyStr(ctx.get(), glob, "input", JS_NewStringLen(ctx.get(), body.c_str(), body.size()));
-            }
-            JS_FreeValue(ctx.get(), glob);
+                Global::set_context(ctx.get(), name, JS_NewStringLen(ctx.get(), body.c_str(), body.size()));
         }
+        else Global::set_context(ctx.get(), name, JS_UNDEFINED);
 
         std::unordered_set<std::string> render;
         Writer global{handle->response.body()};
@@ -298,40 +321,38 @@ void Router::jsexec(std::shared_ptr<Handle> handle, Engine const &engine, boost:
     if(auto it = params.find("pid"); it != params.end())
         pid = (*it).value;
 
-    if(!pid || !wid || !get<Window>().jsexec(handle, *wid, *pid))
-    {
-        boost::asio::post(pool, [handle, &engine]{
-            handle->response.set(boost::beast::http::field::content_type, "application/json");
+    if(!pid || !wid || !get<Window>().jsexec(handle, *wid, *pid)) enqueue(handle, pool, [handle, &engine]{
+        handle->response.set(boost::beast::http::field::content_type, "application/json");
 
-            Writer writer{handle->response.body()};
-            auto const ts = std::chrono::system_clock::now();
+        Writer writer{handle->response.body()};
+        auto const ts = std::chrono::system_clock::now();
 
-            Engine::preprocess(handle->parser.get().body());
-            handle->response.result(engine.eval(handle->parser.get().body(), writer));
+        Engine::preprocess(handle->parser.get().body());
+        handle->response.result(engine.eval(handle->parser.get().body(), writer));
 
-            set_headers(*handle, std::this_thread::get_id(), std::chrono::system_clock::now() - ts);
-            handle->finish();
-        });
-    }
+        set_headers(*handle, std::this_thread::get_id(), std::chrono::system_clock::now() - ts);
+        handle->finish();
+    });
 }
 
-void Router::jsexec(std::shared_ptr<Handle> handle, Engine const &engine, boost::asio::thread_pool &pool, detail::Version &&version, std::string &&name, std::string &&path)
+void Router::jsexec(std::shared_ptr<Handle> handle, Engine const &engine, boost::asio::thread_pool &pool, detail::Version &&version, std::string &&stem, std::string &&name, std::string &&path)
 {
     if(auto const p = handle->parser.get().target().find_first_of('?'); p != std::string::npos)
         handle->parser.get().target(std::move(path) + std::string(handle->parser.get().target().substr(p)));
     else handle->parser.get().target(std::move(path));
 
-    boost::asio::post(pool, [handle, version=std::move(version), &engine, name=std::move(name), this]() mutable {
+    enqueue(handle, pool, [handle, version=std::move(version), &engine, name=std::move(name), stem=std::move(stem), this]() {
         auto [it, id, ts] = get<Cacher>().cache(applications, version, name);
         if(it != std::end(applications))
         {
             bridge::Context ctx{engine.get_context()};
+            Global::set_context(ctx.get(), stem, JS_UNDEFINED);
 
             Silent::Output error;
             for(std::size_t i = 0; i < it->second.code->size(); ++i)
             {
                 Silent w{error};
-                if(i == it->second.code->size() - 1) Global::set_handle(ctx.get(), *handle);
+                if(i == it->second.code->size() - 1) Global::set_context(ctx.get(), *handle);
                 if(engine.eval(it->second.code->at(i), w, ctx.get(), detail::cell_id(i)); error)
                 {
                     handle->response.result(boost::beast::http::status::internal_server_error);
@@ -600,11 +621,7 @@ void Router::route(std::shared_ptr<Handle> handle, Engine &engine, boost::asio::
     std::string_view const *body = nullptr;
 
     handle->response.set(boost::beast::http::field::server, "boost:beast");
-    if(auto url = boost::urls::parse_relative_ref(handle->parser.get().target()); !url)
-    {
-        handle->response.result(boost::beast::http::status::bad_request);
-    }
-    else
+    if(auto url = boost::urls::parse_relative_ref(handle->parser.get().target()))
     {
         std::string tail;
         std::size_t const path = router.find(url->path(), tail);
@@ -616,6 +633,8 @@ void Router::route(std::shared_ptr<Handle> handle, Engine &engine, boost::asio::
             {
             case boost::beast::http::verb::get:
                 body = &window_;
+                break;
+            case boost::beast::http::verb::head:
                 break;
             case boost::beast::http::verb::post:
                 jsexec(std::move(handle), engine, pool, *url);
@@ -641,7 +660,7 @@ void Router::route(std::shared_ptr<Handle> handle, Engine &engine, boost::asio::
                     else
                     {
                         handle->response.result(boost::beast::http::status::method_not_allowed);
-                        jsexec(std::move(handle), engine, pool, std::move(*version), std::move(name), "/" + part[1]);
+                        jsexec(std::move(handle), engine, pool, std::move(*version), std::move(part[0]), std::move(name), "/" + part[1]);
                     }
                 });
                 return;
@@ -764,11 +783,25 @@ void Router::route(std::shared_ptr<Handle> handle, Engine &engine, boost::asio::
         case router["/api/v1/result/"]:
         case router["/r/"]:
             {
-                auto it = handle->parser.get().find(boost::beast::http::field::accept);
-                Flag flag{
-                    .html = (it != handle->parser.get().end() && "text/html" == it->value()),
-                    .json = (it == handle->parser.get().end() || "application/json" == it->value() || "*/*" == it->value())
-                };
+                auto const at = handle->parser.get().find(boost::beast::http::field::accept);
+                auto const pt = handle->parser.get().find(boost::beast::http::field::prefer);
+
+                Flag flag;
+                flag.skip = pt != handle->parser.get().end() && "return=minimal" == pt->value();
+                if(at != handle->parser.get().end())
+                {
+                    flag.html = "text/html" == at->value();
+                    flag.json = "application/json" == at->value();
+                }
+                if(flag.none())
+                {
+                    if(boost::beast::http::verb::get == handle->parser.get().method())
+                    {
+                        if(auto st = handle->parser.get().find(boost::beast::http::field::sec_fetch_mode); st != handle->parser.get().end())
+                            flag.json = !(flag.html = "navigate" == st->value());
+                    }
+                }
+
                 switch(handle->parser.get().method())
                 {
                 case boost::beast::http::verb::get:
@@ -801,7 +834,7 @@ void Router::route(std::shared_ptr<Handle> handle, Engine &engine, boost::asio::
                         boost::asio::post(*get<Server>().disk, [this, flag, &pool, tail=std::move(tail), &engine, handle=std::move(handle)]{
                             if(auto code = get<Folder>().load<detail::Textcode>(tail); code)
                             {
-                                jsexec(handle, engine, pool, std::move(*code), flag);
+                                jsexec(handle, engine, pool, std::move(*code), std::filesystem::path(tail).stem(), flag);
                             }
                             else
                             {
@@ -872,6 +905,7 @@ void Router::route(std::shared_ptr<Handle> handle, Engine &engine, boost::asio::
             }
         }
     }
+    else handle->response.result(boost::beast::http::status::bad_request);
     handle->response.prepare_payload();
     handle->finish(body);
 }

@@ -4,7 +4,6 @@
 #include <variant>
 #include <vector>
 
-#include <bridge.hpp>
 #include <global.hpp>
 #include <module.hpp>
 #include <notodb.hpp>
@@ -15,10 +14,14 @@
 namespace notojs {
 namespace {
 
+std::unordered_map<std::string, std::unique_ptr<NOTOJS_VERSION_NS::db::Interface_ const>> specific;
+
 class DBException : public bridge::Exception<DBException>
 {
     std::variant<std::error_code, std::reference_wrapper<std::string_view const>, std::runtime_error> ec;
 public:
+    static constexpr std::string_view TRANSACTION{"Transaction was closed"};
+
     DBException(std::error_code &&ec): ec{ec} {}
     DBException(std::string_view const &ec): ec{ec} {}
     DBException(std::runtime_error const &ec): ec{ec} {}
@@ -39,12 +42,6 @@ public:
     }
 };
 
-struct Handle_
-{
-    lmdb::txn *tx{nullptr};
-    lmdb::dbi *db{nullptr};
-};
-
 JSValue mkstat(JSContext *ctx, MDB_stat res)
 {
     bridge::Object obj{ctx};
@@ -57,22 +54,20 @@ JSValue mkstat(JSContext *ctx, MDB_stat res)
     return obj;
 }
 
-struct Handle : bridge::Interface<Handle, Handle_>
+struct Handle : bridge::Interface<Handle, NOTOJS_VERSION_NS::db::Handle::type>
 {
-    BOOST_FORCEINLINE static Handle_ &wrapped(JSValue value)
+    BOOST_FORCEINLINE static NOTOJS_VERSION_NS::db::Handle::type &wrapped(JSValue value)
     {
         return Base::get(value);
     }
 
-    static constexpr std::string_view ERROR{"Transaction is finished"};
-
     template<typename K>
     JSValue del_(JSContext *ctx, K k)
     {
-        if(!ref().db) return DBException::throw_(ctx, ERROR);
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
         lmdb::val key;
-        DB::Allocator ka;
-        DB::set(key, k, ka);
+        NOTOJS_VERSION_NS::db::Allocator ka;
+        NOTOJS_VERSION_NS::db::set(key, k, ka);
         try {
             return ref().db->del(*ref().tx, key) ? JS_TRUE : JS_FALSE;
         } catch(std::runtime_error const &e) {
@@ -89,13 +84,13 @@ struct Handle : bridge::Interface<Handle, Handle_>
     template<typename K>
     JSValue get_(JSContext *ctx, K k)
     {
-        if(!ref().db) return DBException::throw_(ctx, ERROR);
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
         lmdb::val key;
-        DB::Allocator ka;
-        DB::set(key, k, ka);
+        NOTOJS_VERSION_NS::db::Allocator ka;
+        NOTOJS_VERSION_NS::db::set(key, k, ka);
         try {
             if(lmdb::val v; ref().db->get(*ref().tx, key, v))
-                return DB::get(ctx, v);
+                return NOTOJS_VERSION_NS::db::get(ctx, v);
             return JS_NULL;
         } catch(std::runtime_error const &e) {
             return DBException::throw_(ctx, e);
@@ -111,10 +106,10 @@ struct Handle : bridge::Interface<Handle, Handle_>
     template<typename K>
     JSValue has_(JSContext *ctx, K k)
     {
-        if(!ref().db) return DBException::throw_(ctx, ERROR);
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
         lmdb::val key;
-        DB::Allocator ka;
-        DB::set(key, k, ka);
+        NOTOJS_VERSION_NS::db::Allocator ka;
+        NOTOJS_VERSION_NS::db::set(key, k, ka);
         try {
             lmdb::val v;
             return ref().db->get(*ref().tx, key, v) ? JS_TRUE : JS_FALSE;
@@ -132,14 +127,14 @@ struct Handle : bridge::Interface<Handle, Handle_>
     template<typename K, typename V>
     JSValue set_(JSContext *ctx, K k, V v)
     {
-        if(!ref().db) return DBException::throw_(ctx, ERROR);
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
         lmdb::val key;
-        DB::Allocator ka;
-        DB::set(key, k, ka);
+        NOTOJS_VERSION_NS::db::Allocator ka;
+        NOTOJS_VERSION_NS::db::set(key, k, ka);
 
         lmdb::val val;
-        DB::Allocator va;
-        DB::set(val, v, va);
+        NOTOJS_VERSION_NS::db::Allocator va;
+        NOTOJS_VERSION_NS::db::set(val, v, va);
         try {
             ref().db->put(*ref().tx, key, val);
             return JS_UNDEFINED;
@@ -157,18 +152,18 @@ struct Handle : bridge::Interface<Handle, Handle_>
     >;
 
     std::optional<JSValue> range_(JSContext *ctx, bridge::Array &range,
-        lmdb::val &b, DB::Allocator &ba,
-        lmdb::val &e, DB::Allocator &ea)
+        lmdb::val &b, NOTOJS_VERSION_NS::db::Allocator &ba,
+        lmdb::val &e, NOTOJS_VERSION_NS::db::Allocator &ea)
     {
         if(auto v = range[0]; bridge::Number::check(ctx, +v))
         {
             bridge::Number n(ctx, v);
-            DB::set(b, n, ba);
+            NOTOJS_VERSION_NS::db::set(b, n, ba);
         }
         else if(bridge::String::check(ctx, +v))
         {
             auto &s = ba.emplace<2>(ctx, v.release());
-            DB::set(b, s);
+            NOTOJS_VERSION_NS::db::set(b, s);
         }
         else if(!bridge::Null::check(ctx, +v))
         {
@@ -178,12 +173,12 @@ struct Handle : bridge::Interface<Handle, Handle_>
         if(auto v = range[1]; bridge::Number::check(ctx, +v))
         {
             bridge::Number n(ctx, v);
-            DB::set(e, n, ea);
+            NOTOJS_VERSION_NS::db::set(e, n, ea);
         }
         else if(bridge::String::check(ctx, +v))
         {
             auto &s = ea.emplace<2>(ctx, v.release());
-            DB::set(e, s);
+            NOTOJS_VERSION_NS::db::set(e, s);
         }
         else if(!bridge::Null::check(ctx, +v))
         {
@@ -194,13 +189,13 @@ struct Handle : bridge::Interface<Handle, Handle_>
 
     JSValue each_0(JSContext *ctx, bridge::Lambda lambda)
     {
-        if(!ref().db) return DBException::throw_(ctx, ERROR);
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
         try {
             lmdb::val k, v;
             auto cr = lmdb::cursor::open(*ref().tx, *ref().db);
             if(cr.get(k, v, MDB_FIRST)) do {
-                bridge::Strong<void> jk{ctx, DB::get(ctx, k), false};
-                bridge::Strong<void> jv{ctx, DB::get(ctx, v), false};
+                bridge::Strong<void> jk{ctx, NOTOJS_VERSION_NS::db::get(ctx, k), false};
+                bridge::Strong<void> jv{ctx, NOTOJS_VERSION_NS::db::get(ctx, v), false};
                 if(auto r = lambda(std::array<JSValue, 2>{jk, jv});
                     bridge::Error::check(ctx, +r) || (bridge::Boolean::check(ctx, +r) && !bridge::Boolean(ctx, r)))
                         return r.release();
@@ -213,13 +208,13 @@ struct Handle : bridge::Interface<Handle, Handle_>
 
     JSValue each_1(JSContext *ctx, bridge::Array range, bridge::Lambda lambda)
     {
-        if(!ref().db) return DBException::throw_(ctx, ERROR);
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
         if(range.size() != 2) return JS_ThrowTypeError(ctx, "Expecting array of size 2");
 
-        DB::Allocator ba;
+        NOTOJS_VERSION_NS::db::Allocator ba;
         lmdb::val k{NULL, 0};
 
-        DB::Allocator ea;
+        NOTOJS_VERSION_NS::db::Allocator ea;
         lmdb::val e{NULL, 0};
 
         if(auto err = range_(ctx, range, k, ba, e, ea)) return *err;
@@ -229,8 +224,8 @@ struct Handle : bridge::Interface<Handle, Handle_>
             if(k.data() ? cr.get(k, v, MDB_SET_RANGE) : cr.get(k, v, MDB_FIRST)) do {
                 if(e.data() && mdb_cmp(*ref().tx, *ref().db, k, e) > 0)
                     break;
-                bridge::Strong<void> jk{ctx, DB::get(ctx, k), false};
-                bridge::Strong<void> jv{ctx, DB::get(ctx, v), false};
+                bridge::Strong<void> jk{ctx, NOTOJS_VERSION_NS::db::get(ctx, k), false};
+                bridge::Strong<void> jv{ctx, NOTOJS_VERSION_NS::db::get(ctx, v), false};
                 if(auto r = lambda(std::array<JSValue, 2>{jk, jv});
                     bridge::Error::check(ctx, +r) || (bridge::Boolean::check(ctx, +r) && !bridge::Boolean(ctx, r)))
                         return r.release();
@@ -249,14 +244,14 @@ struct Handle : bridge::Interface<Handle, Handle_>
 
     JSValue map_0(JSContext *ctx, bridge::Lambda lambda)
     {
-        if(!ref().db) return DBException::throw_(ctx, ERROR);
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
         try {
             lmdb::val k, v;
             bridge::Strong<bridge::Array> ret{ctx, bridge::Array{ctx}};
             auto cr = lmdb::cursor::open(*ref().tx, *ref().db);
             if(cr.get(k, v, MDB_FIRST)) do {
-                bridge::Strong<void> jk{ctx, DB::get(ctx, k), false};
-                bridge::Strong<void> jv{ctx, DB::get(ctx, v), false};
+                bridge::Strong<void> jk{ctx, NOTOJS_VERSION_NS::db::get(ctx, k), false};
+                bridge::Strong<void> jv{ctx, NOTOJS_VERSION_NS::db::get(ctx, v), false};
                 if(auto r = lambda(std::array<JSValue, 2>{jk, jv});
                     bridge::Error::check(ctx, +r) || (bridge::Boolean::check(ctx, +r) && !bridge::Boolean(ctx, r)))
                         return r.release();
@@ -270,13 +265,13 @@ struct Handle : bridge::Interface<Handle, Handle_>
 
     JSValue map_1(JSContext *ctx, bridge::Array range, bridge::Lambda lambda)
     {
-        if(!ref().db) return DBException::throw_(ctx, ERROR);
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
         if(range.size() != 2) return JS_ThrowTypeError(ctx, "Expecting array of size 2");
 
-        DB::Allocator ba;
+        NOTOJS_VERSION_NS::db::Allocator ba;
         lmdb::val k{NULL, 0};
 
-        DB::Allocator ea;
+        NOTOJS_VERSION_NS::db::Allocator ea;
         lmdb::val e{NULL, 0};
 
         if(auto err = range_(ctx, range, k, ba, e, ea)) return *err;
@@ -287,8 +282,8 @@ struct Handle : bridge::Interface<Handle, Handle_>
             if(k.data() ? cr.get(k, v, MDB_SET_RANGE) : cr.get(k, v, MDB_FIRST)) do {
                 if(e.data() && mdb_cmp(*ref().tx, *ref().db, k, e) > 0)
                     break;
-                bridge::Strong<void> jk{ctx, DB::get(ctx, k), false};
-                bridge::Strong<void> jv{ctx, DB::get(ctx, v), false};
+                bridge::Strong<void> jk{ctx, NOTOJS_VERSION_NS::db::get(ctx, k), false};
+                bridge::Strong<void> jv{ctx, NOTOJS_VERSION_NS::db::get(ctx, v), false};
                 if(auto r = lambda(std::array<JSValue, 2>{jk, jv});
                     bridge::Error::check(ctx, +r) || (bridge::Boolean::check(ctx, +r) && !bridge::Boolean(ctx, r)))
                         return r.release();
@@ -308,14 +303,14 @@ struct Handle : bridge::Interface<Handle, Handle_>
 
     JSValue reduce_0(JSContext *ctx, bridge::Lambda lambda, bridge::Value acc)
     {
-        if(!ref().db) return DBException::throw_(ctx, ERROR);
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
         try {
             lmdb::val k, v;
             bridge::Strong<void> ret{ctx, acc};
             auto cr = lmdb::cursor::open(*ref().tx, *ref().db);
             if(cr.get(k, v, MDB_FIRST)) do {
-                bridge::Strong<void> jk{ctx, DB::get(ctx, k), false};
-                bridge::Strong<void> jv{ctx, DB::get(ctx, v), false};
+                bridge::Strong<void> jk{ctx, NOTOJS_VERSION_NS::db::get(ctx, k), false};
+                bridge::Strong<void> jv{ctx, NOTOJS_VERSION_NS::db::get(ctx, v), false};
                 if(auto r = lambda(std::array<JSValue, 3>{ret, jk, jv});
                     bridge::Error::check(ctx, +r) || (bridge::Boolean::check(ctx, +r) && !bridge::Boolean(ctx, r)))
                         return r.release();
@@ -329,13 +324,13 @@ struct Handle : bridge::Interface<Handle, Handle_>
 
     JSValue reduce_1(JSContext *ctx, bridge::Array range, bridge::Lambda lambda, bridge::Value acc)
     {
-        if(!ref().db) return DBException::throw_(ctx, ERROR);
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
         if(range.size() != 2) return JS_ThrowTypeError(ctx, "Expecting array of size 2");
 
-        DB::Allocator ba;
+        NOTOJS_VERSION_NS::db::Allocator ba;
         lmdb::val k{NULL, 0};
 
-        DB::Allocator ea;
+        NOTOJS_VERSION_NS::db::Allocator ea;
         lmdb::val e{NULL, 0};
 
         if(auto err = range_(ctx, range, k, ba, e, ea)) return *err;
@@ -346,8 +341,8 @@ struct Handle : bridge::Interface<Handle, Handle_>
             if(k.data() ? cr.get(k, v, MDB_SET_RANGE) : cr.get(k, v, MDB_FIRST)) do {
                 if(e.data() && mdb_cmp(*ref().tx, *ref().db, k, e) > 0)
                     break;
-                bridge::Strong<void> jk{ctx, DB::get(ctx, k), false};
-                bridge::Strong<void> jv{ctx, DB::get(ctx, v), false};
+                bridge::Strong<void> jk{ctx, NOTOJS_VERSION_NS::db::get(ctx, k), false};
+                bridge::Strong<void> jv{ctx, NOTOJS_VERSION_NS::db::get(ctx, v), false};
                 if(auto r = lambda(std::array<JSValue, 3>{ret, jk, jv});
                     bridge::Error::check(ctx, +r) || (bridge::Boolean::check(ctx, +r) && !bridge::Boolean(ctx, r)))
                         return r.release();
@@ -367,11 +362,37 @@ struct Handle : bridge::Interface<Handle, Handle_>
 
     JSValue stat(JSContext *ctx) const
     {
-        if(!ref().db) return DBException::throw_(ctx, ERROR);
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
         return notojs::mkstat(ctx, ref().db->stat(*ref().tx));
     }
 
+    JSValue sym(JSContext *ctx) const
+    {
+        if(!ref().db) return DBException::throw_(ctx, DBException::TRANSACTION);
+        bridge::Strong<bridge::Array> arr{ctx, bridge::Array{ctx}};
+
+        lmdb::val k, v;
+        auto cr = lmdb::cursor::open(*ref().tx, *ref().db);
+        if(cr.get(k, v, MDB_FIRST)) do {
+            bridge::Array item{ctx};
+            item.set(0, NOTOJS_VERSION_NS::db::get(ctx, k));
+            item.set(1, NOTOJS_VERSION_NS::db::get(ctx, v));
+            arr.append(item);
+        } while(cr.get(k, v, MDB_NEXT));
+        return bridge::Strong<bridge::Lambda>{ctx, JS_GetPropertyStr(ctx, arr, "values")}(arr).release();
+    }
+
+    struct I : Base::I<I, NOTOJS_VERSION_NS::db::Handle>
+    {
+        NOTOJS_VERSION_NS::db::Handle::Methods::ref get() const override
+        {
+            return ref;
+        }
+        using Base::Base;
+    };
+
     using ctor = bridge::Unconstructable<Handle>;
+    using impl = bridge::Implements<I>;
     static JSCFunctionListEntry const funcs[];
 };
 
@@ -384,6 +405,7 @@ JSCFunctionListEntry const Handle::funcs[] = {
     JS_CFUNC_DEF("map", 2, &Handle::map::invoke),
     JS_CFUNC_DEF("reduce", 2, &Handle::reduce::invoke),
     JS_CFUNC_DEF("set", 2, &Handle::set::invoke),
+    JS_CFUNC_DEF("[Symbol.iterator]", 0, &bridge::Function<&Handle::sym>::invoke),
 };
 
 struct Database : bridge::Interface<Database, std::vector<std::string>>
@@ -391,20 +413,26 @@ struct Database : bridge::Interface<Database, std::vector<std::string>>
     struct Name : bridge::String
     {
         using bridge::String::String;
+
+        static bool tail(std::string_view const &data)
+        {
+            if(data.empty()) return false;
+            for(std::size_t i = 0; i < data.size(); ++i)
+            {
+                if(!std::isalpha(static_cast<unsigned char>(data[i]))
+                    && (data[i] != ':' || !i || data[i - 1] == ':' || i == data.size() - 1))
+                    return false;
+            }
+            return true;
+        }
+
         static bool check(JSContext *ctx, JSValue *value)
         {
             if(!bridge::String::check(ctx, value)) return false;
             Name name(ctx, *value);
             auto const &data = static_cast<std::string_view const &>(name);
-
-            if(data.empty()) return false;
-            if(data[0] == ':') return false;
-            for(std::size_t i = 0; i < data.size(); ++i)
-            {
-                if(!std::isalpha(static_cast<unsigned char>(data[i])) && (data[i] != ':' || data[i - 1] == ':' || i == (data.size() - 1)))
-                    return false;
-            }
-            return data.substr(0,4) != "sys:";
+            auto const prefix = data.substr(0,4);
+            return tail(data) && prefix != "sys:" && prefix != "var:";
         }
     };
 
@@ -419,13 +447,16 @@ struct Database : bridge::Interface<Database, std::vector<std::string>>
         try {
             auto [tx, db] = DB(ctx).open(a, DB::USR, ref());
             std::vector<JSValue> dbs;
+            dbs.reserve(ref().size());
             std::transform(std::begin(db), std::end(db), std::back_inserter(dbs), [&tx=tx, ctx](auto &db) {
-                return Handle::from(ctx, Handle_{&tx, &db});
+                return Handle::from(ctx, NOTOJS_VERSION_NS::db::Handle::type{&tx, &db});
             });
             detail::Scoped scoped([&]{
                 for(auto &handle : dbs)
                 {
-                    Handle::wrapped(handle).db = nullptr;
+                    auto &native = Handle::wrapped(handle);
+                    native.db = nullptr;
+                    native.tx = nullptr;
                     JS_FreeValue(ctx, handle);
                 }
             });
@@ -478,6 +509,93 @@ JSCFunctionListEntry const Database::funcs[] = {
     JS_CFUNC_DEF("ro", 1, &bridge::Function<&Database::ro>::invoke)
 };
 
+struct Custom : bridge::Interface<Custom, std::vector<std::string>>
+{
+    struct Name : bridge::String
+    {
+        using bridge::String::String;
+        static bool check(JSContext *ctx, JSValue *value)
+        {
+            if(!bridge::String::check(ctx, value)) return false;
+            Name name(ctx, *value);
+
+            auto const &data = static_cast<std::string_view const &>(name);
+            if(data.substr(0, 4) != "var:") return false;
+
+            auto const suffix = data.substr(4);
+            return Database::Name::tail(suffix)
+                && specific.find(std::string{suffix}) != specific.end();
+        }
+    };
+
+    JSValue length(JSContext *ctx) const
+    {
+        return bridge::Number(ctx, static_cast<std::uint64_t>(ref().size()));
+    }
+
+    template<DB::Access a>
+    JSValue tx(JSContext *ctx, bridge::Lambda lambda)
+    {
+        try {
+            auto [tx, db] = DB(ctx).open(a, DB::VAR, ref());
+
+            auto dbs = std::vector<JSValue>{};
+            auto tps = std::vector<NOTOJS_VERSION_NS::db::Interface_ const *>{};
+
+            dbs.reserve(ref().size());
+            tps.reserve(ref().size());
+            for(std::size_t i = 0; i < ref().size(); ++i)
+            {
+                auto const *t = specific.at(ref()[i]).get();
+                auto v = t->from(ctx, NOTOJS_VERSION_NS::db::Handle::type{&tx, &db[i]});
+                dbs.push_back(v);
+                tps.push_back(t);
+            }
+            detail::Scoped scoped([&]{
+                for(std::size_t i = 0; i < dbs.size(); ++i)
+                {
+                    auto &native = tps[i]->from(dbs[i]);
+                    native.tx = nullptr;
+                    native.db = nullptr;
+                    JS_FreeValue(ctx, dbs[i]);
+                }
+            });
+            bridge::Strong<void> res = lambda(dbs);
+            if constexpr (a == DB::RO)
+            {
+                tx.abort();
+            }
+            else
+            {
+                if(JS_IsException(res)) tx.abort();
+                else tx.commit();
+            }
+            return res.release();
+        } catch(std::runtime_error const &e) {
+            return DBException::throw_(ctx, e);
+        }
+    }
+
+    JSValue ro(JSContext *ctx, bridge::Lambda lambda)
+    {
+        return tx<DB::RO>(ctx, lambda);
+    }
+
+    JSValue rw(JSContext *ctx, bridge::Lambda lambda)
+    {
+        return tx<DB::RW>(ctx, lambda);
+    }
+
+    using ctor = bridge::Unconstructable<Custom>;
+    static JSCFunctionListEntry const funcs[];
+};
+
+JSCFunctionListEntry const Custom::funcs[] = {
+    JS_CGETSET_DEF("length", &bridge::Getter<&Custom::length>, NULL),
+    JS_CFUNC_DEF("rw", 1, &bridge::Function<&Custom::rw>::invoke),
+    JS_CFUNC_DEF("ro", 1, &bridge::Function<&Custom::ro>::invoke)
+};
+
 struct System : bridge::Interface<System, std::pair<DB::Namespace, std::string>>
 {
     struct Name : bridge::String
@@ -490,9 +608,12 @@ struct System : bridge::Interface<System, std::pair<DB::Namespace, std::string>>
 
         std::optional<DB::Namespace> type() const
         {
-            auto const prefix = static_cast<std::string_view const &>(*this).substr(0,4);
-            if("sys:" == prefix) return DB::SYS;
-            if("var:" == prefix) return DB::VAR;
+            auto const d = static_cast<std::string_view const &>(*this);
+            auto const p = d.substr(0,4);
+            if("sys:" == p) return DB::SYS;
+            if("var:" == p && std::invoke([&d] {
+                return specific.find(std::string{d.substr(4)}) == specific.end();
+            })) return DB::VAR;
             return std::nullopt;
         }
     };
@@ -555,7 +676,7 @@ struct ErrorLog : bridge::Interface<ErrorLog, std::pair<DB::Namespace, std::stri
                 if(auto const s = ++we - v.data(); s < v.size())
                     obj.set("stack", bridge::String{ctx, std::string_view(we, v.size() - s)});
 
-                obj.set("time", bridge::Number{ctx, DB::db_to_host(*reinterpret_cast<std::uint64_t*>(k.data()))});
+                obj.set("time", bridge::Number{ctx, NOTOJS_VERSION_NS::db::db_to_host(*reinterpret_cast<std::uint64_t*>(k.data()))});
                 arr.append(obj);
             } while(cr.get(k, v, MDB_NEXT));
             cr.close();
@@ -576,7 +697,7 @@ struct ErrorLog : bridge::Interface<ErrorLog, std::pair<DB::Namespace, std::stri
             auto [tx, db] = DB(ctx).open(DB::WT, ref().first, ref().second);
             auto cr = lmdb::cursor::open(tx, db);
             if(cr.get(k, v, MDB_FIRST)) do {
-                if(DB::db_to_host(*reinterpret_cast<std::uint64_t*>(k.data())) > kp) break;
+                if(NOTOJS_VERSION_NS::db::db_to_host(*reinterpret_cast<std::uint64_t*>(k.data())) > kp) break;
                 db.del(tx, k); ++n;
             } while(cr.get(k, v, MDB_NEXT));
             cr.close();
@@ -835,9 +956,9 @@ JSCFunctionListEntry const HTTPData::funcs[] = {
     JS_CFUNC_DEF("drop", 2, &HTTPData::drop::invoke)
 };
 
-JSValue backup(JSContext *ctx, fs::facade::Path path)
+JSValue backup(JSContext *ctx, NOTOJS_VERSION_NS::fs::Path path)
 {
-    if(auto [native, writable] = path->native(); !writable)
+    if(auto [native, flag] = path->native(); flag != NOTOJS_VERSION_NS::fs::Path::RW)
         return DBException::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
     else try {
         if(!std::filesystem::exists(native))
@@ -868,6 +989,15 @@ JSValue open_1(JSContext *ctx, bridge::Tail<1, Database::Name> args)
     return Database::from(ctx, std::move(names));
 }
 
+JSValue open_2(JSContext *ctx, bridge::Tail<1, Custom::Name> args)
+{
+    std::vector<std::string> names;
+    names.reserve(args.size());
+    for(std::size_t i = 0; i < args.size(); ++i)
+        names.push_back(static_cast<std::string>(args[i]).substr(4));
+    return Custom::from(ctx, std::move(names));
+}
+
 JSValue info(JSContext *ctx)
 {
     auto res = DB(ctx).info();
@@ -886,7 +1016,7 @@ JSValue stat(JSContext *ctx)
     return mkstat(ctx, res);
 }
 
-using open = bridge::Function<open_0, open_1>;
+using open = bridge::Function<open_0, open_1, open_2>;
 
 JSCFunctionListEntry func[] = {
     JS_CFUNC_DEF("backup", 1, &bridge::Function<backup>::invoke),
@@ -900,9 +1030,11 @@ int init(JSContext *ctx, JSModuleDef *m)
     DBException::init(ctx, m);
     Database::init(ctx, m);
     System::init(ctx, m);
+    Custom::init(ctx, m);
     ErrorLog::init(ctx, m);
     HTTPData::init(ctx, m);
     Handle::init(ctx);
+    for(auto const &e : specific) e.second->init(ctx);
     return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
 }
 
@@ -910,6 +1042,7 @@ int init(JSContext *ctx, JSModuleDef *m)
 
 void notojs_init_db()
 {
+    Custom::init();
     DBException::init();
     Database::init();
     System::init();
@@ -920,12 +1053,14 @@ void notojs_init_db()
 
 void notojs_init_db(JSRuntime *rt)
 {
+    Custom::init(rt);
     DBException::init(rt);
     Database::init(rt);
     System::init(rt);
     HTTPData::init(rt);
     ErrorLog::init(rt);
     Handle::init(rt);
+    for(auto const &e : specific) e.second->init(rt);
 }
 
 void notojs_init_db(detail::Config const &) {}
@@ -936,11 +1071,39 @@ JSModuleDef *notojs_init_db(JSContext *ctx, const char *name)
     if(!mod) return NULL;
 
     JS_AddModuleExportList(ctx, mod, func, sizeof(func)/sizeof(func[0]));
+    JS_AddModuleExport(ctx, mod, Custom::name());
+    JS_AddModuleExport(ctx, mod, DBException::name());
     JS_AddModuleExport(ctx, mod, Database::name());
     JS_AddModuleExport(ctx, mod, System::name());
     JS_AddModuleExport(ctx, mod, ErrorLog::name());
     JS_AddModuleExport(ctx, mod, HTTPData::name());
     return mod;
+}
+
+JSValue NOTOJS_VERSION_NS::db::error(JSContext *ctx)
+{
+    return DBException::throw_(ctx, DBException::TRANSACTION);
+}
+
+JSValue NOTOJS_VERSION_NS::db::error(JSContext *ctx, std::error_code &&ec)
+{
+    return DBException::throw_(ctx, std::move(ec));
+}
+
+JSValue NOTOJS_VERSION_NS::db::error(JSContext *ctx, std::string_view const &ec)
+{
+    return DBException::throw_(ctx, ec);
+}
+
+JSValue NOTOJS_VERSION_NS::db::error(JSContext *ctx, std::runtime_error const &ec)
+{
+    return DBException::throw_(ctx, ec);
+}
+
+void NOTOJS_VERSION_NS::db::init(std::string const &name, std::unique_ptr<Interface_ const> &&ptr)
+{
+    if(!Database::Name::tail(name) || !specific.insert({name, std::move(ptr)}).second)
+        throw std::domain_error("Cannot register database handler " + name);
 }
 
 } // namespace notojs

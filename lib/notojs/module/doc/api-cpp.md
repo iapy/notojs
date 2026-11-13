@@ -1,15 +1,31 @@
 ### C++ SDK{text-decoration=underline}
 
-The public headers are in the repository's `sdk/` directory. Native modules and plugins must be built against compatible **NotoJS** and **QuickJS** ABIs.
+The public SDK is maintained in the repository's `sdk/` directory and installed under `lib/notojs/devkit`. Native modules and plugins must be built against compatible **NotoJS** and **QuickJS** ABIs.
 
 #### Public headers
 
 - `bridge.hpp` — typed wrappers and dispatch for `JSValue` APIs.
-- `global.hpp` and `module.hpp` — wrappers for selected **NotoJS** JavaScript APIs.
+- `engine.hpp` — the `notojs::Task` base class for asynchronous native work exposed as promises.
+- `global.hpp` — wrappers for selected global **NotoJS** JavaScript types.
+- `module.hpp` — wrappers for selected built-in module types.
 - `notodb.hpp` — access to the server's LMDB environment.
-- `engine.hpp` — asynchronous native tasks exposed as promises.
-- `plugin.hpp` — server plugin interfaces.
-- `plugin.cmake` — helper for building `.so` plugins.
+- `plugin.hpp` — server plugin, host, and execution-context interfaces.
+
+#### CMake build helper
+
+Include the installed `notojs.cmake` helper from the same devkit:
+
+```cmake
+include(${CMAKE_INSTALL_PREFIX}/lib/notojs/devkit/notojs.cmake)
+```
+
+It provides these helpers for native extensions:
+
+- `notojs_plugin(name [LINK ...] [NOINSTALL])` builds `name.cpp` as `name.so` and installs it under `lib/notojs/plugin` unless `NOINSTALL` is specified.
+- `notojs_module(name [LINK ...] [NOINSTALL])` builds `name.cpp` as `name.so` and installs it under `lib/notojs/stdlib` unless `NOINSTALL` is specified.
+- `notojs_package(MAINTAINER name)` configures CPack using the current project name and version. Extension DEB and RPM packages receive an exact dependency on the **NotoJS** version that configured the installed devkit.
+
+The `LINK` list accepts additional libraries or CMake targets. The helper assigns a stable private namespace to the extension target and locally built targets linked into it, preventing symbols from different extensions from colliding inside the server process.
 
 ###### See also
 - `doc('global.hpp')`
@@ -97,7 +113,7 @@ extern "C" JSModuleDef *js_init_module(JSContext *ctx, char const *name)
 }
 ```
 
-Place the resulting `.so` file in `[engine].sopath` and import it by filename.
+Place the resulting `.so` file in `[engine].sopath` and import it by filename. The `notojs_module()` helper installs native modules to `lib/notojs/stdlib`, which is the default `[engine].sopath` in an installed **NotoJS** configuration.
 
 #### LMDB
 
@@ -133,7 +149,7 @@ Plugins are `.so` libraries loaded by the server process. Enable a plugin with a
 path = /usr/local/lib/notojs/plugin
 
 [plugin:demo]
-book = demo.notojs
+prefix = demo-
 ```
 
 The server loads `demo.so` and calls:
@@ -148,19 +164,40 @@ Minimal plugin:
 
 ```cpp
 #include <plugin.hpp>
+#include <string>
+#include <unordered_set>
 
 class Demo : public notojs::IPlugin
 {
 public:
-    explicit Demo(boost::property_tree::ptree const &) {}
+    explicit Demo(boost::property_tree::ptree const &config)
+    : prefix{config.get<std::string>("prefix", "demo-")}
+    {}
 
-    bool run(notojs::IHost &host) override
+    bool run() override
     {
-        host.load("demo.notojs");
         return true;
     }
 
-    void end(notojs::IHost &) override {}
+    void end() override {}
+
+    bool updated(std::string const &name) override
+    {
+        if(name.size() < prefix.size() || name.compare(0, prefix.size(), prefix))
+            return false;
+
+        notebooks.insert(name);
+        return true;
+    }
+
+    void removed(std::string const &name) override
+    {
+        notebooks.erase(name);
+    }
+
+private:
+    std::string prefix;
+    std::unordered_set<std::string> notebooks;
 };
 
 extern "C" notojs::IPlugin *notojs_plugin(
@@ -170,32 +207,49 @@ extern "C" notojs::IPlugin *notojs_plugin(
 }
 ```
 
-**NotoJS** owns the returned plugin. `run()` starts it; returning `false` disables it. `end()` stops plugin resources during server shutdown.
+**NotoJS** owns the returned plugin and assigns its protected `host` pointer before invoking plugin callbacks.
+
+For every top-level `.notojs` notebook, `updated(name)` is called during startup and after each save. `name` is the extensionless logical notebook name. Return `true` to subscribe to that notebook. The callback should only update plugin state or scheduling metadata; it must not call `host->exec()` synchronously. When a subscribed notebook is deleted, `removed(name)` is called with the same extensionless name. `run()` starts the plugin after initial notebook discovery; returning `false` disables it. `end()` stops plugin resources during server shutdown.
 
 `IHost` provides:
 
 - `clog(message)` writes a line to the server log.
-- `clog(message, args)` appends string and integer arguments as a JSON array.
-- `lmdb()` — the shared LMDB environment.
-- `load(name)` — registers a notebook for cached execution.
-- `exec(name, context)` — executes a registered notebook.
+- `clog(message, args)` appends supported scalar arguments (`bool`, floating-point values, strings, and signed or unsigned integers) as a JSON array.
+- `lmdb()` returns the shared LMDB environment.
+- `exec(name, context)` executes a subscribed notebook and returns `true` only when compilation and execution succeed. Pass the extensionless logical notebook name; the executed notebook receives the same value as read-only `self.name` from the default `noto:noto` export.
 
-Override `IContext::input()` to provide the notebook's global `input` value and `output()` to inspect the context after successful execution. Override `IPlugin::mod(IHost &)` to expose an optional module as `noto:PLUGIN_NAME`.
+`IContext` exchanges the notebook's `self.context` value around plugin-triggered execution:
 
-Build a plugin with the SDK helper:
+- `set_context(JSContext *ctx, JSValue &value)` runs before execution. Set `value` to an owned `JSValue` created in `ctx`. The host installs and consumes that value; do not free it or use it after the callback returns. Leaving it as `JS_UNDEFINED` starts execution with no context value.
+- `get_context(JSContext *ctx, JSValue value)` runs only after successful execution. `value` is borrowed and valid only for the duration of the callback. Do not free or retain it; copy any needed data into plugin-owned native storage before returning. The host releases the value afterward.
+
+The `JSContext *` supplied to either callback belongs to that execution and must not be retained. Override `IPlugin::mod()` to expose an optional module as `noto:PLUGIN_NAME`.
+
+Build a plugin from `demo.cpp` with the installed SDK helper:
 
 ```cmake
-cmake_minimum_required(VERSION 3.12)
-project(myplugin LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.18)
+project(notojs-demo VERSION 0.1.0 LANGUAGES CXX)
 
-include(sdk/plugin.cmake)
-plugin(myplugin)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include(${CMAKE_INSTALL_PREFIX}/lib/notojs/devkit/notojs.cmake)
+find_package(Boost CONFIG REQUIRED)
+
+notojs_plugin(demo)
+notojs_package(MAINTAINER "Your Name")
 ```
+
+Configure with the same installation prefix as **NotoJS**, then build and install:
 
 ```sh
-cmake -S . -B build
-cmake --build build --target myplugin
+cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/usr/local
+cmake --build build --target demo
+cmake --install build
 ```
+
+`notojs_plugin(demo)` produces `demo.so` and installs it under `lib/notojs/plugin`, matching the `[plugin].path` search directory in the generated server configuration. Enable it with a `[plugin:demo]` section. Packages generated through CPack depend on the exact **NotoJS** devkit version used to configure the project.
 
 Plugins execute inside the server process. Stop worker threads in `end()` and do not retain `JSContext *` or `JSValue` objects beyond callbacks unless their lifetimes are managed explicitly.
 

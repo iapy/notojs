@@ -12,15 +12,7 @@ struct Content
 struct HTML : bridge::Content<HTML>
 {
     using Base::Base;
-
     void *fragment{nullptr};
-
-    struct Interface : bridge::Interface<Interface>
-    {
-        virtual bool json() const = 0;
-        virtual std::string get() const = 0;
-        virtual ~Interface() {}
-    };
 
     JSValue toJSON(JSContext *ctx) const;
     static JSCFunctionListEntry const funcs[1];
@@ -29,14 +21,7 @@ struct HTML : bridge::Content<HTML>
 struct Image : bridge::Content<Image>
 {
     using Base::Base;
-
     void *fragment{nullptr};
-
-    struct Interface : bridge::Interface<Interface>
-    {
-        virtual std::string get() const = 0;
-        virtual ~Interface() {}
-    };
 
     JSValue toJSON(JSContext *ctx) const;
     static JSCFunctionListEntry const funcs[1];
@@ -53,29 +38,30 @@ struct Markdown : bridge::Content<Markdown>
 struct SVG : bridge::Content<SVG>
 {
     using Base::Base;
-
     void *fragment{nullptr};
-
-    struct Interface : bridge::Interface<Interface>
-    {
-        virtual std::string get() const = 0;
-        virtual ~Interface() {}
-    };
 
     JSValue toJSON(JSContext *ctx) const;
     JSValue viewbox(JSContext *ctx) const;
     static JSCFunctionListEntry const funcs[2];
 };
 
+struct Version : bridge::Interface<Version, std::string>
+{
+    JSValue toString(JSContext *ctx);
+    std::vector<std::string> own_properties() const;
+
+    JSValue major(JSContext *ctx) const;
+    JSValue minor(JSContext *ctx) const;
+    JSValue patch(JSContext *ctx) const;
+
+    using ctor = bridge::Unconstructable<Version>;
+    static JSCFunctionListEntry const funcs[5];
+    static JSClassExoticMethods exoticMethods;
+};
+
 struct XML : bridge::Content<XML>
 {
     using Base::Base;
-
-    struct Interface : bridge::Interface<Interface>
-    {
-        virtual std::string get() const = 0;
-        virtual ~Interface() {}
-    };
 
     JSValue toJSON(JSContext *ctx) const;
     static JSCFunctionListEntry const funcs[1];

@@ -66,9 +66,9 @@ const html = await b.load({result: HTML});
 assert(() => html instanceof HTML);
 assert(() => html.data === '<html></html>');
 
-assert(() => throws(() => b.load({result: null})));
-assert(() => throws(() => b.load({result: 'text/html'})));
-assert(() => throws(() => b.load({result: html})));
+assert(throws(() => b.load({result: null}), TypeError));
+assert(throws(() => b.load({result: 'text/html'}), TypeError));
+assert(throws(() => b.load({result: html}), TypeError));
 
 await print(b);
     )JS");
@@ -132,9 +132,9 @@ let caught;
 try { output.forEach(() => { ++calls; throw error; }); }
 catch (e) { caught = e; }
 assert(() => caught === error && calls === 1);
-assert(() => throws(() => output.forEach(null)));
-assert(() => throws(() => Output.prototype.values.call({})));
-assert(() => throws(() => new Output()));
+assert(throws(() => output.forEach(null), TypeError));
+assert(throws(() => Output.prototype.values.call({}), TypeError));
+assert(throws(() => new Output(), TypeError));
 
 print(output);
 print(output['cell-001']);
@@ -145,8 +145,6 @@ caught = undefined;
 try { output.values().next(); } catch (e) { caught = e; }
 assert(() => caught === error);
     )JS");
-
-    std::cout << *get_error() << '\n';
 
     BOOST_TEST(status == boost::beast::http::status::ok);
     BOOST_REQUIRE(get_error() == std::nullopt);
@@ -174,9 +172,9 @@ assert(() => cell.data[0].type === 'notojs.Output');
 assert(() => cell.data[0].data[0][0] === 'first');
 assert(() => Object.keys(cell).join(',') === 'name,data');
 assert(() => !Object.prototype.hasOwnProperty.call(cell, '.allocator'));
-assert(() => throws(() => new Cell()));
-assert(() => throws(() => { cell.name = 'changed'; }));
-assert(() => throws(() => { cell.data = []; }));
+assert(throws(() => new Cell(), TypeError));
+assert(throws(() => { cell.name = 'changed'; }, TypeError));
+assert(throws(() => { cell.data = []; }, TypeError));
 
 print(cell);
 const data = (await notebook('Output').load())['cell-001'].data;
@@ -201,11 +199,11 @@ import { assert } from 'noto:assert';
 import { notebook, Output, Cell } from 'noto:noto';
 
 const remote = notebook('Output');
-const output = await remote.exec({input: ['[]', '[]']});
+const output = await remote.exec({context: ['[]', '[]']});
 assert(() => output instanceof Output && output.length === 2);
 assert(() => output[0] instanceof Cell && output[0] === output['cell-000']);
 
-for (const [input, type] of [
+for (const [context, type] of [
     ['{', SyntaxError],
     [{}, TypeError],
     [[42], TypeError],
@@ -214,11 +212,11 @@ for (const [input, type] of [
     [Array(1001).fill('[]'), RangeError]
 ]) {
     let caught;
-    try { await remote.exec({input}); } catch (error) { caught = error; }
+    try { await remote.exec({context}); } catch (error) { caught = error; }
     assert(() => caught instanceof type);
 }
 
-const full = await remote.exec({input: Array(1000).fill('[]')});
+const full = await remote.exec({context: Array(1000).fill('[]')});
 assert(() => full.length === 1000);
 assert(() => full[999] === full['cell-999']);
 assert(() => full[1000] === undefined && full['cell-1000'] === undefined);

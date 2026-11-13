@@ -6,13 +6,13 @@ namespace {
 
 JSValue html(JSContext *ctx, bridge::String n)
 {
-    return noto::core::html(ctx, n);
+    return noto::core::HTML::make(ctx, n);
 }
 
 JSValue image_0(JSContext *ctx)
 {
     std::vector<std::uint8_t> data{};
-    return noto::core::image(ctx, data.data(), data.size());
+    return noto::core::Image::make(ctx, data.data(), data.size());
 }
 
 JSValue image_1(JSContext *ctx, bridge::String url)
@@ -20,7 +20,7 @@ JSValue image_1(JSContext *ctx, bridge::String url)
     auto const s = static_cast<std::string_view const &>(url);
     auto const u = noto::URL::parse(s.data());
 
-    if(u) return noto::core::image(ctx, std::move(*u));
+    if(u) return noto::core::Image::make(ctx, std::move(*u));
     return JS_NULL;
 }
 
@@ -28,25 +28,25 @@ using image = bridge::Function<&image_0, &image_1>;
 
 JSValue markdown(JSContext *ctx, bridge::String n)
 {
-    return noto::core::markdown(ctx, n);
+    return noto::core::Markdown::make(ctx, n);
 }
 
 JSValue svg_0(JSContext *ctx)
 {
     constexpr std::string_view data{"<svg></svg>"};
-    return noto::core::image(ctx, reinterpret_cast<std::uint8_t const *>(data.data()), data.size(), "image/svg+xml");
+    return noto::core::Image::make(ctx, reinterpret_cast<std::uint8_t const *>(data.data()), data.size(), "image/svg+xml");
 }
 
 JSValue svg_1(JSContext *ctx, bridge::String n)
 {
-    return noto::core::svg(ctx, n);
+    return noto::core::SVG::make(ctx, n);
 }
 
 using svg = bridge::Function<&svg_0, &svg_1>;
 
 JSValue xml(JSContext *ctx, bridge::String n)
 {
-    return noto::core::xml(ctx, n);
+    return noto::core::XML::make(ctx, n);
 }
 
 JSCFunctionListEntry const func[] = {

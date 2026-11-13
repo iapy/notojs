@@ -47,15 +47,8 @@ BOOST_AUTO_TEST_CASE(Throws)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 import { markdown } from 'noto:core';
-assert(() => throws(() => $('{{#a}}', {})));
-assert(() => {
-    try {
-        $(markdown({}), {});
-    } catch (error) {
-        return error instanceof TypeError;
-    }
-    return false;
-});
+assert(throws(() => $('{{#a}}', {}), Error));
+assert(throws(() => $(markdown({}), {}), TypeError));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);

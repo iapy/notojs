@@ -91,8 +91,8 @@ assert(() => window === dom.window);
 assert(() => document instanceof dom.Document);
 assert(() => document instanceof dom.window.HTMLDocument);
 
-assert(() => throws(() => require('dom', {scope: 1}), 'No matching function overload found'));
-assert(() => throws(() => require('dom', {scope: 'foo'}), 'invalid scope [foo]'));
+assert(throws(() => require('dom', {scope: 1}), TypeError, 'No matching function overload found'));
+assert(throws(() => require('dom', {scope: 'foo'}), TypeError, 'invalid scope [foo]'));
     )JS", context.get(), "cell-004");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -102,10 +102,10 @@ BOOST_AUTO_TEST_CASE(Document)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
-assert(() => throws(() => new Document()));
-assert(() => throws(() => new window.HTMLDocument()));
+assert(throws(() => new Document(), TypeError));
+assert(throws(() => new window.HTMLDocument(), TypeError));
 
 const d = Document.html();
 
@@ -128,30 +128,30 @@ assert(() => '' === d.firstChild.systemId);
 const leafParents = [d.doctype, d.createTextNode('text'), d.createComment('comment')];
 for(const parent of leafParents)
 {
-    assert(() => throws(() => parent.appendChild(d.createElement('div')), 'HierarchyRequestError'));
-    assert(() => throws(() => parent.insertBefore(d.createElement('div'), null), 'HierarchyRequestError'));
-    assert(() => throws(() => parent.insertBefore(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
-    assert(() => throws(() => parent.replaceChild(d.createElement('div'), d.documentElement), 'HierarchyRequestError'));
+    assert(throws(() => parent.appendChild(d.createElement('div')), DOMException, 'HierarchyRequestError'));
+    assert(throws(() => parent.insertBefore(d.createElement('div'), null), DOMException, 'HierarchyRequestError'));
+    assert(throws(() => parent.insertBefore(d.createElement('div'), d.documentElement), DOMException, 'HierarchyRequestError'));
+    assert(throws(() => parent.replaceChild(d.createElement('div'), d.documentElement), DOMException, 'HierarchyRequestError'));
     assert(() => !parent.hasChildNodes());
 }
 
 const text = d.createTextNode('document text');
-assert(() => throws(() => d.appendChild(text), 'HierarchyRequestError'));
-assert(() => throws(() => d.insertBefore(text, d.documentElement), 'HierarchyRequestError'));
-assert(() => throws(() => d.replaceChild(text, d.documentElement), 'HierarchyRequestError'));
+assert(throws(() => d.appendChild(text), DOMException, 'HierarchyRequestError'));
+assert(throws(() => d.insertBefore(text, d.documentElement), DOMException, 'HierarchyRequestError'));
+assert(throws(() => d.replaceChild(text, d.documentElement), DOMException, 'HierarchyRequestError'));
 assert(() => null === text.parentNode);
 assert(() => d.documentElement === d.lastChild);
 
 const holder = d.createElement('div');
 const held = holder.appendChild(d.createElement('span'));
-assert(() => throws(() => holder.appendChild(d.doctype), 'HierarchyRequestError'));
-assert(() => throws(() => holder.insertBefore(d.doctype, held), 'HierarchyRequestError'));
-assert(() => throws(() => holder.replaceChild(d.doctype, held), 'HierarchyRequestError'));
+assert(throws(() => holder.appendChild(d.doctype), DOMException, 'HierarchyRequestError'));
+assert(throws(() => holder.insertBefore(d.doctype, held), DOMException, 'HierarchyRequestError'));
+assert(throws(() => holder.replaceChild(d.doctype, held), DOMException, 'HierarchyRequestError'));
 assert(() => held === holder.firstChild);
 assert(() => d === d.doctype.parentNode);
 
 const fragment = d.createDocumentFragment();
-assert(() => throws(() => fragment.appendChild(d.doctype), 'HierarchyRequestError'));
+assert(throws(() => fragment.appendChild(d.doctype), DOMException, 'HierarchyRequestError'));
 assert(() => !fragment.hasChildNodes());
 assert(() => d === d.doctype.parentNode);
 
@@ -173,8 +173,8 @@ assert(() => null === d.nodeValue);
 assert(() => null === d.parentElement);
 assert(() => null === d.parentNode);
 
-assert(() => throws(() => d.toJSON(), "HTMLDocument cannot be serialized"));
-assert(() => throws(() => d.documentElement.toJSON(), "<HTML> cannot be serialized"));
+assert(throws(() => d.toJSON(), TypeError, "HTMLDocument cannot be serialized"));
+assert(throws(() => d.documentElement.toJSON(), TypeError, "<HTML> cannot be serialized"));
 
 assert(() => d.isDefaultNamespace('http://www.w3.org/1999/xhtml'));
 assert(() => !d.isDefaultNamespace('http://www.w3.org/1998/Math/MathML'));
@@ -190,32 +190,32 @@ BOOST_AUTO_TEST_CASE(documentHierarchy)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { Document } from 'noto:dom';
+import { Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 const root = d.documentElement;
 const doctype = d.doctype;
 const extra = d.createElement('extra');
-assert(() => throws(() => d.appendChild(extra), 'HierarchyRequestError'));
-assert(() => throws(() => d.insertBefore(extra, root), 'HierarchyRequestError'));
+assert(throws(() => d.appendChild(extra), DOMException, 'HierarchyRequestError'));
+assert(throws(() => d.insertBefore(extra, root), DOMException, 'HierarchyRequestError'));
 assert(() => null === extra.parentNode);
 assert(() => root === d.documentElement);
 assert(() => doctype === d.doctype);
 
 const secondDoctype = doctype.cloneNode();
-assert(() => throws(() => d.appendChild(secondDoctype), 'HierarchyRequestError'));
+assert(throws(() => d.appendChild(secondDoctype), DOMException, 'HierarchyRequestError'));
 assert(() => null === secondDoctype.parentNode);
 assert(() => doctype === d.doctype);
 
-assert(() => throws(() => d.insertBefore(root, doctype), 'HierarchyRequestError'));
-assert(() => throws(() => d.appendChild(doctype), 'HierarchyRequestError'));
+assert(throws(() => d.insertBefore(root, doctype), DOMException, 'HierarchyRequestError'));
+assert(throws(() => d.appendChild(doctype), DOMException, 'HierarchyRequestError'));
 assert(() => doctype === d.firstChild);
 assert(() => root === d.documentElement);
 
 const elements = d.createDocumentFragment();
 const first = elements.appendChild(d.createElement('first'));
 const second = elements.appendChild(d.createElement('second'));
-assert(() => throws(() => d.appendChild(elements), 'HierarchyRequestError'));
+assert(throws(() => d.appendChild(elements), DOMException, 'HierarchyRequestError'));
 assert(() => 2 === elements.childNodes.length);
 assert(() => first === elements.firstChild);
 assert(() => second === elements.lastChild);
@@ -223,7 +223,7 @@ assert(() => root === d.documentElement);
 
 const text = d.createDocumentFragment();
 const textNode = text.appendChild(d.createTextNode('text'));
-assert(() => throws(() => d.appendChild(text), 'HierarchyRequestError'));
+assert(throws(() => d.appendChild(text), DOMException, 'HierarchyRequestError'));
 assert(() => textNode === text.firstChild);
 assert(() => root === d.documentElement);
 
@@ -256,7 +256,7 @@ BOOST_AUTO_TEST_CASE(documentBatchHierarchy)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { Document } from 'noto:dom';
+import { Document, DOMException } from 'noto:dom';
 
 {
     const d = Document.html();
@@ -264,7 +264,7 @@ import { Document } from 'noto:dom';
     const comment = d.createComment('comment');
     const secondRoot = d.createElement('html');
 
-    assert(() => throws(() => d.append(comment, secondRoot), 'HierarchyRequestError'));
+    assert(throws(() => d.append(comment, secondRoot), DOMException, 'HierarchyRequestError'));
     assert(() => null === comment.parentNode);
     assert(() => null === secondRoot.parentNode);
     assert(() => children.length === d.childNodes.length);
@@ -278,7 +278,7 @@ import { Document } from 'noto:dom';
     const doctype = d.doctype;
     d.removeChild(root);
 
-    assert(() => throws(() => d.prepend(root), 'HierarchyRequestError'));
+    assert(throws(() => d.prepend(root), DOMException, 'HierarchyRequestError'));
     assert(() => null === root.parentNode);
     assert(() => doctype === d.firstChild);
     assert(() => 1 === d.childNodes.length);
@@ -290,7 +290,7 @@ import { Document } from 'noto:dom';
     const doctype = d.doctype;
     d.removeChild(root);
 
-    assert(() => throws(() => doctype.before(root), 'HierarchyRequestError'));
+    assert(throws(() => doctype.before(root), DOMException, 'HierarchyRequestError'));
     assert(() => null === root.parentNode);
     assert(() => doctype === d.firstChild);
     assert(() => 1 === d.childNodes.length);
@@ -324,7 +324,7 @@ import { Document } from 'noto:dom';
     const firstRoot = d.createElement('html');
     const secondRoot = d.createElement('html');
 
-    assert(() => throws(() => d.replaceChildren(firstRoot, secondRoot), 'HierarchyRequestError'));
+    assert(throws(() => d.replaceChildren(firstRoot, secondRoot), DOMException, 'HierarchyRequestError'));
     assert(() => null === firstRoot.parentNode);
     assert(() => null === secondRoot.parentNode);
     assert(() => children.length === d.childNodes.length);
@@ -336,7 +336,7 @@ import { Document } from 'noto:dom';
     const d = Document.html();
     const children = [...d.childNodes];
 
-    assert(() => throws(() => d.replaceChildren('text'), 'HierarchyRequestError'));
+    assert(throws(() => d.replaceChildren('text'), DOMException, 'HierarchyRequestError'));
     assert(() => children.length === d.childNodes.length);
     for(let i = 0; i < children.length; ++i)
         assert(() => children[i] === d.childNodes[i]);
@@ -349,7 +349,7 @@ import { Document } from 'noto:dom';
     const firstRoot = fragment.appendChild(d.createElement('html'));
     const secondRoot = fragment.appendChild(d.createElement('html'));
 
-    assert(() => throws(() => d.replaceChildren(fragment), 'HierarchyRequestError'));
+    assert(throws(() => d.replaceChildren(fragment), DOMException, 'HierarchyRequestError'));
     assert(() => firstRoot === fragment.firstChild);
     assert(() => secondRoot === fragment.lastChild);
     assert(() => 2 === fragment.childNodes.length);
@@ -364,7 +364,7 @@ import { Document } from 'noto:dom';
     const fragment = d.createDocumentFragment();
     const text = fragment.appendChild(d.createTextNode('text'));
 
-    assert(() => throws(() => d.replaceChildren(fragment), 'HierarchyRequestError'));
+    assert(throws(() => d.replaceChildren(fragment), DOMException, 'HierarchyRequestError'));
     assert(() => text === fragment.firstChild);
     assert(() => children.length === d.childNodes.length);
     for(let i = 0; i < children.length; ++i)
@@ -412,8 +412,9 @@ import { Document } from 'noto:dom';
     const firstRoot = d.createElement('html');
     const secondRoot = d.createElement('html');
 
-    assert(() => throws(
+    assert(throws(
         () => root.replaceWith(comment, firstRoot, secondRoot),
+        DOMException,
         'HierarchyRequestError'
     ));
     assert(() => null === comment.parentNode);
@@ -440,7 +441,7 @@ import { Document } from 'noto:dom';
     assert(() => beforeRoot === root.previousSibling);
 
     const children = [...d.childNodes];
-    assert(() => throws(() => root.before('text'), 'HierarchyRequestError'));
+    assert(throws(() => root.before('text'), DOMException, 'HierarchyRequestError'));
     assert(() => children.length === d.childNodes.length);
     for(let i = 0; i < children.length; ++i)
         assert(() => children[i] === d.childNodes[i]);
@@ -475,14 +476,14 @@ import { Document } from 'noto:dom';
 const d = Document.html();
 const a = d.body.appendChild(d.createElement('a'));
 
-assert(() => throws(() => xml(d), "No matching function overload found"));
-assert(() => throws(() => xml(a), "Invalid XML: not an XML document"));
+assert(throws(() => xml(d), TypeError, "No matching function overload found"));
+assert(throws(() => xml(a), TypeError, "Invalid XML: not an XML document"));
 
 assert(() => html(d) instanceof HTML);
-assert(() => throws(() => html(d).toJSON(), "HTML cannot be serialized"));
+assert(throws(() => html(d).toJSON(), TypeError, "HTML cannot be serialized"));
 
 assert(() => html(d.body) instanceof HTML);
-assert(() => throws(() => html(d.body).toJSON(), "HTML cannot be serialized"));
+assert(throws(() => html(d.body).toJSON(), TypeError, "HTML cannot be serialized"));
 
 assert(() => html(a) instanceof HTML);
 assert(() => html(a).toJSON() instanceof Object);
@@ -524,7 +525,7 @@ assert(() => d.documentElement.isSameNode(b1.parentElement));
 assert(() => d.head === b1.previousSibling);
 assert(() => d.head === b1.previousElementSibling);
 
-assert(() => throws(() => b1.toJSON(), "<BODY> cannot be serialized"));
+assert(throws(() => b1.toJSON(), TypeError, "<BODY> cannot be serialized"));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -560,7 +561,7 @@ assert(() => d.documentElement === h1.parentElement);
 assert(() => null === h1.previousSibling);
 assert(() => null === h1.previousElementSibling);
 
-assert(() => throws(() => h1.toJSON(), "<HEAD> cannot be serialized"));
+assert(throws(() => h1.toJSON(), TypeError, "<HEAD> cannot be serialized"));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -585,7 +586,7 @@ assert(() => '' === d.title);
 assert(() => '<!DOCTYPE html><html><head><title></title></head><body></body></html>' == d.toString());
 
 assert(() => 'TITLE' == d.head.firstChild.nodeName);
-assert(() => throws(() => d.head.firstChild.toJSON(), "<TITLE> cannot be serialized"));
+assert(throws(() => d.head.firstChild.toJSON(), TypeError, "<TITLE> cannot be serialized"));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -635,11 +636,11 @@ BOOST_AUTO_TEST_CASE(createElementNS)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 
-assert(() => throws(() => d.createElementNS('http://', 'a'), 'NamespaceError'));
+assert(throws(() => d.createElementNS('http://', 'a'), DOMException, 'NamespaceError'));
 
 const a = d.createElementNS('http://www.w3.org/1999/xhtml', 'a');
 assert(() => 'http://www.w3.org/1999/xhtml' === a.namespaceURI);
@@ -684,7 +685,7 @@ BOOST_AUTO_TEST_CASE(attributes)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 const created = d.createAttribute('Data-ID');
@@ -709,9 +710,9 @@ assert(() => !created.isEqualNode(differentName));
 assert(() => !created.isEqualNode(differentNamespace));
 sameName.value = 'different';
 assert(() => !created.isEqualNode(sameName));
-assert(() => throws(() => d.createAttribute(''), 'InvalidCharacterError'));
-assert(() => throws(() => d.createAttribute('*'), 'InvalidCharacterError'));
-assert(() => throws(() => d.createAttribute('bad name'), 'InvalidCharacterError'));
+assert(throws(() => d.createAttribute(''), DOMException, 'InvalidCharacterError'));
+assert(throws(() => d.createAttribute('*'), DOMException, 'InvalidCharacterError'));
+assert(throws(() => d.createAttribute('bad name'), DOMException, 'InvalidCharacterError'));
 
 const detachedOwner = d.createElement('div');
 detachedOwner.setAttribute('owned', 'value');
@@ -762,7 +763,7 @@ assert(() => 'http://apple.com' == href.nodeValue);
 assert(() => 'http://apple.com' == href.textContent);
 
 a.removeAttribute('alt');
-assert(() => throws(() => n.removeNamedItem('alt'), 'NotFoundError'));
+assert(throws(() => n.removeNamedItem('alt'), DOMException, 'NotFoundError'));
 assert(() => a.hasAttribute('href'));
 
 a.removeAttribute('href');
@@ -850,7 +851,7 @@ BOOST_AUTO_TEST_CASE(attributesNS)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 
@@ -874,24 +875,24 @@ const a = d.createElementNS('http://www.w3.org/2000/svg', 'text');
 assert(() => !a.hasAttributeNS('http://www.w3.org/2000/svg', 'fill'));
 assert(() => null == a.getAttributeNS('http://www.w3.org/2000/svg', 'href'));
 
-assert(() => throws(() => a.setAttributeNS('', 'href', 'http://apple.com'), 'NamespaceError'));
-assert(() => throws(() => a.setAttributeNS('', 'href', 1), 'NamespaceError'));
-assert(() => throws(() => a.setAttributeNS('', 'href', null), 'NamespaceError'));
-assert(() => throws(() => a.setAttributeNS('', 'href', true)), 'NamespaceError');
-assert(() => throws(() => a.setAttributeNS('', 'href', false)), 'NamespaceError');
+assert(throws(() => a.setAttributeNS('', 'href', 'http://apple.com'), DOMException, 'NamespaceError'));
+assert(throws(() => a.setAttributeNS('', 'href', 1), DOMException, 'NamespaceError'));
+assert(throws(() => a.setAttributeNS('', 'href', null), DOMException, 'NamespaceError'));
+assert(throws(() => a.setAttributeNS('', 'href', true), DOMException, 'NamespaceError'));
+assert(throws(() => a.setAttributeNS('', 'href', false), DOMException, 'NamespaceError'));
 
 a.setAttributeNS('http://www.w3.org/2000/svg', 'href', 'http://apple.com');
 assert(() => a.hasAttributeNS(null, 'href'));
 assert(() => 'http://apple.com' == a.getAttributeNS(null, 'href'));
 
-assert(() => throws(() => a.hasAttributeNS('', 'href')), 'NamespaceError');
+assert(throws(() => a.hasAttributeNS('', 'href'), DOMException, 'NamespaceError'));
 assert(() => a.hasAttributeNS('http://www.w3.org/2000/svg', 'href'));
 assert(() => 'http://apple.com' == a.getAttributeNS('http://www.w3.org/2000/svg', 'href'));
 
 a.removeAttributeNS('http://www.w3.org/2000/svg', 'href');
 assert(() => !a.hasAttributeNS('http://www.w3.org/2000/svg', 'href'));
 
-assert(() => throws(() => removeAttributeNS('', 'href')), 'NamespaceError');
+assert(throws(() => a.removeAttributeNS('', 'href'), DOMException, 'NamespaceError'));
 a.removeAttributeNS('http://www.w3.org/2000/svg', 'href');
 assert(() => null == a.getAttributeNS('http://www.w3.org/2000/svg', 'href'));
 
@@ -915,7 +916,7 @@ BOOST_AUTO_TEST_CASE(createAttributeNS)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 
@@ -947,10 +948,10 @@ assert(() => el === svg.ownerElement);
 assert(() => svg === el.getAttributeNodeNS('http://www.w3.org/2000/svg', 'viewBox'));
 assert(() => '0 0 100 100' == el.getAttributeNS('http://www.w3.org/2000/svg', 'viewBox'));
 
-assert(() => throws(() => d.createAttributeNS('http://', 'href'), 'NamespaceError'));
-assert(() => throws(() => d.createAttributeNS('http://www.w3.org/2000/svg', ''), 'InvalidCharacterError'));
-assert(() => throws(() => d.createAttributeNS('http://www.w3.org/2000/svg', '*'), 'InvalidCharacterError'));
-assert(() => throws(() => d.createAttributeNS('http://www.w3.org/2000/svg', 'bad name'), 'InvalidCharacterError'));
+assert(throws(() => d.createAttributeNS('http://', 'href'), DOMException, 'NamespaceError'));
+assert(throws(() => d.createAttributeNS('http://www.w3.org/2000/svg', ''), DOMException, 'InvalidCharacterError'));
+assert(throws(() => d.createAttributeNS('http://www.w3.org/2000/svg', '*'), DOMException, 'InvalidCharacterError'));
+assert(throws(() => d.createAttributeNS('http://www.w3.org/2000/svg', 'bad name'), DOMException, 'InvalidCharacterError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -960,7 +961,7 @@ BOOST_AUTO_TEST_CASE(namedNodeMap)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 assert(() => null === d.body.getAttributeNode('attr'));
@@ -970,7 +971,7 @@ const b = d.body.appendChild(d.createElement('div')).attributes;
 
 assert(() => 0 === a.length);
 assert(() => 0 === b.length);
-assert(() => throws(() => a.setNamedItem('a', 'b'), 'No matching function overload found'));
+assert(throws(() => a.setNamedItem('a', 'b'), TypeError, 'No matching function overload found'));
 
 d.body.children[0].setAttribute('foo', 'bar');
 d.body.children[1].setAttribute('foo', 'baz');
@@ -985,8 +986,8 @@ assert(() => d.body.children[0] === bar.ownerElement);
 assert(() => d.body.children[1] === baz.ownerElement);
 assert(() => null === bar.namespaceURI);
 assert(() => null === baz.namespaceURI);
-assert(() => throws(() => b.setNamedItem(bar), 'InUseAttributeError'));
-assert(() => throws(() => d.body.children[1].setAttributeNode(bar), 'InUseAttributeError'));
+assert(throws(() => b.setNamedItem(bar), DOMException, 'InUseAttributeError'));
+assert(throws(() => d.body.children[1].setAttributeNode(bar), DOMException, 'InUseAttributeError'));
 assert(() => d.body.children[0] === bar.ownerElement);
 assert(() => d.body.children[1] === baz.ownerElement);
 assert(() => bar === a.removeNamedItem('foo'));
@@ -1046,7 +1047,7 @@ foo.normalize();
 assert(() => 'foo' === foo.value);
 assert(() => foo === d.body.children[0].removeAttributeNode(foo));
 assert(() => !foo.isConnected);
-assert(() => throws(() => d.body.children[0].removeAttributeNode(foo), 'NotFoundError'));
+assert(throws(() => d.body.children[0].removeAttributeNode(foo), DOMException, 'NotFoundError'));
 assert(() => null === d.body.children[0].setAttributeNode(foo));
 assert(() => foo.isConnected);
 
@@ -1056,9 +1057,9 @@ assert(() => buz.isEqualNode(bar));
 assert(() => !buz.isSameNode(bar));
 assert(() => null === buz.getRootNode());
 
-assert(() => throws(() => buz.appendChild(d.body), 'HierarchyRequestError'));
-assert(() => throws(() => buz.removeChild(d.body), 'HierarchyRequestError'));
-assert(() => throws(() => buz.replaceChild(d.body, d.body), 'HierarchyRequestError'));
+assert(throws(() => buz.appendChild(d.body), DOMException, 'HierarchyRequestError'));
+assert(throws(() => buz.removeChild(d.body), DOMException, 'HierarchyRequestError'));
+assert(throws(() => buz.replaceChild(d.body, d.body), DOMException, 'HierarchyRequestError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -1068,7 +1069,7 @@ BOOST_AUTO_TEST_CASE(namedNodeMapNS)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 assert(() => null === d.body.getAttributeNodeNS(null, 'class'));
@@ -1079,7 +1080,7 @@ const b = d.body.appendChild(d.createElementNS('http://www.w3.org/2000/svg', 'sv
 assert(() => 0 === a.length);
 assert(() => 0 === b.length);
 
-assert(() => throws(() => a.getNamedItemNS('http://', 'a'), 'NamespaceError'));
+assert(throws(() => a.getNamedItemNS('http://', 'a'), DOMException, 'NamespaceError'));
 d.body.children[0].setAttributeNS('http://www.w3.org/2000/svg', 'viewBox', '0 0 100 100');
 d.body.children[1].setAttributeNS('http://www.w3.org/2000/svg', 'viewBox', '0 0 200 200');
 
@@ -1095,8 +1096,8 @@ assert(() => 'http://www.w3.org/2000/svg' === bvb.namespaceURI);
 assert(() => avb === d.body.children[0].getAttributeNodeNS('http://www.w3.org/2000/svg', 'viewBox'));
 assert(() => bvb === d.body.children[1].getAttributeNodeNS('http://www.w3.org/2000/svg', 'viewBox'));
 
-assert(() => throws(() => b.setNamedItemNS(avb), 'InUseAttributeError'));
-assert(() => throws(() => d.body.children[1].setAttributeNodeNS(avb), 'InUseAttributeError'));
+assert(throws(() => b.setNamedItemNS(avb), DOMException, 'InUseAttributeError'));
+assert(throws(() => d.body.children[1].setAttributeNodeNS(avb), DOMException, 'InUseAttributeError'));
 assert(() => d.body.children[0] === avb.ownerElement);
 assert(() => d.body.children[1] === bvb.ownerElement);
 assert(() => avb === a.removeNamedItemNS('http://www.w3.org/2000/svg', 'viewBox'));
@@ -1271,13 +1272,13 @@ BOOST_AUTO_TEST_CASE(CDATASection)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const h = Document.html();
 const d = Document.xml('<root><![CDATA[Some cdata]]></root>');
 const c = d.documentElement.firstChild;
 
-assert(() => throws(() => h.createCDATASection('Created cdata'), 'NotSupportedError'));
+assert(throws(() => h.createCDATASection('Created cdata'), DOMException, 'NotSupportedError'));
 assert(() => c instanceof window.Node);
 assert(() => c instanceof window.CharacterData);
 assert(() => c instanceof window.Text);
@@ -1312,7 +1313,7 @@ BOOST_AUTO_TEST_CASE(ProcessingInstruction)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.xml('<root><?target data?></root>');
 const p = d.documentElement.firstChild;
@@ -1340,9 +1341,9 @@ assert(() => 'value' == n.nodeValue);
 assert(() => 'value' == n.data);
 assert(() => !n.isConnected);
 assert(() => null === n.sheet);
-assert(() => throws(() => h.createProcessingInstruction('', 'value'), 'InvalidCharacterError'));
-assert(() => throws(() => h.createProcessingInstruction('bad name', 'value'), 'InvalidCharacterError'));
-assert(() => throws(() => h.createProcessingInstruction('created', 'bad ?> value'), 'InvalidCharacterError'));
+assert(throws(() => h.createProcessingInstruction('', 'value'), DOMException, 'InvalidCharacterError'));
+assert(throws(() => h.createProcessingInstruction('bad name', 'value'), DOMException, 'InvalidCharacterError'));
+assert(throws(() => h.createProcessingInstruction('created', 'bad ?> value'), DOMException, 'InvalidCharacterError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -1484,8 +1485,8 @@ assert(() => 2 == v.length);
 assert(() => a == v[0]);
 assert(() => b == v[1]);
 
-assert(() => throws(() => c.forEach(() => { throw 1 })));
-assert(() => throws(() => c.forEach(() => { throw 1 }, 0)));
+assert(throws(() => c.forEach(() => { throw 1 })));
+assert(throws(() => c.forEach(() => { throw 1 }, 0)));
 
 const x = Array.from(c);
 assert(() => 2 == x.length);
@@ -1579,7 +1580,7 @@ BOOST_AUTO_TEST_CASE(compareDocumentPosition)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d1 = Document.html();
 const d2 = Document.html();
@@ -1598,7 +1599,7 @@ assert(() => 1 === c.compareDocumentPosition(b));
 const div = d1.createElement('div');
 div.appendChild(a);
 
-assert(() => throws(() => a.appendChild(div), 'HierarchyRequestError'));
+assert(throws(() => a.appendChild(div), DOMException, 'HierarchyRequestError'));
 
 assert(() => 1 === a.compareDocumentPosition(b));
 assert(() => 1 === b.compareDocumentPosition(a));
@@ -1774,7 +1775,7 @@ BOOST_AUTO_TEST_CASE(insertBefore)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 
@@ -1795,13 +1796,13 @@ assert(() => b == a.nextElementSibling);
 
 assert(() => '<body><a></a><b></b></body>' == d.body.toString().trim());
 assert(() => '<a></a><b></b>' == d.body.getHTML().trim());
-assert(() => throws(() => a.insertBefore(b, d.body), 'NotFoundError'));
-assert(() => throws(() => d.body.insertBefore(a, d.body), 'NotFoundError'));
-assert(() => throws(() => d.body.insertBefore(d.body, a), 'HierarchyRequestError'));
-assert(() => throws(() => d.body.insertBefore(a, d.createElement('x')), 'NotFoundError'));
+assert(throws(() => a.insertBefore(b, d.body), DOMException, 'NotFoundError'));
+assert(throws(() => d.body.insertBefore(a, d.body), DOMException, 'NotFoundError'));
+assert(throws(() => d.body.insertBefore(d.body, a), DOMException, 'HierarchyRequestError'));
+assert(throws(() => d.body.insertBefore(a, d.createElement('x')), DOMException, 'NotFoundError'));
 
 const e = Document.xml('<root/>');
-assert(() => throws(() => e.documentElement.insertBefore(a, null), 'WrongDocumentError'));
+assert(throws(() => e.documentElement.insertBefore(a, null), DOMException, 'WrongDocumentError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -1859,11 +1860,11 @@ BOOST_AUTO_TEST_CASE(removeChild)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
-assert(() => throws(() => d.body.removeChild(null), 'No matching function overload found'));
-assert(() => throws(() => d.body.removeChild(d.body), 'NotFoundError'));
+assert(throws(() => d.body.removeChild(null), TypeError, 'No matching function overload found'));
+assert(throws(() => d.body.removeChild(d.body), DOMException, 'NotFoundError'));
 
 const a = d.body.appendChild(d.createElement('a'));
 const b = d.body.appendChild(d.createElement('b'));
@@ -1873,8 +1874,8 @@ assert(() => b === d.body.removeChild(b));
 assert(() => !a.isConnected);
 assert(() => !b.isConnected);
 
-assert(() => throws(() => d.body.removeChild(a), 'NotFoundError'));
-assert(() => throws(() => d.body.removeChild(Document.html().body), 'WrongDocumentError'));
+assert(throws(() => d.body.removeChild(a), DOMException, 'NotFoundError'));
+assert(throws(() => d.body.removeChild(Document.html().body), DOMException, 'WrongDocumentError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -1884,18 +1885,18 @@ BOOST_AUTO_TEST_CASE(replaceChild)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 
 const a = d.body.appendChild(d.createElement('a'));
-assert(() => throws(() => d.body.replaceChild(d.body, a), 'HierarchyRequestError'));
-assert(() => throws(() => d.body.replaceChild(Document.html().body, a), 'WrongDocumentError'));
+assert(throws(() => d.body.replaceChild(d.body, a), DOMException, 'HierarchyRequestError'));
+assert(throws(() => d.body.replaceChild(Document.html().body, a), DOMException, 'WrongDocumentError'));
 
 assert(() => a === d.body.replaceChild(d.createElement('b'), a));
 assert(() => !a.isConnected);
 
-assert(() => throws(() => d.body.replaceChild(d.createElement('h1'), a), 'NotFoundError'));
+assert(throws(() => d.body.replaceChild(d.createElement('h1'), a), DOMException, 'NotFoundError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -2054,8 +2055,8 @@ assert(() => 2 == v.length);
 assert(() => a == v[0]);
 assert(() => b == v[1]);
 
-assert(() => throws(() => c.forEach(() => { throw 1 })));
-assert(() => throws(() => c.forEach(() => { throw 1 }, 0)));
+assert(throws(() => c.forEach(() => { throw 1 })));
+assert(throws(() => c.forEach(() => { throw 1 }, 0)));
 
 const x = Array.from(c);
 assert(() => 2 == x.length);
@@ -2131,14 +2132,14 @@ BOOST_AUTO_TEST_CASE(outerHTML)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 assert(() => '<body></body>' === d.body.outerHTML);
 
 const root = d.documentElement;
 const rootHTML = root.outerHTML;
-assert(() => throws(() => { root.outerHTML = '<main></main>'; }, 'NoModificationAllowedError'));
+assert(throws(() => { root.outerHTML = '<main></main>'; }, DOMException, 'NoModificationAllowedError'));
 assert(() => root === d.documentElement);
 assert(() => rootHTML === root.outerHTML);
 
@@ -2210,16 +2211,16 @@ BOOST_AUTO_TEST_CASE(outerText)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 
 const detached = d.createElement('div');
-assert(() => throws(() => { detached.outerText = 'detached'; }, 'NoModificationAllowedError'));
+assert(throws(() => { detached.outerText = 'detached'; }, DOMException, 'NoModificationAllowedError'));
 assert(() => '<div></div>' === detached.outerHTML);
 
 const root = d.documentElement;
-assert(() => throws(() => { root.outerText = 'root'; }, 'HierarchyRequestError'));
+assert(throws(() => { root.outerText = 'root'; }, DOMException, 'HierarchyRequestError'));
 assert(() => root === d.documentElement);
 
 const fragment = d.createDocumentFragment();
@@ -2259,7 +2260,7 @@ BOOST_AUTO_TEST_CASE(after)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 
@@ -2288,9 +2289,9 @@ assert(() => 'foo' == n.nodeValue);
 n = n.nextSibling;
 assert(() => 'A' == n.nodeName);
 
-assert(() => throws(() => e.after(d.body), 'HierarchyRequestError'));
-assert(() => throws(() => d.documentElement.after(''), 'HierarchyRequestError'));
-assert(() => throws(() => e.after(Document.html().body), 'WrongDocumentError'));
+assert(throws(() => e.after(d.body), DOMException, 'HierarchyRequestError'));
+assert(throws(() => d.documentElement.after(''), DOMException, 'HierarchyRequestError'));
+assert(throws(() => e.after(Document.html().body), DOMException, 'WrongDocumentError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -2300,7 +2301,7 @@ BOOST_AUTO_TEST_CASE(append)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 d.body.append(d.createElement('p'), 'foo', d.createElement('a'));
@@ -2309,8 +2310,8 @@ assert(() => 'P' == d.body.childNodes[0].nodeName);
 assert(() => 'foo' == d.body.childNodes[1].nodeValue);
 assert(() => 'A' == d.body.childNodes[2].nodeName);
 
-assert(() => throws(() => d.body.append(d.body), 'HierarchyRequestError'));
-assert(() => throws(() => d.body.append(Document.html().body), 'WrongDocumentError'));
+assert(throws(() => d.body.append(d.body), DOMException, 'HierarchyRequestError'));
+assert(throws(() => d.body.append(Document.html().body), DOMException, 'WrongDocumentError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -2320,7 +2321,7 @@ BOOST_AUTO_TEST_CASE(before)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 
@@ -2331,9 +2332,9 @@ assert(() => 'P' == d.body.childNodes[0].nodeName);
 assert(() => 'foo' == d.body.childNodes[1].nodeValue);
 assert(() => 'A' == d.body.childNodes[2].nodeName);
 
-assert(() => throws(() => e.before(d.body), 'HierarchyRequestError'));
-assert(() => throws(() => d.documentElement.before(''), 'HierarchyRequestError'));
-assert(() => throws(() => e.before(Document.html().body), 'WrongDocumentError'));
+assert(throws(() => e.before(d.body), DOMException, 'HierarchyRequestError'));
+assert(throws(() => d.documentElement.before(''), DOMException, 'HierarchyRequestError'));
+assert(throws(() => e.before(Document.html().body), DOMException, 'WrongDocumentError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -2343,7 +2344,7 @@ BOOST_AUTO_TEST_CASE(replaceWith)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 
@@ -2387,8 +2388,8 @@ const detached = d.createElement('i');
 detached.replaceWith('ignored');
 assert(() => detached.parentNode === null);
 
-assert(() => throws(() => d.body.firstChild.replaceWith(d.body), 'HierarchyRequestError'));
-assert(() => throws(() => d.body.firstChild.replaceWith(Document.html().body), 'WrongDocumentError'));
+assert(throws(() => d.body.firstChild.replaceWith(d.body), DOMException, 'HierarchyRequestError'));
+assert(throws(() => d.body.firstChild.replaceWith(Document.html().body), DOMException, 'WrongDocumentError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -2426,7 +2427,7 @@ BOOST_AUTO_TEST_CASE(closest)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 assert(() => d.documentElement === d.body.closest('html'));
@@ -2459,7 +2460,7 @@ assert(() => d.body === p.closest('#body'));
 assert(() => d.body === p.closest('.bar'));
 assert(() => d.body === p.closest('body.bar'));
 
-assert(() => throws(() => p.closest('['), 'SyntaxError'));
+assert(throws(() => p.closest('['), DOMException, 'SyntaxError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -2469,7 +2470,7 @@ BOOST_AUTO_TEST_CASE(matches)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 
@@ -2499,7 +2500,7 @@ assert(() => p.matches('body > div.foo > p.bar'));
 assert(() => !p.matches('body > p'));
 assert(() => !p.matches('body > p.bar'));
 
-assert(() => throws(() => p.matches('['), 'SyntaxError'));
+assert(throws(() => p.matches('['), DOMException, 'SyntaxError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -2509,7 +2510,7 @@ BOOST_AUTO_TEST_CASE(classList)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 const c = d.body.classList;
@@ -2574,8 +2575,8 @@ assert(() => c.contains('defg'));
 assert(() => !c.contains('ddd'));
 assert(() => c.contains('1'));
 
-assert(() => throws(() => c.add(''), 'SyntaxError'));
-assert(() => throws(() => c.add('a b'), 'InvalidCharacterError'));
+assert(throws(() => c.add(''), DOMException, 'SyntaxError'));
+assert(throws(() => c.add('a b'), DOMException, 'InvalidCharacterError'));
 
 c.value = 'c1 c2';
 c.add('c1', 'c2');
@@ -2611,8 +2612,8 @@ assert(() => 'c2 4' === c.value);
 assert(() => 'c2 4' === c.toString());
 assert(() => 'c2 4' === d.body.className);
 
-assert(() => throws(() => c.remove(''), 'SyntaxError'));
-assert(() => throws(() => c.remove('a b'), 'InvalidCharacterError'));
+assert(throws(() => c.remove(''), DOMException, 'SyntaxError'));
+assert(throws(() => c.remove('a b'), DOMException, 'InvalidCharacterError'));
 
 assert(() => !c.replace(1, 2));
 assert(() => c.replace('c2', 2));
@@ -2630,10 +2631,10 @@ assert(() => '1 c3' === c.value);
 assert(() => '1 c3' === c.toString());
 assert(() => '1 c3' === d.body.className);
 
-assert(() => throws(() => c.replace('', 1), 'SyntaxError'));
-assert(() => throws(() => c.replace(1, ''), 'SyntaxError'));
-assert(() => throws(() => c.replace('a b', 2), 'InvalidCharacterError'));
-assert(() => throws(() => c.replace(2, 'a b'), 'InvalidCharacterError'));
+assert(throws(() => c.replace('', 1), DOMException, 'SyntaxError'));
+assert(throws(() => c.replace(1, ''), DOMException, 'SyntaxError'));
+assert(throws(() => c.replace('a b', 2), DOMException, 'InvalidCharacterError'));
+assert(throws(() => c.replace(2, 'a b'), DOMException, 'InvalidCharacterError'));
 
 assert(() => !c.toggle(1));
 assert(() => 'c3' === c.value);
@@ -2655,8 +2656,8 @@ assert(() => '1 c3' === c.value);
 assert(() => '1 c3' === c.toString());
 assert(() => '1 c3' === d.body.className);
 
-assert(() => throws(() => c.toggle(''), 'SyntaxError'));
-assert(() => throws(() => c.toggle('a b'), 'InvalidCharacterError'));
+assert(throws(() => c.toggle(''), DOMException, 'SyntaxError'));
+assert(throws(() => c.toggle('a b'), DOMException, 'InvalidCharacterError'));
 
 assert(() => c.toggle(1, true));
 assert(() => !c.toggle(1, false));
@@ -2728,8 +2729,8 @@ assert(() => 2 == v.length);
 assert(() => '1' == v[0]);
 assert(() => 'c1' == v[1]);
 
-assert(() => throws(() => c.forEach(() => { throw 1 })));
-assert(() => throws(() => c.forEach(() => { throw 1 }, 0)));
+assert(throws(() => c.forEach(() => { throw 1 })));
+assert(throws(() => c.forEach(() => { throw 1 }, 0)));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -2892,7 +2893,7 @@ BOOST_AUTO_TEST_CASE(insertAdjacentElement)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 const div = d.body.appendChild(d.createElement('div'));
@@ -2931,14 +2932,14 @@ assert(() => h2 === div.nextSibling);
 assert(() => u === h2.nextSibling);
 assert(() => p === ul.previousSibling);
 
-assert(() => throws(() => div.insertAdjacentElement('a', a), 'Wrong position argument [a]'));
-assert(() => throws(() => div.insertAdjacentElement('beforebegin', Document.html().body), 'WrongDocumentError'));
-assert(() => throws(() => div.insertAdjacentElement('afterbegin', Document.html().body), 'WrongDocumentError'));
-assert(() => throws(() => div.insertAdjacentElement('beforeend', Document.html().body), 'WrongDocumentError'));
-assert(() => throws(() => div.insertAdjacentElement('afterend', Document.html().body), 'WrongDocumentError'));
+assert(throws(() => div.insertAdjacentElement('a', a), TypeError, 'Wrong position argument [a]'));
+assert(throws(() => div.insertAdjacentElement('beforebegin', Document.html().body), DOMException, 'WrongDocumentError'));
+assert(throws(() => div.insertAdjacentElement('afterbegin', Document.html().body), DOMException, 'WrongDocumentError'));
+assert(throws(() => div.insertAdjacentElement('beforeend', Document.html().body), DOMException, 'WrongDocumentError'));
+assert(throws(() => div.insertAdjacentElement('afterend', Document.html().body), DOMException, 'WrongDocumentError'));
 
-assert(() => throws(() => b.insertAdjacentElement('afterbegin', div), 'HierarchyRequestError'));
-assert(() => throws(() => b.insertAdjacentElement('beforeend', div), 'HierarchyRequestError'));
+assert(throws(() => b.insertAdjacentElement('afterbegin', div), DOMException, 'HierarchyRequestError'));
+assert(throws(() => b.insertAdjacentElement('beforeend', div), DOMException, 'HierarchyRequestError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -3021,7 +3022,7 @@ assert(() => 'UL' === div.lastChild.nodeName);
 assert(() => 'H2' === div.nextSibling.nodeName);
 assert(() => 'I' === div.nextSibling.nextSibling.nodeName);
 
-assert(() => throws(() => div.insertAdjacentHTML('a', ''), 'Wrong position argument [a]'));
+assert(throws(() => div.insertAdjacentHTML('a', ''), TypeError, 'Wrong position argument [a]'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -3031,7 +3032,7 @@ BOOST_AUTO_TEST_CASE(prepend)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 const div = d.body.appendChild(d.createElement('div'));
@@ -3054,8 +3055,8 @@ assert(() => 'bar' === div.firstChild.nextSibling.nodeValue);
 assert(() => u === div.firstChild.nextSibling.nextSibling);
 assert(() => a === div.firstChild.nextSibling.nextSibling.nextSibling);
 
-assert(() => throws(() => div.prepend(Document.html().body), 'WrongDocumentError'));
-assert(() => throws(() => div.prepend(d.body), 'HierarchyRequestError'));
+assert(throws(() => div.prepend(Document.html().body), DOMException, 'WrongDocumentError'));
+assert(throws(() => div.prepend(d.body), DOMException, 'HierarchyRequestError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -3065,7 +3066,7 @@ BOOST_AUTO_TEST_CASE(atomicNodeMutations)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { Document } from 'noto:dom';
+import { Document, DOMException } from 'noto:dom';
 
 const d = Document.html();
 const other = Document.html();
@@ -3075,12 +3076,12 @@ for(const method of ['append', 'prepend']) {
     const valid = d.createElement('valid');
     const foreign = other.createElement('foreign');
 
-    assert(() => throws(() => target[method](valid, foreign), 'WrongDocumentError'));
+    assert(throws(() => target[method](valid, foreign), DOMException, 'WrongDocumentError'));
     assert(() => null === valid.parentNode);
     assert(() => !target.hasChildNodes());
 
     const cycleValid = d.createElement('cycle-valid');
-    assert(() => throws(() => target[method](cycleValid, target), 'HierarchyRequestError'));
+    assert(throws(() => target[method](cycleValid, target), DOMException, 'HierarchyRequestError'));
     assert(() => null === cycleValid.parentNode);
     assert(() => !target.hasChildNodes());
 }
@@ -3091,13 +3092,13 @@ for(const method of ['before', 'after']) {
     const valid = d.createElement('valid');
     const foreign = other.createElement('foreign');
 
-    assert(() => throws(() => target[method](valid, foreign), 'WrongDocumentError'));
+    assert(throws(() => target[method](valid, foreign), DOMException, 'WrongDocumentError'));
     assert(() => null === valid.parentNode);
     assert(() => 1 === parent.childNodes.length);
     assert(() => target === parent.firstChild);
 
     const cycleValid = d.createElement('cycle-valid');
-    assert(() => throws(() => target[method](cycleValid, parent), 'HierarchyRequestError'));
+    assert(throws(() => target[method](cycleValid, parent), DOMException, 'HierarchyRequestError'));
     assert(() => null === cycleValid.parentNode);
     assert(() => 1 === parent.childNodes.length);
     assert(() => target === parent.firstChild);
@@ -3202,7 +3203,7 @@ BOOST_AUTO_TEST_CASE(querySelector)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html(`
 <body>
@@ -3231,10 +3232,10 @@ assert(() => q1[1] === q2[1]);
 
 assert(() => q1[0] === d.querySelector('div'));
 assert(() => q1[0] === d.body.querySelector('div'));
-assert(() => throws(() => d.querySelector('['), 'SyntaxError'));
-assert(() => throws(() => d.querySelectorAll('['), 'SyntaxError'));
-assert(() => throws(() => d.body.querySelector('['), 'SyntaxError'));
-assert(() => throws(() => d.body.querySelectorAll('['), 'SyntaxError'));
+assert(throws(() => d.querySelector('['), DOMException, 'SyntaxError'));
+assert(throws(() => d.querySelectorAll('['), DOMException, 'SyntaxError'));
+assert(throws(() => d.body.querySelector('['), DOMException, 'SyntaxError'));
+assert(throws(() => d.body.querySelectorAll('['), DOMException, 'SyntaxError'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -3337,7 +3338,7 @@ BOOST_AUTO_TEST_CASE(getElementsByTagNameNS)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html(`
 <body>
@@ -3345,8 +3346,8 @@ const d = Document.html(`
 </body>
 `);
 
-assert(() => throws(() => d.getElementsByTagNameNS('http://', 'a'), 'NamespaceError'));
-assert(() => throws(() => d.body.getElementsByTagNameNS('http://', 'a'), 'NamespaceError'));
+assert(throws(() => d.getElementsByTagNameNS('http://', 'a'), DOMException, 'NamespaceError'));
+assert(throws(() => d.body.getElementsByTagNameNS('http://', 'a'), DOMException, 'NamespaceError'));
 
 const a1 = d.getElementsByTagName('svg');
 const b1 = d.getElementsByTagNameNS(null, 'svg');
@@ -3493,7 +3494,7 @@ BOOST_AUTO_TEST_CASE(replaceChildren)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { window, Document } from 'noto:dom';
+import { window, Document, DOMException } from 'noto:dom';
 
 const d = Document.html('<body><div></div>foo<p></p></body>');
 const c = [...d.body.childNodes];
@@ -3511,13 +3512,13 @@ assert(() => 'bar' === d.body.childNodes[1].nodeValue);
 const first = d.body.firstChild;
 const valid = d.createElement('valid');
 const foreign = Document.html().createElement('foreign');
-assert(() => throws(() => d.body.replaceChildren(valid, foreign), 'WrongDocumentError'));
+assert(throws(() => d.body.replaceChildren(valid, foreign), DOMException, 'WrongDocumentError'));
 assert(() => null === valid.parentNode);
 assert(() => 2 === d.body.childNodes.length);
 assert(() => first === d.body.firstChild);
 
 const cycleValid = d.createElement('cycle-valid');
-assert(() => throws(() => d.body.replaceChildren(cycleValid, d.body), 'HierarchyRequestError'));
+assert(throws(() => d.body.replaceChildren(cycleValid, d.body), DOMException, 'HierarchyRequestError'));
 assert(() => null === cycleValid.parentNode);
 assert(() => 2 === d.body.childNodes.length);
 assert(() => first === d.body.firstChild);
@@ -4727,8 +4728,8 @@ assert(() => insertedRow === rows[0]);
 assert(() => firstRow === rows[1]);
 table.deleteRow(0);
 assert(() => firstRow === rows[0]);
-assert(() => throws(() => table.insertRow(999)));
-assert(() => throws(() => table.deleteRow(999)));
+assert(throws(() => table.insertRow(999), RangeError));
+assert(throws(() => table.deleteRow(999), RangeError));
 assert(() => rows[0] instanceof window.HTMLTableRowElement);
 assert(() => rows[0].parentElement instanceof window.HTMLTableSectionElement);
 assert(() => rows[0] == rows[0].parentElement.rows[0]);
@@ -4748,8 +4749,8 @@ const sectionAppendedRow = firstSection.insertRow();
 assert(() => sectionAppendedRow === sectionRows[sectionRowCount]);
 firstSection.deleteRow(-1);
 assert(() => sectionRowCount == sectionRows.length);
-assert(() => throws(() => firstSection.insertRow(999)));
-assert(() => throws(() => firstSection.deleteRow(999)));
+assert(throws(() => firstSection.insertRow(999), RangeError));
+assert(throws(() => firstSection.deleteRow(999), RangeError));
 
 assert(() => 2 == rows[0].cells.length);
 assert(() => rows[0].cells[0] instanceof window.HTMLTableCellElement);
@@ -4790,8 +4791,8 @@ const appendedCell = rows[1].insertCell();
 assert(() => appendedCell === rows[1].cells[2]);
 rows[1].deleteCell(-1);
 assert(() => 2 == rows[1].cells.length);
-assert(() => throws(() => rows[1].insertCell(999)));
-assert(() => throws(() => rows[1].deleteCell(999)));
+assert(throws(() => rows[1].insertCell(999), RangeError));
+assert(throws(() => rows[1].deleteCell(999), RangeError));
 
 assert(() => 1 == rows[1].rowIndex);
 assert(() => 0 == rows[1].sectionRowIndex);

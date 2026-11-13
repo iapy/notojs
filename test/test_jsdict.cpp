@@ -9,10 +9,10 @@ BOOST_AUTO_TEST_CASE(IDict)
 import { assert, throws } from 'noto:assert';
 import { IDict } from 'jsdict.so';
 
-assert(() => throws(() => new IDict(['a']), "IDict: no matching constructor found"));
-assert(() => throws(() => new IDict([['a']]), "IDict: no matching constructor found"));
-assert(() => throws(() => new IDict({'a': 'b'}), "IDict: no matching constructor found"));
-assert(() => throws(() => new IDict([['a', 'b']]), "IDict: no matching constructor found"));
+assert(throws(() => new IDict(['a']), TypeError, "IDict: no matching constructor found"));
+assert(throws(() => new IDict([['a']]), TypeError, "IDict: no matching constructor found"));
+assert(throws(() => new IDict({'a': 'b'}), TypeError, "IDict: no matching constructor found"));
+assert(throws(() => new IDict([['a', 'b']]), TypeError, "IDict: no matching constructor found"));
 
 const empty = new IDict();
 assert(() => '' == empty.string);
@@ -55,10 +55,10 @@ BOOST_AUTO_TEST_CASE(SDict)
 import { assert, throws } from 'noto:assert';
 import { SDict } from 'jsdict.so';
 
-assert(() => throws(() => new SDict(['a']), "SDict: no matching constructor found"));
-assert(() => throws(() => new SDict([['a']]), "SDict: no matching constructor found"));
-assert(() => throws(() => new SDict({'a': 1}), "SDict: no matching constructor found"));
-assert(() => throws(() => new SDict([['a', 1]]), "SDict: no matching constructor found"));
+assert(throws(() => new SDict(['a']), TypeError, "SDict: no matching constructor found"));
+assert(throws(() => new SDict([['a']]), TypeError, "SDict: no matching constructor found"));
+assert(throws(() => new SDict({'a': 1}), TypeError, "SDict: no matching constructor found"));
+assert(throws(() => new SDict([['a', 1]]), TypeError, "SDict: no matching constructor found"));
 
 const empty = new SDict();
 assert(() => '' == empty.string);

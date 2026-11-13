@@ -7,8 +7,6 @@ BOOST_FIXTURE_TEST_SUITE(HTTPData, notojs::testing::ContextFixture)
 
 BOOST_AUTO_TEST_CASE(Cache)
 {
-    db();
-
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 import { icon } from 'noto:core';
@@ -41,8 +39,8 @@ assert(() => 'https://api.iconify.design' == a[0].base);
 assert(() => 2 == Object.keys(a[0].path).length);
 assert(() => 'internal' == a[0].type);
 
-assert(() => throws(() => c.drop('sys', 'https://api.iconify.design')));
-assert(() => throws(() => c.drop('system', 'https://api.iconify.design/')));
+assert(throws(() => c.drop('sys', 'https://api.iconify.design'), TypeError));
+assert(throws(() => c.drop('system', 'https://api.iconify.design/'), TypeError));
 
 assert(() => 0 == c.drop('system', 'https://api.iconify.design'));
 assert(() => 2 == c.drop('internal', 'https://api.iconify.design'));

@@ -71,10 +71,10 @@ struct XMLDocument : bridge::Interface<XMLDocument, dom::XMLDocument, Document>
         return bridge::String{ctx, ref().toString()};
     }
 
-    struct I : Base::I<I, XML::Interface>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::core::XML>
     {
         using Base::Base;
-        std::string get() const override
+        std::string data() const override
         {
             return ref.toString();
         }

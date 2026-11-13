@@ -84,6 +84,9 @@ methods:
       -
         - String
         - String
+      -
+        - String
+        - Any
     docs: Storage.setItem
     text: |-
       Encrypts `arg1` and stores it under key `arg0`, replacing any existing value for that key.

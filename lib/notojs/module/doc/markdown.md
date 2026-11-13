@@ -110,8 +110,11 @@ E = mc^2
 $$
 
 A highlighted paragraph {color=red}
+A palette-colored paragraph {color=c0}
 ]]>
 ```
+
+Inline `color` styles may use `c0` through `c9` to select a color from the shared notebook palette. The palette is also available to browser renderers as `window.palette`.
 
 JavaScript fenced code blocks are runnable by default in rendered Markdown. The notebook adds a **Run code** action for `js` and `javascript` fences:
 

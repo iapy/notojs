@@ -1,8 +1,25 @@
-cmake_minimum_required(VERSION 3.12)
-
 add_executable(builder ${CMAKE_CURRENT_SOURCE_DIR}/builder.cpp)
 target_link_libraries(builder PRIVATE Boost::program_options yaml-cpp::yaml-cpp)
 target_compile_features(builder PUBLIC cxx_std_17)
+
+if(EXISTS ${CMAKE_INSTALL_PREFIX}/lib/notojs/devkit/docstub.cmake)
+include(${CMAKE_INSTALL_PREFIX}/lib/notojs/devkit/docstub.cmake)
+
+notojs_docstub(${PROJECT_SOURCE_DIR}/lib/notojs/global.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/lib/notojs/module/assert.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/lib/notojs/module/db.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/lib/notojs/module/doc.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/lib/notojs/module/dom.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/lib/notojs/module/fs.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/lib/notojs/module/noto.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/lib/notojs/module/render.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/std/crypto/crypto.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/std/gzip/gzip.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/std/yaml/yaml.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/std/zip/zip.cpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/sdk/global.hpp)
+notojs_docstub(${PROJECT_SOURCE_DIR}/sdk/module.hpp)
+endif()
 
 set(DOCS
     ${PROJECT_SOURCE_DIR}/lib/notojs/global.yml
@@ -13,6 +30,7 @@ set(DOCS
     ${PROJECT_SOURCE_DIR}/lib/notojs/module/dom.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/module/fs.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/module/noto.yml
+    ${PROJECT_SOURCE_DIR}/lib/notojs/module/render.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/script/console.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/script/crypto.yml
     ${PROJECT_SOURCE_DIR}/lib/notojs/script/dollar.yml
@@ -36,9 +54,7 @@ set(DOCS
     ${CMAKE_CURRENT_SOURCE_DIR}/markdown.md
     ${CMAKE_CURRENT_SOURCE_DIR}/notojs.md
     ${CMAKE_CURRENT_SOURCE_DIR}/packages.md
-    ${CMAKE_CURRENT_SOURCE_DIR}/pipeline.md
     ${CMAKE_CURRENT_SOURCE_DIR}/selectors.md
-    ${CMAKE_CURRENT_SOURCE_DIR}/timers.md
     ${CMAKE_CURRENT_SOURCE_DIR}/ui.md
     ${CMAKE_CURRENT_SOURCE_DIR}/yaml.md
 )
@@ -55,7 +71,11 @@ endif()
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/libdoc.cpp
-    COMMAND $<TARGET_FILE:builder> --output ${CMAKE_CURRENT_BINARY_DIR}/libdoc.cpp ${DOCS}
+    COMMAND
+        $<TARGET_FILE:builder>
+        --output
+        ${CMAKE_CURRENT_BINARY_DIR}/libdoc.cpp
+        ${DOCS}
     DEPENDS builder ${DOCS}
     VERBATIM)
 

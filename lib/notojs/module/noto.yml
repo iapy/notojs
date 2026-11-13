@@ -3,7 +3,9 @@
   notebook execution, application URLs, and package resolver configuration.
 
   ###### Exports
+  - default `object self`
   - `config`
+  - `server`
   - `version`
   - `class Config`
   - `class Version`
@@ -13,6 +15,17 @@
   - `function application`
   - `function notebook`
   - `function packages`
+
+  ###### Constants
+  - `config` — top-level read-only runtime configuration (`Config`)
+  - `server` — whether server configuration is available (`Boolean`)
+  - `version` — current NotoJS runtime version (`Version`)
+
+  Import the default export conventionally as `self`:
+
+  ```js
+  import self from 'noto:noto';
+  ```
 ---
 class: Config
 docs: Config
@@ -46,59 +59,6 @@ methods:
       This method is available only on the top-level `config` object. Throws
       `TypeError` when called on a nested configuration section.
 ---
-class: Version
-docs: Version
-text: |-
-  Represents the version of the running **NotoJS** runtime.
-
-  The current version is exported as `version`. Its read-only `major`, `minor`,
-  and `patch` properties expose the numeric components of the version string.
-  `Version` objects cannot be constructed directly.
-
-  ```js
-  import { version } from 'noto:noto';
-
-  const text = version.toString();
-  const { major, minor, patch } = version;
-  const json = JSON.stringify({ version });
-  ```
-properties:
-  major:
-    getter: true
-    docs: Version.major
-    text: |-
-      Returns the major version component as a `Number`. This property is read-only.
-  minor:
-    getter: true
-    docs: Version.minor
-    text: |-
-      Returns the minor version component as a `Number`. This property is read-only.
-  patch:
-    getter: true
-    docs: Version.patch
-    text: |-
-      Returns the patch version component as a `Number`. This property is read-only.
-methods:
-  toJSON:
-    args:
-      -
-        []
-    docs: Version.toJSON
-    text: |-
-      Returns the runtime version as a `String`, equivalent to `toString()`.
-
-      Called automatically by `JSON.stringify()`. The version is serialized as
-      a string, not an object containing the individual version components.
-  toString:
-    args:
-      -
-        []
-    docs: Version.toString
-    text: |-
-      Returns the full runtime version string, such as `"0.4.0"`.
-
-      This is the version embedded when **NotoJS** was built.
----
 class: Cell
 docs: Cell
 text: |-
@@ -110,23 +70,22 @@ text: |-
 
   Each `Cell` is an object with read-only, enumerable `name` and `data`
   properties. `name` is the canonical cell ID; `data` is the parsed array of
-  recorded output entries. The array contents remain mutable. Cells cannot
-  be constructed directly.
+  recorded output entries. The array contents remain mutable.
 impl:
-  - IPrint
+  - noto::Print
 ctor:
   args:
     -
       []
   docs: Cell.constructor
   text: |-
-    Cell.constructor
+    Creates an empty `Cell`. Cells are normally obtained from an `Output` object.
 ---
 class: Output
 docs: Output
 text: |-
   Represents an array-like object containing notebook cell results. It is not
-  an `Array` and cannot be constructed directly.
+  an `Array`.
 
   Cells are stored under enumerable canonical names (`cell-000` through
   `cell-999`). Numeric indices are non-enumerable aliases: `output[0]` and
@@ -139,14 +98,14 @@ text: |-
   execution promise. Results containing more than 1000 cells are rejected
   rather than wrapping canonical names.
 impl:
-  - IPrint
+  - noto::Print
 ctor:
   args:
     -
       []
   docs: Output.constructor
   text: |-
-    Output.constructor
+    Creates an empty `Output`. Populated objects are normally returned by notebook execution or loading.
 methods:
   "[Symbol.iterator]":
     args:
@@ -184,15 +143,20 @@ text: |-
   `Notebook` objects are created with `notebook()`. When printed, a `Notebook`
   loads and renders its saved output.
 impl:
-  - IPrint
+  - noto::Print
 defs:
+  - type: Format
+    base: detail::Reference
+    docs: Notebook.Format
+    text: |-
+      Result-format selector accepted by notebook operations: the global `JSON` object or the `HTML` constructor from `noto:core`.
   - struct: ExecOptions
     fields:
       result:
         type:
           Any:
             - "Null"
-            - Notebook::Format
+            - Notebook.Format
         docs: Notebook.ExecOptions.result
         text: |-
           Selects the result returned by `exec()`.
@@ -205,16 +169,16 @@ defs:
 
           Only these values are accepted. Pass the global `JSON` object or
           the `HTML` constructor, not a string or an instance.
-      input:
+      context:
         type: Any
-        docs: Notebook.ExecOptions.input
+        docs: Notebook.ExecOptions.context
         text: |-
-          Supplies the request body, exposed to the notebook as the global
-          `input` value.
+          Supplies the request body, exposed to the notebook as `self.context`
+          from the default `noto:noto` export.
 
           A `String` is sent unchanged. Any other value is serialized as JSON
           and sent with `Content-Type: application/json`.
-          If omitted, no input is sent.
+          If omitted, no request body is sent and `self.context` is `undefined`.
       update:
         type: Boolean
         docs: Notebook.ExecOptions.update
@@ -227,12 +191,12 @@ defs:
     text: |-
       Options passed as a plain object to `Notebook.exec()`.
 
-      All fields are optional. By default, executes without input or saving
+      All fields are optional. By default, executes without context or saving
       results and returns an `Output` object.
   - struct: LoadOptions
     fields:
       result:
-        type: Notebook::Format
+        type: Notebook.Format
         docs: Notebook.LoadOptions.result
         text: |-
           Selects the result returned by `load()`.
@@ -249,8 +213,14 @@ defs:
       Options passed as a plain object to `Notebook.load()`.
 
       The `result` field is optional and defaults to `JSON`. Loading retrieves
-      saved results without executing the notebook; there are no `input` or
+      saved results without executing the notebook; there are no `context` or
       `update` options.
+properties:
+  name:
+    getter: true
+    docs: Notebook.name
+    text: |-
+      Notebook.name
 methods:
   exec:
     args:
@@ -273,7 +243,7 @@ methods:
 
       const output = await report.exec();
       const html = await report.exec({
-        input: { title: 'Report' },
+        context: { title: 'Report' },
         result: HTML
       });
 
@@ -301,6 +271,56 @@ methods:
       const saved = await notebook('report').load();
       const html = await notebook('report').load({ result: HTML });
       ```
+---
+class: Self
+docs: Self
+text: |-
+  Provides the current notebook execution identity and input/state. The module's
+  default export is a `Self` object, conventionally imported as `self`.
+
+  `Self` objects cannot be constructed directly.
+ctor:
+  args:
+    -
+      []
+  docs: Self.constructor
+  text: |-
+    Self.constructor
+properties:
+  context:
+    getter: true
+    setter:
+      - Any
+    docs: Self.context
+    text: |-
+      Gets or sets the notebook input/state for the current execution context.
+      Assigning `undefined` clears the value.
+
+      The value is set from the Result API request body (parsed JSON when the
+      content type is `application/json`, otherwise a string) and by UI context
+      cells. Application executions start with `undefined` but may use this
+      property as state shared by their cells. Plugin-triggered execution uses
+      `IContext::set_context()` before execution and passes the final value to
+      `IContext::get_context()` after successful execution.
+  name:
+    getter: true
+    docs: Self.name
+    text: |-
+      The read-only, extensionless logical notebook name.
+
+      It is set for Result API, application, and plugin-triggered execution. It
+      is `undefined` in interactive UI kernels, including when an application
+      notebook is run interactively in the editor.
+---
+class: Version
+docs: Version
+text: |-
+  Represents a semantic NotoJS version.
+
+  The read-only, enumerable `major`, `minor`, and `patch` properties contain
+  the numeric version components. `toString()` and `toJSON()` return the full
+  `major.minor.patch` string. `Version` objects cannot be constructed directly;
+  the current runtime version is exported as `version`.
 ---
 function: application
 args:

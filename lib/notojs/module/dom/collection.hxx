@@ -33,7 +33,7 @@ struct Collection : Base
             : JS_UNDEFINED;
     }
 
-    void set_property(JSContext *ctx, const char *name, JSValueConst) {}
+    int set_property(JSContext *ctx, const char *name, JSValueConst) { return 1; }
     void del_property(JSContext *ctx, const char *name) {}
 
     JSValue entries(JSContext *ctx) const

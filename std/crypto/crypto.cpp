@@ -9,7 +9,7 @@
 #include <climits>
 #include <unordered_map>
 
-#include <bridge.hpp>
+#include <module.hpp>
 #include <notodb.hpp>
 
 #include <boost/uuid/uuid.hpp>
@@ -437,7 +437,8 @@ struct Storage : bridge::Interface<Storage, std::string>
             if(!success)
                 return JS_ThrowInternalError(ctx, "Failed to authenticate encrypted value");
 
-            return bridge::String{ctx, std::string{decrypted.begin(), decrypted.end()}};
+            lmdb::val result{decrypted.data(), decrypted.size()};
+            return notojs::NOTOJS_VERSION_NS::db::get(ctx, result);
         } catch(std::runtime_error const &e) {
             return JS_ThrowInternalError(ctx, "std::runtime_error [%s]", e.what());
         }
@@ -477,7 +478,7 @@ struct Storage : bridge::Interface<Storage, std::string>
         }
     }
 
-    JSValue setItem(JSContext *ctx, bridge::String k, bridge::String v)
+    JSValue set(JSContext *ctx, bridge::String &k, std::string_view data)
     {
         Key master;
         if(!getkey(ctx, master))
@@ -493,7 +494,7 @@ struct Storage : bridge::Interface<Storage, std::string>
         identity.append(name);
 
         std::vector<std::uint8_t> encrypted;
-        if(!encrypt(value_key, static_cast<std::string_view const &>(v), identity, encrypted))
+        if(!encrypt(value_key, data, identity, encrypted))
             return JS_ThrowInternalError(ctx, "OpenSSL AES-256-GCM encryption failed");
 
         try {
@@ -506,6 +507,25 @@ struct Storage : bridge::Interface<Storage, std::string>
             return JS_ThrowInternalError(ctx, "std::runtime_error [%s]", e.what());
         }
     }
+
+    JSValue setItem_0(JSContext *ctx, bridge::String k, bridge::String v)
+    {
+        return set(ctx, k, static_cast<std::string_view const &>(v));
+    }
+
+    JSValue setItem_1(JSContext *ctx, bridge::String k, bridge::Value v)
+    {
+        lmdb::val value;
+        notojs::NOTOJS_VERSION_NS::db::Allocator allocator;
+        notojs::NOTOJS_VERSION_NS::db::set(value, v, allocator);
+        return set(ctx, k, std::string_view{value.data(), value.size()});
+    }
+
+    using setItem = bridge::Function
+    <
+        &Storage::setItem_0,
+        &Storage::setItem_1
+    >;
 
     JSValue removeItem(JSContext *ctx, bridge::String k)
     {
@@ -542,7 +562,7 @@ JSCFunctionListEntry const Storage::funcs[] = {
     JS_CFUNC_DEF("key", 1, &bridge::Function<&Storage::key>::invoke),
     JS_CFUNC_DEF("clear", 0, &bridge::Function<&Storage::clear>::invoke),
     JS_CFUNC_DEF("getItem", 1, &bridge::Function<&Storage::getItem>::invoke),
-    JS_CFUNC_DEF("setItem", 2, &bridge::Function<&Storage::setItem>::invoke),
+    JS_CFUNC_DEF("setItem", 2, &Storage::setItem::invoke),
     JS_CFUNC_DEF("removeItem", 1, &bridge::Function<&Storage::removeItem>::invoke),
 
     JS_CGETSET_DEF("length", &bridge::Getter<&Storage::get_length>, NULL)

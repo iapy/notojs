@@ -134,7 +134,7 @@ BOOST_AUTO_TEST_CASE(ScriptHttpError)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-assert(() => throws(() => require.script('/doesnotexist.js', 'a'), 'Bad HTTP status code: 404'));
+assert(throws(() => require.script('/doesnotexist.js', 'a'), InternalError, 'Bad HTTP status code: 404'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -153,7 +153,6 @@ assert(() => typeof(mustache) == 'object');
 
 BOOST_AUTO_TEST_CASE(HttpInvalidURL)
 {
-    db();
     eval(R"JS(
 import 'http:// ';
     )JS");

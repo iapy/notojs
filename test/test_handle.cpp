@@ -14,13 +14,16 @@ BOOST_AUTO_TEST_CASE(Text)
     socket.parser.get().method(boost::beast::http::verb::post);
 
     bridge::Context context{notojs::testing::engine->get_context()};
-    notojs::testing::global->set_handle(context.get(), socket);
+    notojs::testing::global->set_context(context.get(), "Text", JS_UNDEFINED);
+    notojs::testing::global->set_context(context.get(), socket);
 
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
+import self from 'noto:noto';
 
 assert(() => "/text" == request.path);
 assert(() => "POST" == request.method);
+assert(() => "Text" == self.name);
 assert(() => request.headers.has("Content-Type"));
 assert(() => "text/txt" == request.headers.get("Content-Type"));
 
@@ -46,11 +49,13 @@ BOOST_AUTO_TEST_CASE(Json)
     socket.parser.get().method(boost::beast::http::verb::put);
 
     bridge::Context context{notojs::testing::engine->get_context()};
-    notojs::testing::global->set_handle(context.get(), socket);
-
+    notojs::testing::global->set_context(context.get(), "Json", JS_UNDEFINED);
+    notojs::testing::global->set_context(context.get(), socket);
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
+import self from 'noto:noto';
 
+assert(() => "Json" == self.name);
 assert(() => "/json" == request.path);
 assert(() => "PUT" == request.method);
 
@@ -96,10 +101,13 @@ BOOST_AUTO_TEST_CASE(Multipart)
     socket.parser.get().method(boost::beast::http::verb::post);
 
     bridge::Context context{notojs::testing::engine->get_context()};
-    notojs::testing::global->set_handle(context.get(), socket);
-
+    notojs::testing::global->set_context(context.get(), "Multipart", JS_UNDEFINED);
+    notojs::testing::global->set_context(context.get(), socket);
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
+import self from 'noto:noto';
+
+assert(() => "Multipart" == self.name);
 
 const data = await request.formData();
 assert(() => data instanceof FormData);
@@ -130,12 +138,15 @@ BOOST_AUTO_TEST_CASE(MultipartMalformed)
     socket.parser.get().method(boost::beast::http::verb::post);
 
     bridge::Context context{notojs::testing::engine->get_context()};
-    notojs::testing::global->set_handle(context.get(), socket);
+    notojs::testing::global->set_context(context.get(), "MultipartMalformed", JS_UNDEFINED);
+    notojs::testing::global->set_context(context.get(), socket);
 
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
+import self from 'noto:noto';
 
-assert(() => throws(() => request.formData(), 'Missing multipart boundary'));
+assert(() => "MultipartMalformed" == self.name);
+assert(throws(() => request.formData(), TypeError, 'Missing multipart boundary'));
     )JS", context.get(), "cell-uuid-1");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -153,10 +164,14 @@ BOOST_AUTO_TEST_CASE(FormDataUrlEncoded)
     socket.parser.get().method(boost::beast::http::verb::post);
 
     bridge::Context context{notojs::testing::engine->get_context()};
-    notojs::testing::global->set_handle(context.get(), socket);
+    notojs::testing::global->set_context(context.get(), "FormDataUrlEncoded", JS_UNDEFINED);
+    notojs::testing::global->set_context(context.get(), socket);
 
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
+import self from 'noto:noto';
+
+assert(() => "FormDataUrlEncoded" == self.name);
 
 const data = await request.formData();
 assert(() => data instanceof FormData);
@@ -178,13 +193,17 @@ BOOST_AUTO_TEST_CASE(FormDataUnsupported)
     socket.parser.get().method(boost::beast::http::verb::post);
 
     bridge::Context context{notojs::testing::engine->get_context()};
-    notojs::testing::global->set_handle(context.get(), socket);
+    notojs::testing::global->set_context(context.get(), "FormDataUnsupported", JS_UNDEFINED);
+    notojs::testing::global->set_context(context.get(), socket);
 
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
+import self from 'noto:noto';
 
-assert(() => throws(
+assert(() => "FormDataUnsupported" == self.name);
+assert(throws(
     () => request.formData(),
+    TypeError,
     'Unsupported form data Content-Type: application/json'
 ));
     )JS", context.get(), "cell-uuid-1");

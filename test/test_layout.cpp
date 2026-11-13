@@ -9,11 +9,11 @@ BOOST_AUTO_TEST_CASE(Columns)
 import { assert, throws } from 'noto:assert';
 import { html } from 'noto:core';
 
-assert(() => throws(() => print['abracadabra'](), "Invalid layout: [abracadabra]"));
-assert(() => throws(() => print['40 50'](), "Invalid layout: [40 50]"));
-assert(() => throws(() => print['40% 50'](), "Invalid layout: [40% 50]"));
-assert(() => throws(() => print['40 50%'](), "Invalid layout: [40 50%]"));
-assert(() => throws(() => print['40- 50%'](), "Invalid layout: [40- 50%]"));
+assert(throws(() => print['abracadabra'](), TypeError, "Invalid layout: [abracadabra]"));
+assert(throws(() => print['40 50'](), TypeError, "Invalid layout: [40 50]"));
+assert(throws(() => print['40% 50'](), TypeError, "Invalid layout: [40% 50]"));
+assert(throws(() => print['40 50%'](), TypeError, "Invalid layout: [40 50%]"));
+assert(throws(() => print['40- 50%'](), TypeError, "Invalid layout: [40- 50%]"));
 
 print['40%'](html(''));
 print['40% 60%'](html(''), html(''));

@@ -1,4 +1,5 @@
 #include <boost/test/unit_test.hpp>
+#include <module.hpp>
 #include "test_engine.hpp"
 
 BOOST_FIXTURE_TEST_SUITE(Fs, notojs::testing::Fixture)
@@ -34,12 +35,12 @@ try {
 assert(() => error instanceof fs.FileSystemError);
 assert(() => error instanceof Error);
 
-assert(() => throws(() => fs.path('ab'), 'Expecting absolute path'));
-assert(() => throws(() => fs.path('/ab'), 'Not mounted'));
-assert(() => throws(() => fs.path('/ro').remove(), 'Read-only file system'));
-assert(() => throws(() => fs.path('/rw').remove(), 'Read-only file system'));
-assert(() => throws(() => fs.path('/ro/test').mkdir(), 'Read-only file system'));
-assert(() => throws(() => fs.path('/rw/test/foo').mkdir(), 'No such file or directory'));
+assert(throws(() => fs.path('ab'), TypeError, 'Expecting absolute path'));
+assert(throws(() => fs.path('/ab'), TypeError, 'Not mounted'));
+assert(throws(() => fs.path('/ro').remove(), fs.FileSystemError, 'Read-only file system'));
+assert(throws(() => fs.path('/rw').remove(), fs.FileSystemError, 'Read-only file system'));
+assert(throws(() => fs.path('/ro/test').mkdir(), fs.FileSystemError, 'Read-only file system'));
+assert(throws(() => fs.path('/rw/test/foo').mkdir(), fs.FileSystemError, 'No such file or directory'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -74,15 +75,15 @@ assert(() => fs.path('/rw/d/test.txt').exists);
 const j = await fs.path('/ro/d/test.txt').json();
 assert(() => 42 == j);
 
-assert(() => throws(() => b.remove({recursive: true}), 'Read-only file system'));
-assert(() => throws(() => b.remove(), 'Read-only file system'));
-assert(() => throws(() => a.remove(), 'Directory not empty'));
+assert(throws(() => b.remove({recursive: true}), fs.FileSystemError, 'Read-only file system'));
+assert(throws(() => b.remove(), fs.FileSystemError, 'Read-only file system'));
+assert(throws(() => a.remove(), fs.FileSystemError, 'Directory not empty'));
 
 const c = fs.path('/rw/b');
 const d = fs.path('/ro/b');
 
-assert(() => throws(() => a.move(d), 'Read-only file system'));
-assert(() => throws(() => b.move(c), 'Read-only file system'));
+assert(throws(() => a.move(d), fs.FileSystemError, 'Read-only file system'));
+assert(throws(() => b.move(c), fs.FileSystemError, 'Read-only file system'));
 
 a.move(c);
 assert(() => !a.exists);
@@ -110,14 +111,14 @@ assert(() => !y.exists);
 assert(() => !z.exists);
 
 await x.write('Foo');
-assert(() => throws(() => x.copy(y), 'Read-only file system'));
+assert(throws(() => x.copy(y), fs.FileSystemError, 'Read-only file system'));
 
 x.copy(z);
 assert(() => z.exists);
 assert(() => y.exists);
 
 await x.write('Bar');
-assert(() => throws(() => x.copy(z), 'File exists'));
+assert(throws(() => x.copy(z), fs.FileSystemError, 'File exists'));
 
 x.copy(z, {overwrite: true});
 
@@ -139,7 +140,7 @@ const b = fs.path('/ro/a.txt')
 assert(() => !a.exists);
 assert(() => !b.exists);
 
-assert(() => throws(() => b.write('test'), 'Read-only file system'));
+assert(throws(() => b.write('test'), fs.FileSystemError, 'Read-only file system'));
 
 const n = await a.write('test');
 assert(() => 4 == a.size);
@@ -159,7 +160,7 @@ assert(() => 4 == v.size);
 assert(() => 'text/plain' == v.type);
 
 const c = fs.path('/rw/x/a.txt');
-assert(() => throws(() => c.write('test'), 'No such file or directory'));
+assert(throws(() => c.write('test'), fs.FileSystemError, 'No such file or directory'));
 
 const m = await a.write('foobar');
 assert(() => 6 == a.size);
@@ -172,7 +173,7 @@ assert(() => 3 == p);
 t = await b.text();
 assert(() => 'foobarbaz' == t);
 
-assert(() => throws(() => b.json()));
+assert(throws(() => b.json(), SyntaxError));
 await a.write('{"value":42}');
 
 t = await b.json();
@@ -185,6 +186,29 @@ assert(() => !a.exists);
     BOOST_TEST(get_error() == std::nullopt);
 }
 
+BOOST_AUTO_TEST_CASE(NativeConversions)
+{
+    auto const [native, native_flag] = noto::fs::Path::v2n("/rw/.hidden");
+    BOOST_TEST(native_flag == noto::fs::Path::RW);
+    BOOST_TEST(native.filename().string() == ".hidden");
+
+    auto const [virtual_path, virtual_flag] = noto::fs::Path::n2v(native);
+    BOOST_TEST(virtual_flag == noto::fs::Path::RW);
+    BOOST_TEST(virtual_path.generic_string() == "/rw/.hidden");
+
+    auto const [relative, relative_flag] = noto::fs::Path::n2v("relative");
+    BOOST_TEST(relative == std::filesystem::path{"relative"});
+    BOOST_TEST(relative_flag == noto::fs::Path::UNMOUNTED);
+
+    auto const [unmounted_native, unmounted_native_flag] = noto::fs::Path::v2n("/unmounted");
+    BOOST_TEST(unmounted_native.empty());
+    BOOST_TEST(unmounted_native_flag == noto::fs::Path::UNMOUNTED);
+
+    auto const [unmounted_virtual, unmounted_virtual_flag] = noto::fs::Path::n2v("/unmounted");
+    BOOST_TEST(unmounted_virtual.empty());
+    BOOST_TEST(unmounted_virtual_flag == noto::fs::Path::UNMOUNTED);
+}
+
 BOOST_AUTO_TEST_CASE(API)
 {
     eval(R"JS(
@@ -192,8 +216,8 @@ import { assert, throws } from 'noto:assert';
 import { make } from 'fs.so';
 
 const a = make('/rw/a.txt');
-assert(() => throws(() => make('foo'), 'Expecting absolute path'));
-assert(() => throws(() => make('/xx'), 'Not mounted'));
+assert(throws(() => make('foo'), TypeError, 'Expecting absolute path'));
+assert(throws(() => make('/xx'), TypeError, 'Not mounted'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);

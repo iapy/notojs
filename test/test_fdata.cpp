@@ -17,8 +17,8 @@ assert(() => "foo1" == f(1));
 assert(() => "foobar" == f("bar"));
 assert(() => "foo1" == f(1, "ignored"));
 assert(() => "foobar" == f("bar", 42));
-assert(() => throws(() => f()));
-assert(() => throws(() => f({})));
+assert(throws(() => f(), TypeError));
+assert(throws(() => f({}), TypeError));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -50,8 +50,8 @@ assert(() => stringReceiver.self === 'receiver' && stringReceiver.value === 'foo
 
 const booleanReceiver = f.call(false, 'foo', 'bar');
 assert(() => booleanReceiver.self === false && booleanReceiver.value === 'foobar');
-assert(() => throws(() => f('foo')));
-assert(() => throws(() => f('foo', {})));
+assert(throws(() => f('foo'), TypeError));
+assert(throws(() => f('foo', {}), TypeError));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -70,8 +70,8 @@ const text = f.call(first, 'bar');
 const number = f.call(second, 42);
 assert(() => text.self === first && text.value === 'foobar');
 assert(() => number.self === second && number.value === 'foo42');
-assert(() => throws(() => f.call(first)));
-assert(() => throws(() => f.call(first, {})));
+assert(throws(() => f.call(first), TypeError));
+assert(throws(() => f.call(first, {}), TypeError));
 
 const captured = bindSelf('foo', 'bar');
 const result = captured.call(first);
@@ -125,15 +125,15 @@ assert(() => captured('a', 'b', 'c', 'd', 'e') === 'p7:5:a:e');
 assert(() => captured('next') === 'p7:1:next:next');
 
 // Capturing every fixed argument still leaves a required runtime tail.
-assert(() => throws(() => unbound()));
-assert(() => throws(() => unbound('p')));
-assert(() => throws(() => unbound('p', 7)));
-assert(() => throws(() => partial(7)));
-assert(() => throws(() => captured()));
-assert(() => throws(() => unbound(1, 7, 'a')));
-assert(() => throws(() => partial('wrong', 'a')));
-assert(() => throws(() => captured(1)));
-assert(() => throws(() => captured('a', 'b', 'c', {})));
+assert(throws(() => unbound(), TypeError));
+assert(throws(() => unbound('p'), TypeError));
+assert(throws(() => unbound('p', 7), TypeError));
+assert(throws(() => partial(7), TypeError));
+assert(throws(() => captured(), TypeError));
+assert(throws(() => unbound(1, 7, 'a'), TypeError));
+assert(throws(() => partial('wrong', 'a'), TypeError));
+assert(throws(() => captured(1), TypeError));
+assert(throws(() => captured('a', 'b', 'c', {}), TypeError));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -153,17 +153,17 @@ assert(() => unbound('p', 7) === 'p7:0');
 assert(() => partial(7, 'a', 'b', 'c') === 'p7:3:a:c');
 assert(() => captured() === 'p7:0');
 assert(() => captured('a') === 'p7:1:a:a');
-assert(() => throws(() => unbound('p')));
-assert(() => throws(() => partial({})));
-assert(() => throws(() => captured('a', 'b', 42)));
+assert(throws(() => unbound('p'), TypeError));
+assert(throws(() => partial({}), TypeError));
+assert(throws(() => captured('a', 'b', 42), TypeError));
 
 // These strings pass check(), but must fail the callback's custom valid().
-assert(() => throws(() => unbound('', 7), 'empty prefix'));
-assert(() => throws(() => bindRequired()('', 7, 'a'), 'empty prefix'));
+assert(throws(() => unbound('', 7), TypeError, 'empty prefix'));
+assert(throws(() => bindRequired()('', 7, 'a'), TypeError, 'empty prefix'));
 const invalidPartial = bindOptional('');
 const invalidCaptured = bindRequired('', 7);
-assert(() => throws(() => invalidPartial(7, 'a'), 'empty prefix'));
-assert(() => throws(() => invalidCaptured('a'), 'empty prefix'));
+assert(throws(() => invalidPartial(7, 'a'), TypeError, 'empty prefix'));
+assert(throws(() => invalidCaptured('a'), TypeError, 'empty prefix'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -187,11 +187,11 @@ assert(() => second.self === null && second.value === 'p7:1:a:a');
 const third = captured.call(42, 'a', 'b', 'c', 'd');
 assert(() => third.self === 42 && third.value === 'p7:4:a:d');
 assert(() => captured('a').self === undefined);
-assert(() => throws(() => captured.call(receiver)));
-assert(() => throws(() => partial.call(receiver, 'wrong', 'a')));
-assert(() => throws(() => captured.call(receiver, 'a', {})));
+assert(throws(() => captured.call(receiver), TypeError));
+assert(throws(() => partial.call(receiver, 'wrong', 'a'), TypeError));
+assert(throws(() => captured.call(receiver, 'a', {}), TypeError));
 const invalid = bindRequiredSelf('', 7);
-assert(() => throws(() => invalid.call(receiver, 'a'), 'empty prefix'));
+assert(throws(() => invalid.call(receiver, 'a'), TypeError, 'empty prefix'));
 
 const optional = bindOptionalSelf('p', 7);
 assert(() => optional.length === 0);
@@ -221,9 +221,9 @@ assert(() => captured(9) === 'fixed');
 assert(() => unbound('p', 7, 'a') === 'p7:1:a:a');
 assert(() => partial(7, 'a', 'b', 'c') === 'p7:3:a:c');
 assert(() => captured('a', 'b', 'c', 'd', 'e') === 'p7:5:a:e');
-assert(() => throws(() => captured()));
-assert(() => throws(() => captured({})));
-assert(() => throws(() => captured('a', 'b', {})));
+assert(throws(() => captured(), TypeError));
+assert(throws(() => captured({}), TypeError));
+assert(throws(() => captured('a', 'b', {}), TypeError));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);

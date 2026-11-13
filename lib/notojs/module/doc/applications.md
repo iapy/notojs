@@ -64,6 +64,23 @@ and exposes the request path to the application as:
 
 If the application notebook does not exist, **NotoJS** returns **404 Not Found**.
 
+### Execution context
+
+The default `noto:noto` export provides the application's execution identity and notebook-local state:
+
+```javascript!noplay
+import self from 'noto:noto';
+
+print(self.name);    // "hello" for app/hello.notojs
+print(self.context); // undefined at the start of the request
+
+self.context = { started: Date.now() };
+```
+
+`self.name` is read-only and contains the extensionless application name. Each request runs in a fresh execution context, so `self.context` starts as `undefined`; application cells may read and write it during that request. Assigning `undefined` clears it. Read the HTTP request body through the handler's `request` object rather than `self.context`.
+
+When the same application notebook is executed interactively in the UI, it uses an interactive kernel and `self.name` is `undefined`.
+
 ### Handler cell
 
 Application notebooks start with a handler cell. In the editor, this cell is shown with a protected wrapper. You write the body of an async function; NotoJS wraps it as:

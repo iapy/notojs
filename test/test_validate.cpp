@@ -9,9 +9,9 @@ BOOST_AUTO_TEST_CASE(Validate)
 import { assert, throws } from 'noto:assert';
 import { Path } from 'validate.so'
 
-assert(() => throws(() => new Path(), 'Path: no matching constructor found'));
-assert(() => throws(() => new Path(''), 'Path constructor: invalid path []'));
-assert(() => throws(() => new Path('xxx'), 'Path constructor: invalid path [xxx]'));
+assert(throws(() => new Path(), TypeError, 'Path: no matching constructor found'));
+assert(throws(() => new Path(''), TypeError, 'Path constructor: invalid path []'));
+assert(throws(() => new Path('xxx'), TypeError, 'Path constructor: invalid path [xxx]'));
 
 var a = new Path('/');
 assert(() => '/' == a.path);
@@ -19,7 +19,7 @@ assert(() => '/' == a.path);
 var b = new Path('/var');
 assert(() => '/var' == b.path);
 
-assert(() => throws(() => a.path = 'x', 'Path: invalid path [x]'));
+assert(throws(() => a.path = 'x', TypeError, 'Path: invalid path [x]'));
 assert(() => '/' == a.path);
 
 a.path = '/etc';

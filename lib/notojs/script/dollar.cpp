@@ -27,7 +27,7 @@ JSValue ajax(JSContext *ctx, Config config)
     auto u = config.get<bridge::String>("url");
     if(!u) return JS_ThrowTypeError(ctx, "$.ajax: url should be specified");
 
-    auto url = facade::URL::parse(static_cast<std::string_view>(*u).data());
+    auto url = NOTOJS_VERSION_NS::URL::parse(static_cast<std::string_view>(*u).data());
     if(!url) return JS_ThrowTypeError(ctx, "$.ajax: malformed url %s", static_cast<std::string_view>(*u).data());
 
     std::chrono::milliseconds timeout{10000};
@@ -68,7 +68,7 @@ JSValue ajax(JSContext *ctx, Config config)
             request.set(key, static_cast<std::string_view const &>(value));
         });
 
-    return facade::fetch(ctx, std::move(request), std::move(*url),
+    return NOTOJS_VERSION_NS::fetch(ctx, std::move(request), std::move(*url),
         json
         ? +[](JSContext *ctx, JSValue, boost::beast::http::response<boost::beast::http::string_body> const &response)
         {

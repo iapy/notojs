@@ -53,10 +53,12 @@ print(count);
 
 For ordinary cell declarations, explicit `export` statements make the intended public interface clearer. Direct `globalThis` assignment is useful for mutable shared state and compatibility with scripts that install browser-like globals.
 
-Some notebook features generate exports automatically:
+Some notebook features generate code automatically:
 
-- An enabled input cell exports `input`, making its text or parsed JSON value available to subsequent cells.
+- An enabled context cell imports the default `self` object from `noto:noto` and assigns its text or parsed JSON value to `self.context`. Disabling or removing the cell assigns `undefined`, which clears the value.
 - A named Markdown block prefixed with `!` is rewritten as an exported Markdown value.
+
+In interactive UI kernels, `self.name` is `undefined`. Non-kernel execution paths set it to the extensionless logical notebook name: the Result API, applications, and plugin-triggered execution all provide a name.
 
 ### Resetting execution state
 

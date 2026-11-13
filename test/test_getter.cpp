@@ -60,7 +60,7 @@ import { Headers, Request, bodyof } from 'getter.so';
 assert(() => '' == bodyof());
 assert(() => 'bar' == bodyof('foo', 'bar'));
 assert(() => 'body' == bodyof(new Request('body'), new Headers('bar')));
-assert(() => throws(() => bodyof(1,2,3)));
+assert(throws(() => bodyof(1,2,3), TypeError));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);

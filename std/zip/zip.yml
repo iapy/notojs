@@ -1,10 +1,12 @@
 text: |-
-  `zip.so` provides the `zip` function for reading and writing **zip** archives.
+  `zip.so` provides a default-exported `zip` factory for reading and writing
+  **zip** archives. The factory is not available as a named export.
 
-  ###### Exports
-  - `class Zip`
-  - `class ZipError`
+  ###### Default export
   - `function zip`
+
+  ###### Named exports
+  - `class ZipError`
 also:
   - topic:zip
 ---
@@ -102,15 +104,3 @@ methods:
       Otherwise, it resolves to an `Object` mapping entry names to errors that occurred during writing.
 
       Throws `ZipError` if the **zip** archive cannot be opened for writing.
----
-function: zip
-args:
-  -
-    - fs::IPath
-docs: zip
-text: |-
-  Creates a `Zip` instance.
-
-  Returns a `Zip` instance with `arg0` as the path to the **zip** file.
-
-  ###### Default export

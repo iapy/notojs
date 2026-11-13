@@ -21,7 +21,7 @@ Right side (top-to-bottom or right-to-left depending on the browser window size)
 - ![play](https://api.iconify.design/material-symbols-light/play-circle-outline.svg) run all cells{.list-item-with-icon}
     - `⌘ + Shift + Enter` on Apple
     - `Ctrl + Shift + Enter` on Windows/Linux
-- ![input](https://api.iconify.design/material-symbols-light/draft-orders.svg) add an input cell{.list-item-with-icon}
+- ![context](https://api.iconify.design/material-symbols-light/draft-orders.svg) add a context cell{.list-item-with-icon}
 
 ### Generic cells
 
@@ -50,26 +50,34 @@ After execution, the cell toolbar shows:
 - left side: the generated cell name, such as `cell-000`. Absence of generated name indicates that the cell has never been executed in the current kernel.
 - right side: cell execution time
 
-### Input cell
+### Context cell
 
-Input cell is used to define the global `input` value for notebook execution.
+A context cell sets `self.context`, the notebook input/state exposed by the default `noto:noto` export.
 
-Input cell can switch between two modes:
+Context cell can switch between two modes:
 
-- ![text](https://api.iconify.design/material-symbols-light/article-outline.svg) text input — the content is exported as a string{.list-item-with-icon}
-- ![json](https://api.iconify.design/material-symbols-light/data-object.svg) json input — the content is parsed as JSON and exported as JavaScript object{.list-item-with-icon}
+- ![text](https://api.iconify.design/material-symbols-light/article-outline.svg) text mode — the content is assigned as a string{.list-item-with-icon}
+- ![json](https://api.iconify.design/material-symbols-light/data-object.svg) JSON mode — the content is parsed and assigned as a JavaScript object{.list-item-with-icon}
 
-Internally, the input cell generates code equivalent to one of:
+Internally, the context cell generates code equivalent to one of:
 
 ```js!noplay
-globalThis.input = "...text...";
-globalThis.input = { /* object data */ };
+import self from 'noto:noto';
+self.context = "...text...";
 ```
 
-Input cell is intended for testing automated notebook execution and is not saved with the notebook. Disabling or removing the input cell executes
+or:
 
 ```js!noplay
-delete globalThis.input
+import self from 'noto:noto';
+self.context = { /* object data */ };
+```
+
+A context cell is intended for testing automated notebook execution and is not saved with the notebook. Disabling or removing it clears the value by executing:
+
+```js!noplay
+import self from 'noto:noto';
+self.context = undefined;
 ```
 
 ### Package configuration cell

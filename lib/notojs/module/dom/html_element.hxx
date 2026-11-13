@@ -679,7 +679,7 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
         dynamic_cast<dom::HTMLBackend *>(self.doc.get())->nodes.erase(self);
     }
 
-    struct I : Base::I<I, HTML::Interface>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::core::HTML>
     {
         using Base::Base;
         bool json() const override
@@ -687,7 +687,7 @@ struct HTMLElement : bridge::Interface<HTMLElement, dom::HTMLElement, Element>
             lxb_tag_id_t tag = (lxb_tag_id_t)static_cast<lxb_dom_node_t *>(ref)->local_name;
             return LXB_TAG_HTML != tag && LXB_TAG_HEAD != tag && LXB_TAG_BODY != tag && LXB_TAG_TITLE != tag;
         }
-        std::string get() const override
+        std::string data() const override
         {
             return ref.toString();
         }

@@ -28,7 +28,7 @@ const e = d.toJSON();
 assert(() => 'Custom' == e.type);
 assert(() => 'custom' == e.data);
 assert(() => 'custom' == consume(d));
-assert(() => throws(() => consume({})));
+assert(throws(() => consume({}), TypeError));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);

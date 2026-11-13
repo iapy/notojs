@@ -9,14 +9,12 @@
 
 namespace notojs {
 
-class Config;
 class Engine;
 class Plugin;
 class Router;
-class Timers;
 class Window;
 
-class Server : public Requires<Engine, Plugin, Router, Timers, Window>
+class Server : public Requires<Engine, Plugin, Router, Window>
 {
 private:
     int main();

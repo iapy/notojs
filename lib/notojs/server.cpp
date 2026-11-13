@@ -5,7 +5,6 @@
 #include <notojs/plugin.hpp>
 #include <notojs/router.hpp>
 #include <notojs/server.hpp>
-#include <notojs/timers.hpp>
 #include <notojs/writer.hpp>
 #include <notojs/window.hpp>
 #include <memory.hpp>
@@ -197,7 +196,6 @@ int Server::main()
 
         get<Plugin>().mod();
         get<Plugin>().run();
-        get<Timers>().run();
         boost::asio::signal_set signals(ioc, SIGINT, SIGTERM);
         signals.async_wait([&](const boost::system::error_code& error, int signal){
             if(error)
@@ -208,7 +206,6 @@ int Server::main()
             {
                 std::clog << "signal" << notojs::values(signal);
                 get<Plugin>().end();
-                get<Timers>().end();
                 get<Window>().end();
                 ioc.stop();
             }

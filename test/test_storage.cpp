@@ -7,18 +7,17 @@ BOOST_FIXTURE_TEST_SUITE(Storage, notojs::testing::Fixture)
 
 BOOST_AUTO_TEST_CASE(Storage)
 {
-    db();
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-assert(() => throws(() => new Storage(''), 'Storage constructor: invalid namespace []'));
-assert(() => throws(() => new Storage('a b'), 'Storage constructor: invalid namespace [a b]'));
-assert(() => throws(() => new Storage('a/b'), 'Storage constructor: invalid namespace [a/b]'));
+assert(throws(() => new Storage(''), TypeError, 'Storage constructor: invalid namespace []'));
+assert(throws(() => new Storage('a b'), TypeError, 'Storage constructor: invalid namespace [a b]'));
+assert(throws(() => new Storage('a/b'), TypeError, 'Storage constructor: invalid namespace [a/b]'));
 
 const s = new Storage('foo');
 assert(() => 0 == s.length);
 assert(() => null == s.getItem('test'));
 
-assert(() => throws(() => s.setItem('test')));
+assert(throws(() => s.setItem('test'), TypeError));
 
 s.setItem('test', 'one');
 s.setItem('json', {'foo': 42});
@@ -50,9 +49,55 @@ assert(() => null == s.getItem('json'));
     BOOST_TEST(get_error() == std::nullopt);
 }
 
+BOOST_AUTO_TEST_CASE(NativeAPI)
+{
+    eval(R"JS(
+import { assert } from 'noto:assert';
+import { get, remove, setString, setValue } from 'storage.so';
+
+const ns = 'native-api';
+
+setString(ns, 'string', 'test');
+setValue(ns, 'value', {foo: 42, nested: {enabled: true}});
+
+assert(() => 'test' === get(ns, 'string'));
+assert(() => 42 === get(ns, 'value').foo);
+assert(() => true === get(ns, 'value').nested.enabled);
+
+const storage = new Storage(ns);
+assert(() => 'test' === storage.getItem('string'));
+assert(() => 42 === storage.getItem('value').foo);
+
+remove(ns, 'string');
+remove(ns, 'value');
+
+assert(() => null === get(ns, 'string'));
+assert(() => null === get(ns, 'value'));
+assert(() => 0 === storage.length);
+
+setString(storage, 'string', 'test');
+setValue(storage, 'value', {foo: 42, nested: {enabled: true}});
+
+assert(() => 'test' === get(storage, 'string'));
+assert(() => 42 === get(storage, 'value').foo);
+assert(() => true === get(storage, 'value').nested.enabled);
+
+assert(() => 'test' === storage.getItem('string'));
+assert(() => 42 === storage.getItem('value').foo);
+
+remove(storage, 'string');
+remove(storage, 'value');
+
+assert(() => null === get(storage, 'string'));
+assert(() => null === get(storage, 'value'));
+assert(() => 0 === storage.length);
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
 BOOST_AUTO_TEST_CASE(Extend)
 {
-    db();
     eval(R"JS(
 import { assert } from 'noto:assert';
 
@@ -85,11 +130,10 @@ assert(() => 2 == s.getItem('counter'));
 BOOST_AUTO_TEST_CASE(Require)
 {
     bridge::Context context{notojs::testing::engine->get_context()};
-    db();
 
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-assert(() => throws(() => require('storage')));
+assert(throws(() => require('storage'), TypeError));
     )JS", context.get(), "cell-001");
 
     eval(R"JS(
@@ -114,10 +158,10 @@ require('storage', {scope: 'notebook', ns: 'foo'});
 import { assert, throws } from 'noto:assert';
 assert(() => globalThis.localStorage instanceof Storage);
 
-assert(() => throws(() => require('storage', {scope: 1}), 'No matching function overload found'));
-assert(() => throws(() => require('storage', {scope: 'foo'}), 'invalid scope [foo]'));
-assert(() => throws(() => require('storage', {ns: 'a b'}), 'Storage constructor: invalid namespace [a b]'));
-assert(() => throws(() => require('storage', {ns: 'a/b'}), 'Storage constructor: invalid namespace [a/b]'));
+assert(throws(() => require('storage', {scope: 1}), TypeError, 'No matching function overload found'));
+assert(throws(() => require('storage', {scope: 'foo'}), TypeError, 'invalid scope [foo]'));
+assert(throws(() => require('storage', {ns: 'a b'}), TypeError, 'Storage constructor: invalid namespace [a b]'));
+assert(throws(() => require('storage', {ns: 'a/b'}), TypeError, 'Storage constructor: invalid namespace [a/b]'));
     )JS", context.get(), "cell-005");
 
     BOOST_TEST(get_error() == std::nullopt);

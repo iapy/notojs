@@ -8,7 +8,7 @@ text: |-
 also:
   - https://developer.mozilla.org/en-US/docs/Web/API/Blob
 impl:
-  - IBlob
+  - noto::Blob
 defs:
   - type: Parts
     base: Array
@@ -111,7 +111,7 @@ text: |-
   Represents immutable binary data with a file name and modification timestamp.
   `File` extends `Blob`, so it supports the same body-reading and slicing operations.
 impl:
-  - IFile
+  - noto::File
 defs:
   - struct: Options
     fields:
@@ -192,15 +192,15 @@ methods:
         - String
       -
         - String
-        - IBlob
+        - noto::Blob
       -
         - String
-        - IBlob
+        - noto::Blob
         - String
     docs: FormData.append
     text: |-
       Appends a field without replacing existing entries with the same name.
-      String values remain strings. `File` and `IBlob` values are returned as `File` objects; a plain blob uses `"blob"` as its default filename unless `arg2` supplies another name.
+      String values remain strings. `File` and `NOTOJS_VERSION_NS::Blob` values are returned as `File` objects; a plain blob uses `"blob"` as its default filename unless `arg2` supplies another name.
   delete:
     args:
       -
@@ -258,10 +258,10 @@ methods:
         - String
       -
         - String
-        - IBlob
+        - noto::Blob
       -
         - String
-        - IBlob
+        - noto::Blob
         - String
     docs: FormData.set
     text: |-
@@ -502,13 +502,6 @@ text: |-
   The `ServerRequest` represents **NotoJS** HTTP application request and is a base class of `Request`.
 
   > Implemented on top of `boost::beast::http::request<boost::beast::http::string_body>`.{.info}
-ctor:
-  args:
-    -
-      []
-  docs: ServerRequest.constructor
-  text: |-
-    Constructs empty `ServerRequest`
 properties:
   headers:
     getter: true
@@ -581,7 +574,7 @@ text: |-
 also:
   - https://developer.mozilla.org/en-US/docs/Web/API/URL
 impl:
-  - IURL
+  - noto::URL
 defs:
   - type: String
     base: String
@@ -1005,18 +998,25 @@ properties:
     text: |-
       The URL of the response.
 ---
+class: Print
+docs: Print
+text: |-
+  Print
+---
 class: Storage
 docs: Storage
 text: |-
   A key–value persistence interface backed by **LMDB**, providing fast, durable storage across executions.
   Unlike the standard browser implementation, it can store any JSON-serializable values — not just strings.
 
-  `Storage` is accessible using **NotoJS** HTTP API.
+  `Storage` is accessible using the **NotoJS** HTTP API and through the `noto::Storage` C++ facade.
 also:
   - https://developer.mozilla.org/en-US/docs/Web/API/Storage
   - topic:api
   - topic:lmdb
   - topic:ui
+impl:
+  - noto::Storage
 defs:
   - type: Namespace
     base: String
@@ -1218,8 +1218,6 @@ args:
   -
     - String
   -
-    - Function
-  -
     - HTML
     - Object
   -
@@ -1229,24 +1227,18 @@ args:
     - Markdown
     - Object
 text: |-
-  Creates Markdown, processes the current notebook input, or applies a template, depending on the arguments.
+  Creates Markdown or applies a **Mustache** template, depending on the arguments.
 
-  When passed a single string, returns an immutable `Markdown` value containing that string.
+  When passed a single `String`, returns an immutable `Markdown` value containing that string.
 
-  When passed a function as `arg0`, invokes it with the current `globalThis.input` value and stores the result back in `globalThis.input`.
-  This is a building block for **NotoJS** pipelines.
-
-  When passed a template and a values object, applies a **Mustache** template to the given input.
+  When passed a `String`, `HTML`, or `Markdown` template and a values object,
+  renders the template with **Mustache** and returns a value of the same type as
+  the template.
 
   - `arg0` — template input
   - `arg1` — values object used for template substitution
-
-  The template is rendered using **Mustache** with `arg0` as the template and `arg1` as the data.
-
-  Returns a value of the same type as `arg0` with the template applied.
 also:
   - dollar
-  - topic:pipeline
 ---
 function: atob
 args:

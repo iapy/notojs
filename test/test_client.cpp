@@ -8,14 +8,14 @@ BOOST_AUTO_TEST_CASE(FetchError)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 
-assert(() => throws(() => fetch(), 'No matching function overload found'));
-assert(() => throws(() => fetch(1), 'No matching function overload found'));
-assert(() => throws(() => fetch('http://abracad.abra'), 'Host not found (authoritative)'));
-assert(() => throws(() => fetch('http://127.0.0.1:7777'), 'Connection refused'));
-assert(() => throws(() => fetch(new Request(), 0), 'No matching function overload found'));
-assert(() => throws(() => fetch(new Request('http://abracad.abra/')), 'Host not found (authoritative)'));
-assert(() => throws(() => fetch(new Request('http://127.0.0.1:7777')), 'Connection refused'));
-assert(() => throws(() => fetch('abracadabra'), 'invalid url [abracadabra]'));
+assert(throws(() => fetch(), TypeError, 'No matching function overload found'));
+assert(throws(() => fetch(1), TypeError, 'No matching function overload found'));
+assert(throws(() => fetch('http://abracad.abra'), InternalError, 'Host not found (authoritative)'));
+assert(throws(() => fetch('http://127.0.0.1:7777'), InternalError, 'Connection refused'));
+assert(throws(() => fetch(new Request(), 0), TypeError, 'No matching function overload found'));
+assert(throws(() => fetch(new Request('http://abracad.abra/')), InternalError, 'Host not found (authoritative)'));
+assert(throws(() => fetch(new Request('http://127.0.0.1:7777')), InternalError, 'Connection refused'));
+assert(throws(() => fetch('abracadabra'), TypeError, 'invalid url [abracadabra]'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -146,7 +146,7 @@ assert(() => response.headers.has('Server'));
 assert(() => 'boost:beast' == response.headers.get('Server'));
 assert(() => response.headers.has('Content-Type'));
 assert(() => 'application/json' == response.headers.get('Content-Type'));
-assert(() => throws(() => response.json()));
+assert(throws(() => response.json(), SyntaxError));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -167,7 +167,7 @@ assert(() => response.url.endsWith('/json/bad'));
 assert(() => 'boost:beast' == response.headers.get('Server'));
 assert(() => response.headers.has('Content-Type'));
 assert(() => 'application/json' == response.headers.get('Content-Type'));
-assert(() => throws(() => response.json()));
+assert(throws(() => response.json(), SyntaxError));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -335,9 +335,9 @@ BOOST_AUTO_TEST_CASE(Redirect)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 
-assert(() => throws(() => fetch('/redirect', {redirect: 'error'}), 'Redirect was not allowed'));
-assert(() => throws(() => fetch('/redirect/noloc'), 'Redirect without location'));
-assert(() => throws(() => fetch('/redirect/badloc'), 'Bad redirect location'));
+assert(throws(() => fetch('/redirect', {redirect: 'error'}), InternalError, 'Redirect was not allowed'));
+assert(throws(() => fetch('/redirect/noloc'), InternalError, 'Redirect without location'));
+assert(throws(() => fetch('/redirect/badloc'), InternalError, 'Bad redirect location'));
 
 var response = await fetch('/redirect', {redirect: 'manual'});
 assert(() => 302 == response.status);
@@ -546,8 +546,8 @@ assert(() => !response.headers.has('X-Foo'));
 const t1 = await response.text();
 assert(() => 'text' == t1);
 
-assert(() => throws(() => response.body = 'foobar', 'no setter for property'));
-assert(() => throws(() => response.status = 500, 'no setter for property'));
+assert(throws(() => response.body = 'foobar', TypeError, 'no setter for property'));
+assert(throws(() => response.status = 500, TypeError, 'no setter for property'));
 response.headers.set('X-Foo', 'bar');
 
 assert(() => response.ok);

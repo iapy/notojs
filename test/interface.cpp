@@ -1,10 +1,14 @@
 #include <bridge.hpp>
 namespace {
 
-struct ITest : bridge::Interface<ITest>
+struct Test : bridge::Interface<Test>
 {
-    virtual std::string get_name() = 0;
-    virtual ~ITest() {}
+    using Base::Base;
+    struct Methods
+    {
+        virtual std::string get_name() = 0;
+        virtual ~Methods() = default;
+    };
 };
 
 struct A : bridge::Interface<A, std::string>
@@ -16,7 +20,7 @@ struct A : bridge::Interface<A, std::string>
         ref() = value;
     }
 
-    struct I : Base::I<I, ITest>
+    struct I : Base::I<I, Test>
     {
         using Base::Base;
 
@@ -44,7 +48,7 @@ struct B : bridge::Interface<B, std::int32_t>
         ref() = static_cast<std::int32_t>(value);
     }
 
-    struct I : Base::I<I, ITest>
+    struct I : Base::I<I, Test>
     {
         using Base::Base;
 
@@ -86,7 +90,7 @@ struct D : bridge::Interface<D, std::string, C>
         ref() = value;
     }
 
-    struct I : Base::I<I, ITest>
+    struct I : Base::I<I, Test>
     {
         using Base::Base;
 
@@ -111,7 +115,7 @@ struct E : bridge::Interface<E, bridge::Object>
 {
     using Base::Base;
 
-    struct I : Base::I<I, ITest>
+    struct I : Base::I<I, Test>
     {
         using Base::Base;
 
@@ -125,7 +129,7 @@ struct E : bridge::Interface<E, bridge::Object>
     using impl = bridge::Implements<I>;
 };
 
-JSValue get_name(JSContext *ctx, ITest::Impl value)
+JSValue get_name(JSContext *ctx, Test value)
 {
     return bridge::String(ctx, value->get_name());
 }

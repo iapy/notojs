@@ -17,7 +17,7 @@ JSCFunctionListEntry const func[] = {
 
 static int init(JSContext *ctx, JSModuleDef *m)
 {
-    JS_FreeValue(ctx, notojs::facade::import(ctx, "noto:fs"));
+    JS_FreeValue(ctx, notojs::NOTOJS_VERSION_NS::import(ctx, "noto:fs"));
     return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
 }
 

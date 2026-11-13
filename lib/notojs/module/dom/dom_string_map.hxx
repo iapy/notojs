@@ -23,9 +23,10 @@ struct DOMStringMap : bridge::Interface<DOMStringMap, dom::DOMStringMap>
         return ref().own_property(n, desc);
     }
 
-    void set_property(JSContext *ctx, char const *n, JSValueConst value)
+    int set_property(JSContext *ctx, char const *n, JSValueConst value)
     {
         ref().set_property(n, bridge::Value{ctx, value}.toString());
+        return 1;
     }
 
     void del_property(JSContext *ctx, char const *n)

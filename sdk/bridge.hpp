@@ -12,7 +12,6 @@
 #include <cstdint>
 #include <vector>
 #include <limits>
-#include <memory>
 #include <array>
 
 #define BRIDGE_DEFINE_STRUCT(type) \
@@ -71,7 +70,20 @@ namespace detail {
 
 BOOST_FORCEINLINE void set_allocator(JSContext *ctx, JSValue p, JSValue a)
 {
-    JS_DefinePropertyValueStr(ctx, p, ".allocator", JS_DupValue(ctx, a), JS_PROP_CONFIGURABLE);
+    JSValue sym = JS_NewSymbol(ctx, "notojs.allocator", true);
+    JSAtom atom = JS_ValueToAtom(ctx, sym);
+    JS_DefinePropertyValue(ctx, p, atom, JS_DupValue(ctx, a), 0);
+    JS_FreeAtom(ctx, atom);
+    JS_FreeValue(ctx, sym);
+}
+
+BOOST_FORCEINLINE bool string_property(JSContext *ctx, JSAtom prop)
+{
+    JSValue value = JS_AtomToValue(ctx, prop);
+    if(JS_IsException(value)) return false;
+    bool const result = JS_IsString(value);
+    JS_FreeValue(ctx, value);
+    return result;
 }
 
 template<typename, typename = void>
@@ -111,6 +123,27 @@ template<class T>
 struct get_exotic<T, std::void_t<decltype(&T::exoticMethods)>>
 {
     BOOST_FORCEINLINE static JSClassExoticMethods *get() { return &T::exoticMethods; }
+};
+
+template<class, class = void>
+struct get_call
+{
+    static constexpr JSClassCall *fn = nullptr;
+};
+
+template<class T>
+struct get_call<T, std::enable_if_t<std::is_invocable_v<T, JSContext*, JSValueConst, int, JSValueConst*>>>
+{
+    static constexpr JSClassCall *fn = +[](JSContext *ctx, JSValueConst self, JSValueConst receiver, int argc, JSValueConst *argv, int) {
+        if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
+        {
+            if constexpr (!has_constructor<T>::value)
+                return T{ctx, self}(ctx, receiver, argc, argv);
+            else
+                return (*reinterpret_cast<T*>(JS_GetOpaque(self, T::cid)))(ctx, self, argc, argv);
+        }
+        return JS_ThrowTypeError(ctx, "is not a function");
+    };
 };
 
 constexpr void *is_tail_impl(...) { return nullptr; }
@@ -275,7 +308,10 @@ struct setter<f> : std::disjunction<std::is_same<void, R>, std::is_same<JSValue,
     BOOST_FORCEINLINE static bool checks(JSValue self)
     {
         JSClassID const cid = JS_GetClassID(self);
-        return T::cid == cid || T::upcast.find(cid) != std::end(T::upcast);
+        if constexpr (!has_constructor<T>::value)
+            return T::cid == cid;
+        else
+            return T::cid == cid || T::upcast.find(cid) != std::end(T::upcast);
     }
 
     BOOST_FORCEINLINE static auto valid(JSContext *ctx, JSValue &arg)
@@ -288,19 +324,29 @@ struct setter<f> : std::disjunction<std::is_same<void, R>, std::is_same<JSValue,
     {
         if constexpr (std::is_same_v<R, JSValue>)
         {
-            if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
+            if constexpr (!has_constructor<T>::value)
+            {
+                if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
+                    return (T{ctx, self}.*f)(ctx, V(ctx, v));
+            }
+            else if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
                 return (reinterpret_cast<T*>(JS_GetOpaque(self, T::cid))->*f)(ctx, V(ctx, v));
-            else
-                return (T::upcast.find(cid)->second(JS_GetOpaque(self, cid)).*f)(ctx, V(ctx, v));
+            else if(auto it = T::upcast.find(cid); it != std::end(T::upcast))
+                return (it->second(JS_GetOpaque(self, cid)).*f)(ctx, V(ctx, v));
         }
         else
         {
-            if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
+            if constexpr (!has_constructor<T>::value)
+            {
+                if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
+                    (T{ctx, self}.*f)(ctx, V(ctx, v));
+            }
+            else if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
                 (reinterpret_cast<T*>(JS_GetOpaque(self, T::cid))->*f)(ctx, V(ctx, v));
-            else
-                (T::upcast.find(cid)->second(JS_GetOpaque(self, cid)).*f)(ctx, V(ctx, v));
-            return JS_UNDEFINED;
+            else if(auto it = T::upcast.find(cid); it != std::end(T::upcast))
+                (it->second(JS_GetOpaque(self, cid)).*f)(ctx, V(ctx, v));
         }
+        return JS_UNDEFINED;
     }
 };
 
@@ -830,10 +876,14 @@ class object_iterator
 {
 public:
     inline object_iterator(JSContext *ctx, JSValue obj)
-    : obj{obj}, ctx{ctx}, cur{0}, len{0}
+    : obj{obj}, ctx{ctx}, cur{0}, len{0}, tab{nullptr}, error{false}
     {
         if(JS_GetOwnPropertyNames(ctx, &tab, &len, obj, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) != 0)
+        {
             tab = nullptr;
+            len = 0;
+            error = true;
+        }
     }
 
     object_iterator(object_iterator &&) = delete;
@@ -853,14 +903,27 @@ public:
         return cur != len;
     }
 
+    BOOST_FORCEINLINE bool failed() const
+    {
+        return error;
+    }
+
     BOOST_FORCEINLINE JSAtom atom() const
     {
         return tab[cur].atom;
     }
 
-    BOOST_FORCEINLINE std::string_view key() const
+    inline std::string_view key() const
     {
-        return {JS_AtomToCString(ctx, tab[cur].atom)};
+        char const *text = JS_AtomToCString(ctx, tab[cur].atom);
+        if(!text)
+        {
+            error = true;
+            return {};
+        }
+        key_buffer.assign(text);
+        JS_FreeCString(ctx, text);
+        return key_buffer;
     }
 
     template<typename T>
@@ -885,6 +948,8 @@ private:
     std::uint32_t cur;
     std::uint32_t len;
     JSPropertyEnum *tab;
+    mutable bool error;
+    mutable std::string key_buffer;
 };
 
 template<typename T>
@@ -997,9 +1062,9 @@ struct Array : detail::Reference
         JS_SetPropertyUint32(ctx, value, i, v);
     }
 
-    BOOST_FORCEINLINE void append(JSValue v)
+    BOOST_FORCEINLINE bool append(JSValue v)
     {
-        JS_SetPropertyUint32(ctx, value, size(), v);
+        return 0 <= JS_SetPropertyUint32(ctx, value, size(), v);
     }
 
     BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue *value) { return JS_IsArray(ctx, *value); }
@@ -1711,11 +1776,11 @@ struct Implements<Head, Tail...>
     template<typename U>
     static constexpr void register_upcast()
     {
-        if(!Head::Base::upcast.count(U::cid)) Head::Base::upcast[U::cid] = [](JSContext *ctx, JSValue value) -> std::unique_ptr<typename Head::Ifac> {
+        if(!Head::Ifac::Base::upcast.count(U::cid)) Head::Ifac::Base::upcast[U::cid] = [](JSContext *ctx, JSValue value) -> void * {
             if constexpr (std::is_base_of_v<Object, U>)
-                return std::make_unique<Head>(ctx, value);
+                return new Head{ctx, value};
             else
-                return std::make_unique<Head>(static_cast<typename U::Wrapped &>(reinterpret_cast<U*>(JS_GetOpaque(value, U::cid))->ref()));
+                return new Head{static_cast<typename U::Wrapped &>(reinterpret_cast<U*>(JS_GetOpaque(value, U::cid))->ref())};
         };
         Implements<Tail...>::template register_upcast<U>();
     }
@@ -1731,46 +1796,49 @@ struct Implements<>
 template<typename Impl>
 int del_property(JSContext *ctx, JSValueConst self, JSAtom prop)
 {
-    int result = 0;
-    if(const char *name = JS_AtomToCString(ctx, prop); name)
+    JSPropertyDescriptor desc;
+    if(int own = JS_GetOwnProperty(ctx, &desc, Impl::proto, prop); own)
     {
-        JSPropertyDescriptor desc;
-        if(JS_GetOwnProperty(ctx, &desc, Impl::proto, prop))
-        {
-            if(!JS_IsUndefined(desc.getter)) JS_FreeValue(ctx, desc.getter);
-            if(!JS_IsUndefined(desc.setter)) JS_FreeValue(ctx, desc.setter);
-            if(!JS_IsUndefined(desc.value)) JS_FreeValue(ctx, desc.value);
-        }
-        else
-        {
-            reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->del_property(ctx, name);
-            result = 1;
-        }
-        JS_FreeCString(ctx, name);
+        if(own < 0) return -1;
+        if(!JS_IsUndefined(desc.getter)) JS_FreeValue(ctx, desc.getter);
+        if(!JS_IsUndefined(desc.setter)) JS_FreeValue(ctx, desc.setter);
+        if(!JS_IsUndefined(desc.value)) JS_FreeValue(ctx, desc.value);
+        return 0;
     }
-    return result;
+    if(!detail::string_property(ctx, prop)) return JS_HasException(ctx) ? -1 : 0;
+
+    const char *name = JS_AtomToCString(ctx, prop);
+    if(!name) return -1;
+    if constexpr (!detail::has_constructor<Impl>::value)
+        Impl{ctx, self}.del_property(ctx, name);
+    else
+        reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->del_property(ctx, name);
+    JS_FreeCString(ctx, name);
+    return 1;
 }
 
 template<typename Impl>
 int has_property(JSContext *ctx, JSValueConst self, JSAtom prop)
 {
-    int result = -1;
-    if(const char *name = JS_AtomToCString(ctx, prop); name)
+    JSPropertyDescriptor desc;
+    if(int own = JS_GetOwnProperty(ctx, &desc, Impl::proto, prop); own)
     {
-        JSPropertyDescriptor desc;
-        if(JS_GetOwnProperty(ctx, &desc, Impl::proto, prop))
-        {
-            if(!JS_IsUndefined(desc.getter)) JS_FreeValue(ctx, desc.getter);
-            if(!JS_IsUndefined(desc.setter)) JS_FreeValue(ctx, desc.setter);
-            if(!JS_IsUndefined(desc.value)) JS_FreeValue(ctx, desc.value);
-            result = 1;
-        }
-        else
-        {
-            result = reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->has_property(ctx, name) ? 1 : 0;
-        }
-        JS_FreeCString(ctx, name);
+        if(own < 0) return -1;
+        if(!JS_IsUndefined(desc.getter)) JS_FreeValue(ctx, desc.getter);
+        if(!JS_IsUndefined(desc.setter)) JS_FreeValue(ctx, desc.setter);
+        if(!JS_IsUndefined(desc.value)) JS_FreeValue(ctx, desc.value);
+        return 1;
     }
+    if(!detail::string_property(ctx, prop)) return JS_HasException(ctx) ? -1 : 0;
+
+    const char *name = JS_AtomToCString(ctx, prop);
+    if(!name) return -1;
+    int result;
+    if constexpr (!detail::has_constructor<Impl>::value)
+        result = Impl{ctx, self}.has_property(ctx, name) ? 1 : 0;
+    else
+        result = reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->has_property(ctx, name) ? 1 : 0;
+    JS_FreeCString(ctx, name);
     return result;
 }
 
@@ -1778,29 +1846,33 @@ template<typename Impl>
 JSValue get_property(JSContext *ctx, JSValueConst self, JSAtom prop, JSValueConst receiver)
 {
     JSValue value = JS_UNDEFINED;
-    if(const char *name = JS_AtomToCString(ctx, prop); name)
+    JSPropertyDescriptor desc;
+    if(int own = JS_GetOwnProperty(ctx, &desc, Impl::proto, prop); own)
     {
-        JSPropertyDescriptor desc;
-        if(JS_GetOwnProperty(ctx, &desc, Impl::proto, prop))
+        if(own < 0) return JS_EXCEPTION;
+        if(!JS_IsUndefined(desc.getter))
         {
-            if(!JS_IsUndefined(desc.getter))
-            {
-                value = JS_Call(ctx, desc.getter, receiver, 0, NULL);
-                JS_FreeValue(ctx, desc.getter);
-            }
-            if(!JS_IsUndefined(desc.setter)) JS_FreeValue(ctx, desc.setter);
-            if(!JS_IsUndefined(desc.value))
-            {
-                if(JS_IsUndefined(value)) value = JS_DupValue(ctx, desc.value);
-                JS_FreeValue(ctx, desc.value);
-            }
+            value = JS_Call(ctx, desc.getter, receiver, 0, NULL);
+            JS_FreeValue(ctx, desc.getter);
         }
-        else
+        if(!JS_IsUndefined(desc.setter)) JS_FreeValue(ctx, desc.setter);
+        if(!JS_IsUndefined(desc.value))
         {
-            value = reinterpret_cast<Impl const *>(JS_GetOpaque(self, Impl::cid))->get_property(ctx, name);
+            if(JS_IsUndefined(value)) value = JS_DupValue(ctx, desc.value);
+            JS_FreeValue(ctx, desc.value);
         }
-        JS_FreeCString(ctx, name);
+        return value;
     }
+    if(!detail::string_property(ctx, prop))
+        return JS_HasException(ctx) ? JS_EXCEPTION : JS_UNDEFINED;
+
+    const char *name = JS_AtomToCString(ctx, prop);
+    if(!name) return JS_EXCEPTION;
+    if constexpr (!detail::has_constructor<Impl>::value)
+        value = Impl{ctx, self}.get_property(ctx, name);
+    else
+        value = reinterpret_cast<Impl const *>(JS_GetOpaque(self, Impl::cid))->get_property(ctx, name);
+    JS_FreeCString(ctx, name);
     return value;
 }
 
@@ -1842,46 +1914,45 @@ int own_properties(JSContext *ctx, JSPropertyEnum **ptab, uint32_t *plen, JSValu
 template<typename Impl>
 int own_property(JSContext *ctx, JSPropertyDescriptor *desc, JSValueConst self, JSAtom prop)
 {
-    int result = -1;
-    if(const char *name = JS_AtomToCString(ctx, prop); name)
-    {
-        if constexpr (!detail::has_constructor<Impl>::value)
-            result = Impl{ctx, self}.own_property(ctx, name, desc) ? 1 : 0;
-        else
-            result = reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->own_property(ctx, name, desc) ? 1 : 0;
-        JS_FreeCString(ctx, name);
-    }
+    if(!detail::string_property(ctx, prop)) return JS_HasException(ctx) ? -1 : 0;
+
+    const char *name = JS_AtomToCString(ctx, prop);
+    if(!name) return -1;
+    int result;
+    if constexpr (!detail::has_constructor<Impl>::value)
+        result = Impl{ctx, self}.own_property(ctx, name, desc) ? 1 : 0;
+    else
+        result = reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->own_property(ctx, name, desc) ? 1 : 0;
+    JS_FreeCString(ctx, name);
     return result;
 }
 
 template<typename Impl>
 int set_property(JSContext *ctx, JSValueConst self, JSAtom prop, JSValueConst value, JSValueConst receiver, int flags)
 {
-    int result = -1;
-    if(const char *name = JS_AtomToCString(ctx, prop); name)
+    JSPropertyDescriptor desc;
+    if(int own = JS_GetOwnProperty(ctx, &desc, Impl::proto, prop); own)
     {
-        JSPropertyDescriptor desc;
-        if(JS_GetOwnProperty(ctx, &desc, Impl::proto, prop))
+        if(own < 0) return -1;
+        if(!JS_IsUndefined(desc.getter)) JS_FreeValue(ctx, desc.getter);
+        if(!JS_IsUndefined(desc.setter))
         {
-            if(!JS_IsUndefined(desc.getter)) JS_FreeValue(ctx, desc.getter);
-            if(!JS_IsUndefined(desc.setter))
-            {
-                JS_FreeValue(ctx, JS_Call(ctx, desc.setter, receiver, 1, &value));
-                JS_FreeValue(ctx, desc.setter);
-            }
-            if(!JS_IsUndefined(desc.value)) JS_FreeValue(ctx, desc.value);
-            result = 0;
+            JS_FreeValue(ctx, JS_Call(ctx, desc.setter, receiver, 1, &value));
+            JS_FreeValue(ctx, desc.setter);
         }
-        else
-        {
-            if constexpr (!detail::has_constructor<Impl>::value)
-                result = Impl{ctx, self}.set_property(ctx, name, value);
-            else
-                reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->set_property(ctx, name, value);
-            result = 1;
-        }
-        JS_FreeCString(ctx, name);
+        if(!JS_IsUndefined(desc.value)) JS_FreeValue(ctx, desc.value);
+        return 0;
     }
+    if(!detail::string_property(ctx, prop)) return JS_HasException(ctx) ? -1 : 0;
+
+    const char *name = JS_AtomToCString(ctx, prop);
+    if(!name) return -1;
+    int result;
+    if constexpr (!detail::has_constructor<Impl>::value)
+        result = Impl{ctx, self}.set_property(ctx, name, value);
+    else
+        result = reinterpret_cast<Impl *>(JS_GetOpaque(self, Impl::cid))->set_property(ctx, name, value);
+    JS_FreeCString(ctx, name);
     return result;
 }
 
@@ -1979,16 +2050,19 @@ public:
     static void init(JSContext *);
     static void init(JSContext *, JSValue);
     static void init(JSContext *, JSModuleDef *);
+
     static void alias(JSContext *, JSValue, const char *);
+    static void alias(JSContext *, JSModuleDef *, const char * = nullptr);
 
     static char const *name();
 
     template<typename Im, typename If>
-    struct I : If
+    struct I : If::Methods
     {
     public:
         I(Native_ &ref): ref{ref} {}
         using Base = I<Im, If>;
+        using Ifac = If;
 
     protected:
         Native_ &ref;
@@ -2109,6 +2183,7 @@ template<typename Impl, typename Native_, typename Extends_>
 JSClassDef Interface<Impl, Native_, Extends_>::def = {
     .class_name = Base::name(),
     .finalizer = Base::free,
+    .call = detail::get_call<Impl>::fn,
     .exotic = detail::get_exotic<Impl>::get()
 };
 
@@ -2220,13 +2295,21 @@ void Interface<Impl, Native_, Extends_>::alias(JSContext *ctx, JSValue target, c
     JS_SetPropertyStr(ctx, target, name, JS_GetPropertyStr(ctx, proto, "constructor"));
 }
 
-template<typename Impl>
-struct Interface<Impl, Object, void> : Object
+template<typename Impl, typename Native_, typename Extends_>
+void Interface<Impl, Native_, Extends_>::alias(JSContext *ctx, JSModuleDef *glob, const char *name)
 {
+    JS_SetModuleExport(ctx, glob, name ? name : Interface<Impl, Native_, Extends_>::name(), JS_GetPropertyStr(ctx, proto, "constructor"));
+}
+
+template<typename Impl>
+class Interface<Impl, Object, void> : public Object
+{
+public:
     using Object::Object;
     using Base = Interface<Impl, Object, void>;
     using impl = Implements<>;
     using priv = Private<>;
+    using esab = void;
 
     BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue *value)
     {
@@ -2246,15 +2329,16 @@ struct Interface<Impl, Object, void> : Object
     static void init(JSContext *, JSModuleDef *);
 
     static char const *name();
-    static JSValue ctor(JSContext *ctx);
-    static JSValue ctor(JSContext *ctx, Object &&);
+    static JSValue ctor(JSContext *ctx, Object *o = nullptr);
+    static bool ctor(JSContext *ctx, JSValue);
 
     template<typename Im, typename If>
-    struct I : If
+    struct I : If::Methods
     {
     public:
         I(JSContext *ctx, JSValue value): ref{ctx, value} {}
         using Base = I<Im, If>;
+        using Ifac = If;
 
     protected:
         Object ref;
@@ -2262,6 +2346,14 @@ struct Interface<Impl, Object, void> : Object
 
 private:
     Interface() = delete;
+
+    friend JSValue get_property<Impl>(JSContext *, JSValueConst, JSAtom, JSValueConst);
+    friend int own_properties<Impl>(JSContext *, JSPropertyEnum **, uint32_t *, JSValueConst);
+    friend int own_property<Impl>(JSContext *, JSPropertyDescriptor *, JSValueConst, JSAtom);
+    friend int set_property<Impl>(JSContext *, JSValueConst, JSAtom, JSValueConst, JSValueConst, int);
+    friend int has_property<Impl>(JSContext *, JSValueConst, JSAtom);
+    friend int del_property<Impl>(JSContext *, JSValueConst, JSAtom);
+
     static thread_local JSValue proto; // bound to context
 
 private:
@@ -2279,6 +2371,7 @@ template<typename Impl>
 JSClassDef Interface<Impl, Object, void>::def = {
     .class_name = Interface<Impl, Object, void>::name(),
     .finalizer = NULL,
+    .call = detail::get_call<Impl>::fn,
     .exotic = detail::get_exotic<Impl>::get()
 };
 
@@ -2347,6 +2440,9 @@ JSValue Interface<Impl, Object, void>::make(JSContext *ctx)
             return JS_NewCFunction2(ctx, &Unconstructable<Impl>::invoke, name(), 1, JS_CFUNC_constructor, 0);
     });
 
+    if constexpr (!std::is_same_v<void, typename Impl::esab>)
+        JS_SetPrototype(ctx, proto, Impl::esab::proto);
+
     JS_SetConstructor(ctx, ctor, proto);
     JS_SetClassProto(ctx, cid, proto);
     Impl::priv::make(ctx);
@@ -2354,15 +2450,9 @@ JSValue Interface<Impl, Object, void>::make(JSContext *ctx)
 }
 
 template<typename Impl>
-JSValue Interface<Impl, Object, void>::ctor(JSContext *ctx)
+JSValue Interface<Impl, Object, void>::ctor(JSContext *ctx, Object *copy)
 {
-    return ctor(ctx, JS_UNDEFINED, 0, NULL);
-}
-
-template<typename Impl>
-JSValue Interface<Impl, Object, void>::ctor(JSContext *ctx, Object &&copy)
-{
-    return ctor(ctx, JS_UNDEFINED, 1, +copy);
+    return ctor(ctx, JS_UNDEFINED, copy ? 1 : 0, copy ? +*copy : NULL);
 }
 
 template<typename Impl>
@@ -2374,14 +2464,14 @@ JSValue Interface<Impl, Object, void>::ctor(JSContext *ctx, JSValueConst, int ar
         bridge::Strong<void> res{ctx, JS_NewObjectProtoClass(ctx, Impl::proto, Impl::cid), false};
         if(JS_IsException(res)) return res.release();
 
-        JSPropertyEnum *properties = nullptr;
         std::uint32_t count = 0;
-        if(JS_GetOwnPropertyNames(ctx, &properties, &count, argv[0], JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK | JS_GPN_ENUM_ONLY) < 0)
+        JSPropertyEnum *properties = nullptr;
+        if(JS_GetOwnPropertyNames(ctx, &properties, &count, *argv, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK | JS_GPN_ENUM_ONLY) < 0)
             return JS_EXCEPTION;
 
         for(std::uint32_t i = 0; i < count; ++i)
         {
-            JSValue value = JS_GetProperty(ctx, argv[0], properties[i].atom);
+            JSValue value = JS_GetPropertyInternal(ctx, *argv, properties[i].atom, *argv, 0);
             if(JS_IsException(value) || JS_DefinePropertyValue(ctx, res, properties[i].atom, value, JS_PROP_C_W_E) < 0)
             {
                 JS_FreePropertyEnum(ctx, properties, count);
@@ -2394,39 +2484,64 @@ JSValue Interface<Impl, Object, void>::ctor(JSContext *ctx, JSValueConst, int ar
     return JS_ThrowTypeError(ctx, "%s: no matching constructor found", name());
 }
 
-template<typename If>
-struct Interface<If, void, void>
+template<typename Impl>
+bool Interface<Impl, Object, void>::ctor(JSContext *ctx, JSValue self)
 {
-    using Ifac = If;
-    struct Impl : If::Static
+    bridge::Strong<void> ctor{ctx, JS_GetPropertyStr(ctx, proto, "constructor"), false};
+    return JS_VALUE_GET_PTR(self) == JS_VALUE_GET_PTR(static_cast<JSValue>(ctor));
+}
+
+template<typename If>
+class Interface<If, void, void>
+{
+public:
+    using Base = Interface<If, void, void>;
+
+    Interface() = delete;
+    BOOST_FORCEINLINE Interface(JSContext *ctx, JSValue val)
     {
-        BOOST_FORCEINLINE If * operator -> () { return value.get(); }
-        BOOST_FORCEINLINE If const * operator -> () const { return value.get(); }
+        ptr = upcast[JS_GetClassID(val)](ctx, val);
+    }
 
-        Impl(JSContext *ctx, JSValue val)
-        {
-            JSClassID const cid = JS_GetClassID(val);
-            value = upcast[cid](ctx, val);
-        }
-        BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue *value)
-        {
-            JSClassID const cid = JS_GetClassID(*value);
-            return upcast.find(cid) != std::end(upcast);
-        }
-        static constexpr bool valid(JSContext *ctx, JSValue *value, std::string &message)
-        {
-            return true;
-        }
-    private:
-        std::unique_ptr<If> value;
-    };
+    BOOST_FORCEINLINE Interface(Interface const &other) = delete;
+    BOOST_FORCEINLINE Interface(Interface &&other)
+    {
+        std::swap(ptr, other.ptr);
+    }
 
-    struct Static {};
-    static std::unordered_map<JSClassID, std::function<std::unique_ptr<If>(JSContext*, JSValue)>> upcast;
+    BOOST_FORCEINLINE Interface &operator = (Interface const &other) = delete;
+    BOOST_FORCEINLINE Interface &operator = (Interface &&other)
+    {
+        std::swap(ptr, other.ptr);
+    }
+
+    BOOST_FORCEINLINE auto operator -> () { return reinterpret_cast<typename If::Methods *>(ptr); }
+    BOOST_FORCEINLINE auto operator -> () const { return reinterpret_cast<typename If::Methods const *>(ptr); }
+
+    BOOST_FORCEINLINE static bool check(JSContext *ctx, JSValue *value)
+    {
+        if(!JS_IsObject(*value)) return false;
+        JSClassID const cid = JS_GetClassID(*value);
+        return upcast.find(cid) != std::end(upcast);
+    }
+
+    static constexpr bool valid(JSContext *ctx, JSValue *value, std::string &message)
+    {
+        return true;
+    }
+
+    ~Interface()
+    {
+        static_assert(std::has_virtual_destructor_v<typename If::Methods>);
+        delete reinterpret_cast<typename If::Methods *>(ptr);
+    }
+    static std::unordered_map<JSClassID, std::function<void*(JSContext*, JSValue)>> upcast;
+private:
+    void *ptr{nullptr};
 };
 
 template<typename If>
-std::unordered_map<JSClassID, std::function<std::unique_ptr<If>(JSContext*, JSValue)>> Interface<If, void, void>::upcast;
+std::unordered_map<JSClassID, std::function<void*(JSContext*, JSValue)>> Interface<If, void, void>::upcast;
 
 template<typename Impl>
 class Exception
@@ -2537,7 +2652,7 @@ JSValue Exception<Impl>::make(JSContext *ctx)
 template<typename Impl>
 JSValue Exception<Impl>::reject_(JSContext *ctx, Impl &&impl)
 {
-    bridge::Object obj{ctx, ctor(ctx)};
+    Object obj{ctx, ctor(ctx)};
     impl.populate(ctx, obj);
     return obj;
 }
@@ -2545,7 +2660,7 @@ JSValue Exception<Impl>::reject_(JSContext *ctx, Impl &&impl)
 template<typename Impl>
 JSValue Exception<Impl>::throw_(JSContext *ctx, Impl &&impl)
 {
-    bridge::Object obj{ctx, ctor(ctx)};
+    Object obj{ctx, ctor(ctx)};
     impl.populate(ctx, obj);
     return JS_Throw(ctx, obj);
 }

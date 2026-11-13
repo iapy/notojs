@@ -1,4 +1,3 @@
-#include "quickjs/quickjs.h"
 #include <notojs/config.hpp>
 #include <notojs/global.hpp>
 #include <notojs/logger.hpp>
@@ -20,9 +19,9 @@
 #include <notojs/script/dom.hpp>
 #include <notojs/script/storage.hpp>
 
-#include <bridge.hpp>
 #include <engine.hpp>
 #include <global.hpp>
+#include <module.hpp>
 #include <notodb.hpp>
 
 #include <rapidjson/rapidjson.h>
@@ -131,14 +130,14 @@ struct Blob : bridge::Interface<Blob, Blob_>
         bool is_blob(std::uint32_t i) const
         {
             auto value = (*this)[i];
-            return IBlob::Impl::check(ctx, +value);
+            return NOTOJS_VERSION_NS::Blob::check(ctx, +value);
         }
 
         Blob_::Data blob(std::uint32_t i) const
         {
             auto value = (*this)[i];
-            if(!IBlob::Impl::check(ctx, +value)) return nullptr;
-            return IBlob::Impl{ctx, value}->copy();
+            if(!NOTOJS_VERSION_NS::Blob::check(ctx, +value)) return nullptr;
+            return NOTOJS_VERSION_NS::Blob{ctx, value}->copy();
         }
     };
 
@@ -369,7 +368,7 @@ struct Blob : bridge::Interface<Blob, Blob_>
         return res;
     }
 
-    struct I : Base::I<I, IBlob>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::Blob>
     {
         using Base::Base;
 
@@ -487,7 +486,7 @@ struct File : bridge::Interface<File, File_, Blob>
         File(Blob::Parts, bridge::String, Options)
     >;
 
-    struct I : Base::I<I, IFile>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::File>
     {
         using Base::Base;
 
@@ -557,7 +556,7 @@ struct FormData : bridge::Interface<FormData, FormData_>
     FormData(JSContext *ctx, JSValue val)
     : Base{ctx, val} {}
 
-    static FormData_::BlobValue blob(IBlob::Impl const &value, std::string filename)
+    static FormData_::BlobValue blob(NOTOJS_VERSION_NS::Blob const &value, std::string filename)
     {
         return FormData_::BlobValue{
             .data = value->copy(),
@@ -618,7 +617,7 @@ struct FormData : bridge::Interface<FormData, FormData_>
         return JS_UNDEFINED;
     }
 
-    JSValue append_3(JSContext *ctx, bridge::String name, IBlob::Impl value)
+    JSValue append_3(JSContext *ctx, bridge::String name, NOTOJS_VERSION_NS::Blob value)
     {
         ref().entries.push_back(FormData_::Entry{
             static_cast<std::string>(name), blob(value, "blob")
@@ -626,7 +625,7 @@ struct FormData : bridge::Interface<FormData, FormData_>
         return JS_UNDEFINED;
     }
 
-    JSValue append_4(JSContext *ctx, bridge::String name, IBlob::Impl value, bridge::String filename)
+    JSValue append_4(JSContext *ctx, bridge::String name, NOTOJS_VERSION_NS::Blob value, bridge::String filename)
     {
         ref().entries.push_back(FormData_::Entry{
             static_cast<std::string>(name), blob(value, static_cast<std::string>(filename))
@@ -741,13 +740,13 @@ struct FormData : bridge::Interface<FormData, FormData_>
         return JS_UNDEFINED;
     }
 
-    JSValue set_3(JSContext *ctx, bridge::String name, IBlob::Impl value)
+    JSValue set_3(JSContext *ctx, bridge::String name, NOTOJS_VERSION_NS::Blob value)
     {
         set(static_cast<std::string>(name), blob(value, "blob"));
         return JS_UNDEFINED;
     }
 
-    JSValue set_4(JSContext *ctx, bridge::String name, IBlob::Impl value, bridge::String filename)
+    JSValue set_4(JSContext *ctx, bridge::String name, NOTOJS_VERSION_NS::Blob value, bridge::String filename)
     {
         set(static_cast<std::string>(name), blob(value, static_cast<std::string>(filename)));
         return JS_UNDEFINED;
@@ -1452,6 +1451,7 @@ struct ServerRequest : bridge::Interface<Content<ServerRequest>, boost::beast::h
         return JS_NewStringLen(ctx, method.data(), method.size());
     }
 
+    using ctor = bridge::Unconstructable<ServerRequest>;
     static JSCFunctionListEntry const funcs[];
 };
 
@@ -1811,7 +1811,7 @@ struct URL : bridge::Interface<URL, boost::urls::url>
         return JS_NULL;
     }
 
-    struct I : Base::I<I, IURL>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::URL>
     {
         using Base::Base;
 
@@ -2973,82 +2973,87 @@ JSValue fetch_7(JSContext *ctx, Request::HTTPURL url, bridge::Undefined)
 
 using fetch = bridge::Function<fetch_1, fetch_3, fetch_2, fetch_5, fetch_4, fetch_6, fetch_7>;
 
-JSValue print(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv)
+struct Print : bridge::Interface<Print, std::optional<std::string>>
 {
-    if(argc == 0) return JS_UNDEFINED;
-
-    bool const g = JS_IsString(self);
-    auto &output = Global::Context::ptr(ctx)->output;
-
-    if(argc == 1 && !g && IPrint::Impl::check(ctx, argv))
+    JSValue get_property(JSContext *ctx, char const *name) const
     {
-        return IPrint::Impl{ctx, *argv}->print(ctx, bridge::Array{ctx, output});
-    }
-    else
-    {
-        JSValue length = JS_GetPropertyStr(ctx, output, "length");
-        uint32_t len = 0;
-        if(JS_IsNumber(length))
-            JS_ToUint32(ctx, &len, length);
-        JS_FreeValue(ctx, length);
+        std::string s{name};
+        if(!std::invoke([&s]{
+            constexpr auto percent = [](const char *b, const char *e) {
+                char const *p = b;
+                for(;p != e && *p >= '0' && *p <= '9'; ++p);
+                if(*p != '%') return false;
+                if((p + 1) == e) return true;
+                if(++p; *p != '/') return false;
+                for(++p; p != e && *p >= '0' && *p <= '9'; ++p);
+                return p == e;
+            };
 
-        JSValue out = JS_NewArray(ctx);
-        int i = 0;
-        if(g)
-        {
-            bridge::Object obj{ctx};
-            using namespace std::string_view_literals;
-            obj.set("type", bridge::String{ctx, "notojs.Grid"sv});
-            obj.set("data", self);
-            JS_SetPropertyUint32(ctx, out, i++, obj);
-        }
-        for(int j = 0; j < argc; ++j)
-        {
-            if(IPrint::Impl::check(ctx, argv + j))
+            size_t b = 0;
+            if(s.size() != 0 && s[b] == ':') ++b;
+            std::size_t e = s.find_first_of(' ', b);
+            while(e != std::string::npos)
             {
-                JS_FreeValue(ctx, out);
-                return JS_ThrowRangeError(ctx, "Printable object must be only argument");
+                if(!percent(&s[b], &s[e])) return false;
+                e = s.find_first_of(' ', b = e + 1);
             }
-            JS_SetPropertyUint32(ctx, out, i++, bridge::Lambda::check(ctx, argv + j) ? JS_NewString(ctx, "function") : JS_DupValue(ctx, *(argv + j)));
-        }
-        JS_SetPropertyUint32(ctx, output, len, out);
-        return JS_UNDEFINED;
+
+            return percent(&s[b], &s[s.size()]) || (s.size() == 1 && s[0] == ':');
+        })) return JS_ThrowTypeError(ctx, "Invalid layout: [%s]", s.c_str());
+        return Print::from(ctx, std::move(s));
     }
-}
 
-JSValue proxy(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv)
-{
-    bridge::String layout{ctx, argv[1]};
-    if(auto sv = static_cast<std::string_view const &>(layout); !std::invoke([&sv]{
-        static constexpr auto percent = [](const char *b, const char *e) {
-            char const *p = b;
-            for(;p != e && *p >= '0' && *p <= '9'; ++p);
-            if(*p != '%') return false;
-            if((p + 1) == e) return true;
-            if(++p; *p != '/') return false;
-            for(++p; p != e && *p >= '0' && *p <= '9'; ++p);
-            return p == e;
-        };
+    JSValue operator () (JSContext *ctx, JSValueConst, int argc, JSValueConst *argv)
+    {
+        if(argc == 0) return JS_UNDEFINED;
 
-        size_t b = 0;
-        if(sv.size() != 0 && sv[b] == ':') ++b;
-        std::size_t e = sv.find_first_of(' ', b);
-        while(e != std::string::npos)
+        bool const g = static_cast<bool>(ref());
+        auto &output = Global::Context::ptr(ctx)->output;
+
+        if(argc == 1 && !g && NOTOJS_VERSION_NS::Print::check(ctx, argv))
         {
-            if(!percent(&sv[b], &sv[e])) return false;
-            e = sv.find_first_of(' ', b = e + 1);
+            return NOTOJS_VERSION_NS::Print{ctx, *argv}->print(ctx, bridge::Array{ctx, output});
         }
+        else
+        {
+            JSValue length = JS_GetPropertyStr(ctx, output, "length");
+            uint32_t len = 0;
+            if(JS_IsNumber(length))
+                JS_ToUint32(ctx, &len, length);
+            JS_FreeValue(ctx, length);
 
-        return percent(&sv[b], &sv[sv.size()]) || (sv.size() == 1 && sv[0] == ':');
-    })) return JS_ThrowTypeError(ctx, "Invalid layout: [%s]", sv.data());
+            JSValue out = JS_NewArray(ctx);
+            int i = 0;
+            if(g)
+            {
+                bridge::Object obj{ctx};
+                using namespace std::string_view_literals;
+                obj.set("type", bridge::String{ctx, "notojs.Grid"sv});
+                obj.set("data", bridge::String{ctx, *ref()});
+                JS_SetPropertyUint32(ctx, out, i++, obj);
+            }
+            for(int j = 0; j < argc; ++j)
+            {
+                if(NOTOJS_VERSION_NS::Print::check(ctx, argv + j))
+                {
+                    JS_FreeValue(ctx, out);
+                    return JS_ThrowRangeError(ctx, "Printable object must be only argument");
+                }
+                JS_SetPropertyUint32(ctx, out, i++, bridge::Lambda::check(ctx, argv + j) ? JS_NewString(ctx, "function") : JS_DupValue(ctx, *(argv + j)));
+            }
+            return JS_SetPropertyUint32(ctx, output, len, out) < 0 ? JS_EXCEPTION : JS_UNDEFINED;
+        }
+    }
 
-    std::ignore = JS_DupValue(ctx, argv[1]);
-    return JS_NewCFunctionData(ctx, [](JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv, int, JSValueConst *array){
-        return JS_Call(ctx, array[0], array[1], argc, argv);
-    }, 0, 0, 2, argv);
-}
+    using ctor = bridge::Unconstructable<Print>;
+    static JSClassExoticMethods exoticMethods;
+};
 
-struct Storage : bridge::Interface<Storage, DB::Storage>
+JSClassExoticMethods Print::exoticMethods = {
+    .get_property = &bridge::get_property<Print>
+};
+
+struct Storage : bridge::Interface<Storage, NOTOJS_VERSION_NS::Storage::type>
 {
     struct Namespace : bridge::String
     {
@@ -3074,13 +3079,13 @@ struct Storage : bridge::Interface<Storage, DB::Storage>
     };
 
     Storage(Namespace ns)
-    : Base{DB::Storage{ns, "storage:" + static_cast<std::string>(ns)}}
+    : Base{NOTOJS_VERSION_NS::Storage::type{static_cast<std::string>(ns)}}
     {}
 
     JSValue key(JSContext *ctx, bridge::Number m)
     {
         try {
-            return ref().key(m);
+            return ref().key(ctx, m);
         } catch(std::runtime_error const &e) {
             return JS_ThrowInternalError(ctx, "std::runtime_error [%s]", e.what());
         }
@@ -3089,7 +3094,7 @@ struct Storage : bridge::Interface<Storage, DB::Storage>
     JSValue clear(JSContext *ctx)
     {
         try {
-            return ref().remove(), JS_UNDEFINED;
+            return ref().remove(ctx), JS_UNDEFINED;
         } catch(std::runtime_error const &e) {
             return JS_ThrowInternalError(ctx, "std::runtime_error [%s]", e.what());
         }
@@ -3098,7 +3103,7 @@ struct Storage : bridge::Interface<Storage, DB::Storage>
     JSValue getItem(JSContext *ctx, bridge::String k)
     {
         try {
-            return ref().get(k);
+            return ref().get(ctx, k);
         } catch(std::runtime_error const &e) {
             return JS_ThrowInternalError(ctx, "std::runtime_error [%s]", e.what());
         }
@@ -3107,7 +3112,7 @@ struct Storage : bridge::Interface<Storage, DB::Storage>
     JSValue setItem_0(JSContext *ctx, bridge::String k, bridge::String v)
     {
         try {
-            return ref().set(k, v), JS_UNDEFINED;
+            return ref().set(ctx, k, v), JS_UNDEFINED;
         } catch(std::runtime_error const &e) {
             return JS_ThrowInternalError(ctx, "std::runtime_error [%s]", e.what());
         }
@@ -3116,7 +3121,7 @@ struct Storage : bridge::Interface<Storage, DB::Storage>
     JSValue setItem_1(JSContext *ctx, bridge::String k, bridge::Value v)
     {
         try {
-            return ref().set(k, v), JS_UNDEFINED;
+            return ref().set(ctx, k, v), JS_UNDEFINED;
         } catch(std::runtime_error const &e) {
             return JS_ThrowInternalError(ctx, "std::runtime_error [%s]", e.what());
         }
@@ -3131,7 +3136,7 @@ struct Storage : bridge::Interface<Storage, DB::Storage>
     JSValue removeItem(JSContext *ctx, bridge::String k)
     {
         try {
-            return ref().remove(k), JS_UNDEFINED;
+            return ref().remove(ctx, k), JS_UNDEFINED;
         } catch(std::runtime_error const &e) {
             return JS_ThrowInternalError(ctx, "std::runtime_error [%s]", e.what());
         }
@@ -3140,16 +3145,23 @@ struct Storage : bridge::Interface<Storage, DB::Storage>
     JSValue get_length(JSContext *ctx) const
     {
         try {
-            return bridge::Number(ctx, ref().count());
+            return bridge::Number(ctx, ref().count(ctx));
         } catch(std::runtime_error const &e) {
             return JS_ThrowInternalError(ctx, "std::runtime_error [%s]", e.what());
         }
     }
 
-    using ctor = bridge::Constructor
-    <
-        Storage(Namespace)
-    >;
+    struct I : Base::I<I, NOTOJS_VERSION_NS::Storage>
+    {
+        NOTOJS_VERSION_NS::Storage::type &get() const override
+        {
+            return ref;
+        }
+        using Base::Base;
+    };
+
+    using ctor = bridge::Constructor<Storage(Namespace)>;
+    using impl = bridge::Implements<I>;
 
     static JSCFunctionListEntry const funcs[];
 };
@@ -3733,29 +3745,6 @@ JSValue md_(JSContext *ctx, bridge::String source)
     return Markdown::data(ctx, JS_DupValue(ctx, source));
 }
 
-JSValue pipe_(JSContext *ctx, bridge::Lambda lambda)
-{
-    bridge::Strong<bridge::Object> glob{ctx, JS_GetGlobalObject(ctx)};
-    if(auto r = lambda(std::array<JSValue, 1>{glob["input"]}); bridge::Error::check(ctx, r))
-        return r.release();
-    else if(bridge::Promise::check(ctx, r))
-        bridge::Promise(ctx, r).wrap(
-            [](JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) -> JSValue {
-                if(argc && !JS_IsUndefined(argv[0])) {
-                    bridge::Strong<bridge::Object> glob{ctx, JS_GetGlobalObject(ctx)};
-                    glob.set("input", argv[0]);
-                }
-                return JS_UNDEFINED;
-            },
-            [](JSContext *ctx, JSValueConst, int, JSValueConst *argv) -> JSValue {
-                return JS_DupValue(ctx, argv[0]);
-            }
-        );
-    else if(!JS_IsUndefined(r))
-        glob.set("input", r.release());
-    return JS_UNDEFINED;
-}
-
 template<typename T>
 JSValue dollar_(JSContext *ctx, T t, bridge::Object c)
 {
@@ -3805,7 +3794,6 @@ JSValue dollar_(JSContext *ctx, T t, bridge::Object c)
 
 using dollar = bridge::Function<
     &md_,
-    &pipe_,
     &dollar_<HTML>,
     &dollar_<Markdown>,
     &dollar_<bridge::String>
@@ -3829,7 +3817,7 @@ JSValue require_1(JSContext *ctx, bridge::String name)
     if(auto it = scripts.find(n); it != std::end(scripts))
         return it->second(ctx);
 
-    if(auto url = facade::URL::parse(n.data()); url)
+    if(auto url = NOTOJS_VERSION_NS::URL::parse(n.data()); url)
         return glob->get<Module>().load(ctx, Module::SCRIPT, std::move(*url), n.data());
 
     try {
@@ -3839,7 +3827,7 @@ JSValue require_1(JSContext *ctx, bridge::String name)
         auto [tx, db] = DB(ctx).pkgs();
         if(lmdb::val v; db.get(tx, k, v) && detail::Module::is_script(v))
         {
-            url = facade::URL::parse(v.data());
+            url = NOTOJS_VERSION_NS::URL::parse(v.data());
         }
         tx.abort();
 
@@ -4045,6 +4033,8 @@ JSClassID callback_id;
 
 Global::Global()
 {
+    Print::init();
+
     Blob::init();
     File::init();
     FormData::init();
@@ -4063,6 +4053,7 @@ Global::Global()
     Image::init();
     Markdown::init();
     SVG::init();
+    Version::init();
     XML::init();
 
     JS_NewClassID(&callback_id);
@@ -4070,6 +4061,8 @@ Global::Global()
 
 void Global::init(JSRuntime *rt) const
 {
+    Print::init(rt);
+
     Blob::init(rt);
     File::init(rt);
     FormData::init(rt);
@@ -4088,43 +4081,34 @@ void Global::init(JSRuntime *rt) const
     Image::init(rt);
     Markdown::init(rt);
     SVG::init(rt);
+    Version::init(rt);
     XML::init(rt);
 }
 
 std::unique_ptr<Global::Context> Global::make(JSContext *ctx, JSValue glob) const
 {
     auto context = std::make_unique<Global::Context>(JS_NewArray(ctx));
-    bool const jsapp = (ctx == JS_GetContextOpaque(ctx));
-    bool const fresh = jsapp || !JS_GetContextOpaque(ctx);
+    bool const input = (ctx == JS_GetContextOpaque(ctx));
+    bool const fresh = input || !JS_GetContextOpaque(ctx);
     JS_SetContextOpaque(ctx, context.get());
-
-    JSValue g = JS_NewObject(ctx);
-    JSValue p = JS_NewCFunction(ctx, &print, NULL, 0);
-    JS_SetPropertyStr(ctx, g, "get", JS_NewCFunction(ctx, &proxy, NULL, 3));
-
-    JSValue args[2] = {p, g};
-
-    JSValue proxy = JS_GetPropertyStr(ctx, glob, "Proxy");
-    JS_SetPropertyStr(ctx, glob, "print", JS_CallConstructor(ctx, proxy, 2, args));
-    JS_FreeValue(ctx, proxy);
-
-    JS_FreeValue(ctx, p);
-    JS_FreeValue(ctx, g);
 
     if(fresh)
     {
+        Print::init(ctx);
+
         JS_SetPropertyStr(ctx, glob, "$", JS_NewCFunction(ctx, &dollar::invoke, "$", 1));
         JS_SetPropertyStr(ctx, glob, "atob", JS_NewCFunction(ctx, &bridge::Function<atob>::invoke, "atob", 1));
         JS_SetPropertyStr(ctx, glob, "btoa", JS_NewCFunction(ctx, &bridge::Function<btoa>::invoke, "btoa", 1));
         JS_SetPropertyStr(ctx, glob, "fetch", JS_NewCFunction(ctx, &fetch::invoke, "fetch", 1));
+        JS_SetPropertyStr(ctx, glob, "print", Print::from(ctx, std::nullopt));
 
         JSValue r = JS_NewCFunction(ctx, &require::invoke, "require", 1);
         JS_SetPropertyStr(ctx, r, "script", JS_NewCFunction(ctx, &script::invoke, "script", 1));
         JS_SetPropertyStr(ctx, glob, "require", r);
 
-        if(!jsapp)
+        if(!input)
         {
-            ServerRequest::init(ctx);
+            ServerRequest::init(ctx, glob);
             ServerResponse::init(ctx, glob);
         }
 
@@ -4144,25 +4128,67 @@ std::unique_ptr<Global::Context> Global::make(JSContext *ctx, JSValue glob) cons
         Image::init(ctx);
         Markdown::init(ctx);
         SVG::init(ctx);
+        Version::init(ctx);
         XML::init(ctx);
     }
     return context;
 }
 
-void Global::set_handle(JSContext *ctx, SocketBase &socket)
+void Global::get_context(JSContext *ctx, JSValue &value)
 {
-    if(!JS_GetContextOpaque(ctx))
-    {
-        ServerRequest::init(ctx);
-        JSValue glob = JS_GetGlobalObject(ctx);
-        ServerResponse::init(ctx, glob);
-        JS_FreeValue(ctx, glob);
-        JS_SetContextOpaque(ctx, ctx);
-    }
+    JSValue glob = JS_GetGlobalObject(ctx);
+    JSValue sym = JS_NewSymbol(ctx, "notojs.self.context", true);
+    JSAtom atom = JS_ValueToAtom(ctx, sym);
+    value = JS_GetProperty(ctx, glob, atom);
+    JS_FreeAtom(ctx, atom);
+    JS_FreeValue(ctx, sym);
+    JS_FreeValue(ctx, glob);
+}
 
+void Global::set_context(JSContext *ctx, JSValue value)
+{
+    JSValue glob = JS_GetGlobalObject(ctx);
+    JSValue sym = JS_NewSymbol(ctx, "notojs.self.context", true);
+    JSAtom atom = JS_ValueToAtom(ctx, sym);
+    if(JS_IsUndefined(value))
+        JS_DeleteProperty(ctx, glob, atom, 0);
+    else
+        JS_SetProperty(ctx, glob, atom, JS_DupValue(ctx, value));
+    JS_FreeAtom(ctx, atom);
+    JS_FreeValue(ctx, sym);
+    JS_FreeValue(ctx, glob);
+}
+
+void Global::set_context(JSContext *ctx, SocketBase &socket)
+{
     JSValue glob = JS_GetGlobalObject(ctx);
     JS_SetPropertyStr(ctx, glob, "request", ServerRequest::from(ctx, socket.parser.get(), bridge::unsafe));
     JS_SetPropertyStr(ctx, glob, "response", ServerResponse::from(ctx, socket.response, bridge::unsafe));
+    JS_FreeValue(ctx, glob);
+}
+
+void Global::set_context(JSContext *ctx, std::string const &name, JSValue value)
+{
+    JSValue glob = JS_GetGlobalObject(ctx);
+    if(!JS_GetContextOpaque(ctx))
+    {
+        ServerRequest::init(ctx, glob);
+        ServerResponse::init(ctx, glob);
+        JS_SetContextOpaque(ctx, ctx);
+    }
+    if(!JS_IsUndefined(value))
+    {
+        JSValue sym = JS_NewSymbol(ctx, "notojs.self.context", true);
+        JSAtom atom = JS_ValueToAtom(ctx, sym);
+        JS_SetProperty(ctx, glob, atom, value);
+        JS_FreeAtom(ctx, atom);
+        JS_FreeValue(ctx, sym);
+    }
+    JSValue sym = JS_NewSymbol(ctx, "notojs.self.name", true);
+    JSAtom atom = JS_ValueToAtom(ctx, sym);
+    JS_DefinePropertyValue(ctx, glob, atom, JS_NewStringLen(ctx, name.c_str(), name.size()), 0);
+    JS_FreeAtom(ctx, atom);
+    JS_FreeValue(ctx, sym);
     JS_FreeValue(ctx, glob);
 }
 
@@ -4245,17 +4271,6 @@ void Global::Context::free(JSContext *ctx)
     rejections.clear();
 }
 
-void Global::set_agent(std::string &&agent) const
-{
-    Request_::agent = agent;
-}
-
-void Global::set_prefix(std::string &&prefix) const
-{
-    Request_::local = prefix.substr(prefix.rfind('/') + 1);
-    Request::HTTPString::prefix = prefix;
-}
-
 void Global::configure(detail::Config const &cfg)
 {
     if(auto agent = cfg.get_optional<std::string>("global.agent"); agent)
@@ -4330,12 +4345,12 @@ JSValue Task::run(JSContext *ctx)
     return promise;
 }
 
-JSValue IURL::Static::make(JSContext *ctx, boost::urls::url &&url)
+JSValue NOTOJS_VERSION_NS::URL::make(JSContext *ctx, boost::urls::url &&url)
 {
-    return URL::from(ctx, std::move(url));
+    return notojs::URL::from(ctx, std::move(url));
 }
 
-std::optional<boost::urls::url> IURL::Static::parse(char const *uri)
+std::optional<boost::urls::url> NOTOJS_VERSION_NS::URL::parse(char const *uri)
 {
     if(notojs::Request::HTTPString::prefix && strlen(uri) && *uri == '/')
     {
@@ -4353,37 +4368,37 @@ std::optional<boost::urls::url> IURL::Static::parse(char const *uri)
     return std::nullopt;
 }
 
-JSValue IBlob::Static::make(JSContext *ctx, std::vector<std::uint8_t> &&data, std::string const &type)
+JSValue NOTOJS_VERSION_NS::Blob::make(JSContext *ctx, std::vector<std::uint8_t> &&data, std::string const &type)
 {
     auto const size = data.size();
-    JSValue blob = Blob::from(ctx, Blob_{
+    JSValue blob = notojs::Blob::from(ctx, Blob_{
         .type = type,
         .data = Blob_::from(std::move(data)),
         .size = size
     });
-    Blob::get(blob).dptr = size
-        ? &Blob::get(blob).data->at(0)
+    notojs::Blob::get(blob).dptr = size
+        ? &notojs::Blob::get(blob).data->at(0)
         : nullptr;
     return blob;
 }
 
-JSValue IBlob::Static::make(JSContext *ctx, std::uint8_t const *data, std::size_t size, std::string const &type)
+JSValue NOTOJS_VERSION_NS::Blob::make(JSContext *ctx, std::uint8_t const *data, std::size_t size, std::string const &type)
 {
-    JSValue blob = Blob::from(ctx, Blob_{
+    JSValue blob = notojs::Blob::from(ctx, Blob_{
         .type = type,
         .data = Blob_::from(std::vector<std::uint8_t>(data, data + size)),
         .size = size
     });
-    Blob::get(blob).dptr = size
-        ? &Blob::get(blob).data->at(0)
+    notojs::Blob::get(blob).dptr = size
+        ? &notojs::Blob::get(blob).data->at(0)
         : nullptr;
     return blob;
 }
 
-JSValue IFile::Static::make(JSContext *ctx, std::vector<std::uint8_t> &&data, std::string const &name, std::int64_t time, std::string const &type)
+JSValue NOTOJS_VERSION_NS::File::make(JSContext *ctx, std::vector<std::uint8_t> &&data, std::string const &name, std::int64_t time, std::string const &type)
 {
     auto const size = data.size();
-    JSValue blob = File::from(ctx, File_{
+    JSValue blob = notojs::File::from(ctx, File_{
         Blob_{
             .type = type,
             .data = Blob_::from(std::move(data)),
@@ -4392,15 +4407,15 @@ JSValue IFile::Static::make(JSContext *ctx, std::vector<std::uint8_t> &&data, st
         .name = name,
         .last_modified = time
     });
-    File::get(blob).dptr = size
-        ? &Blob::get(blob).data->at(0)
+    notojs::File::get(blob).dptr = size
+        ? &notojs::Blob::get(blob).data->at(0)
         : nullptr;
     return blob;
 }
 
-JSValue IFile::Static::make(JSContext *ctx, std::uint8_t const *data, std::size_t size, std::string const &name, std::int64_t time, std::string const &type)
+JSValue NOTOJS_VERSION_NS::File::make(JSContext *ctx, std::uint8_t const *data, std::size_t size, std::string const &name, std::int64_t time, std::string const &type)
 {
-    JSValue blob = File::from(ctx, File_{
+    JSValue blob = notojs::File::from(ctx, File_{
         Blob_{
             .type = type,
             .data = Blob_::from(std::vector<std::uint8_t>(data, data + size)),
@@ -4409,13 +4424,13 @@ JSValue IFile::Static::make(JSContext *ctx, std::uint8_t const *data, std::size_
         .name = name,
         .last_modified = time
     });
-    File::get(blob).dptr = size
-        ? &File::get(blob).data->at(0)
+    notojs::File::get(blob).dptr = size
+        ? &notojs::File::get(blob).data->at(0)
         : nullptr;
     return blob;
 }
 
-JSValue facade::clog(JSContext *ctx, int argc, JSValueConst *argv)
+JSValue NOTOJS_VERSION_NS::clog(JSContext *ctx, int argc, JSValueConst *argv)
 {
     if(argc == 0 || !bridge::String::check(ctx, argv))
     {
@@ -4452,7 +4467,7 @@ JSValue facade::clog(JSContext *ctx, int argc, JSValueConst *argv)
     return JS_UNDEFINED;
 }
 
-JSValue facade::fetch(JSContext *ctx,
+JSValue NOTOJS_VERSION_NS::fetch(JSContext *ctx,
     boost::beast::http::request<boost::beast::http::string_body> &&request,
     boost::urls::url &&url,
     JSValue(*callback)(
@@ -4483,14 +4498,32 @@ JSValue facade::fetch(JSContext *ctx,
     return fut;
 }
 
-JSValue facade::print(JSContext *ctx, int argc, JSValueConst *argv)
+JSValue NOTOJS_VERSION_NS::print(JSContext *ctx, int argc, JSValueConst *argv)
 {
-    return notojs::print(ctx, JS_UNDEFINED, argc, argv);
+    bridge::Strong<void> glob{ctx, JS_GetGlobalObject(ctx), false};
+    bridge::Strong<void> impl{ctx, JS_GetPropertyStr(ctx, glob, "print"), false};
+    return JS_Call(ctx, impl, JS_UNDEFINED, argc, argv);
 }
 
-JSValue facade::import(JSContext *ctx, char const *name)
+JSValue NOTOJS_VERSION_NS::import(JSContext *ctx, char const *name)
 {
     return Global::Context::ptr(ctx)->load(ctx, name);
+}
+
+JSValue NOTOJS_VERSION_NS::version(JSContext *ctx, char const *v)
+{
+    if(!v) return JS_NULL;
+
+    char const *p = v;
+    for(int i = 0; i < 3; ++i)
+    {
+        if(*p < '0' || *p > '9') return JS_NULL;
+        do { ++p; } while(*p >= '0' && *p <= '9');
+        if(i < 2) if(*p++ != '.') return JS_NULL;
+    }
+    if(*p != '\0') return JS_NULL;
+
+    return Version::from(ctx, std::string{v});
 }
 
 } // namespace notojs

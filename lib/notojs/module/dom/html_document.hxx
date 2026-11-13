@@ -209,14 +209,14 @@ struct HTMLDocument : bridge::Interface<HTMLDocument, dom::HTMLDocument, Documen
         self.doc->self.reset();
     }
 
-    struct I : Base::I<I, HTML::Interface>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::core::HTML>
     {
         using Base::Base;
         bool json() const override
         {
             return false;
         }
-        std::string get() const override
+        std::string data() const override
         {
             return ref.toString();
         }

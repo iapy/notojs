@@ -8,7 +8,6 @@
 #include <notojs/plugin.hpp>
 #include <notojs/router.hpp>
 #include <notojs/server.hpp>
-#include <notojs/timers.hpp>
 #include <notojs/window.hpp>
 
 int main(int argc, char **argv)
@@ -38,7 +37,6 @@ int main(int argc, char **argv)
             notojs::Plugin,
             notojs::Router,
             notojs::Server,
-            notojs::Timers,
             notojs::Window
         >{}.main<notojs::Config>(argc, argv);
     }

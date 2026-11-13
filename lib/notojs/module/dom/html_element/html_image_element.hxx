@@ -3,10 +3,10 @@ struct HTMLImageElement : bridge::Interface<HTMLImageElement, dom::HTMLElement, 
     HTMLImageElement(JSContext *ctx, JSValue self) : Base{ctx, self} {}
     HTMLImageElement(std::reference_wrapper<dom::HTMLElement> &&rw) : Base(std::move(rw)) {}
 
-    struct I : Base::I<I, Image::Interface>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::core::Image>
     {
         using Base::Base;
-        std::string get() const override
+        std::string data() const override
         {
             return std::string{ref.getAttribute({"src"}).value_or("")};
         }

@@ -32,7 +32,7 @@ import { run } from 'async.so';
 
 const p = run(-1);
 assert(() => p instanceof Promise);
-assert(() => throws(() => p));
+assert(throws(() => p));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);

@@ -80,9 +80,9 @@ BOOST_AUTO_TEST_CASE(Request)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 
-assert(() => throws(() => new Request('xxx-yyy'), 'Request constructor: invalid url [xxx-yyy]'));
-assert(() => throws(() => new Request('ftp://example.org'), 'Request constructor: unsupported scheme [ftp]'));
-assert(() => throws(() => new Request('http://google.com', {method: 'XXX'}), 'Request constructor: invalid method [XXX]'));
+assert(throws(() => new Request('xxx-yyy'), TypeError, 'Request constructor: invalid url [xxx-yyy]'));
+assert(throws(() => new Request('ftp://example.org'), TypeError, 'Request constructor: unsupported scheme [ftp]'));
+assert(throws(() => new Request('http://google.com', {method: 'XXX'}), TypeError, 'Request constructor: invalid method [XXX]'));
 
 var a = new Request('http://google.com');
 assert(() => 'GET' == a.method);
@@ -103,7 +103,7 @@ BOOST_AUTO_TEST_CASE(RequestBody)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 
-assert(() => throws(() => new Request('http://google.com', {body: 1}), 'Request: no matching constructor found'));
+assert(throws(() => new Request('http://google.com', {body: 1}), TypeError, 'Request: no matching constructor found'));
 
 var a = new Request('https://google.com', {method: 'PATCH', body: 'test'});
 const ab = await a.text();
@@ -135,7 +135,7 @@ BOOST_AUTO_TEST_CASE(RequestHeaders)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 
-assert(() => throws(() => new Request('http://google.com', {headers: 1}), 'Request: no matching constructor found'));
+assert(throws(() => new Request('http://google.com', {headers: 1}), TypeError, 'Request: no matching constructor found'));
 
 var a = new Request('https://google.com', {method: 'PATCH', body: {'a':'b'}, headers:{
     'Content-Type': 'text/plain'
@@ -167,8 +167,8 @@ BOOST_AUTO_TEST_CASE(RequestRedirect)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 
-assert(() => throws(() => new Request('http://google.com', {redirect: 1}), 'Request: no matching constructor found'));
-assert(() => throws(() => new Request('http://google.com', {redirect: 'XXX'}), 'Request constructor: invalid redirect method [XXX]'));
+assert(throws(() => new Request('http://google.com', {redirect: 1}), TypeError, 'Request: no matching constructor found'));
+assert(throws(() => new Request('http://google.com', {redirect: 'XXX'}), TypeError, 'Request constructor: invalid redirect method [XXX]'));
 
 assert(() => 'follow' == new Request('http://google.com').redirect);
 assert(() => 'error' == new Request('http://google.com', {redirect: 'error'}).redirect);
@@ -186,8 +186,8 @@ import { assert, throws } from 'noto:assert';
 
 const empty = new Blob();
 assert(() => 0 == empty.size);
-assert(() => throws(() => new Blob('1'), 'Blob: no matching constructor found'));
-assert(() => throws(() => new Blob([1]), 'Blob constructor: invalid type [0]'));
+assert(throws(() => new Blob('1'), TypeError, 'Blob: no matching constructor found'));
+assert(throws(() => new Blob([1]), TypeError, 'Blob constructor: invalid type [0]'));
 
 const b1 = new Blob([]);
 assert(() => 0 == b1.size);
@@ -276,7 +276,7 @@ BOOST_AUTO_TEST_CASE(File)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 
-assert(() => throws(() => new File(), 'File: no matching constructor found'));
+assert(throws(() => new File(), TypeError, 'File: no matching constructor found'));
 
 const start = Date.now();
 const generated = new File(['generated'], 'generated.txt');
@@ -323,7 +323,7 @@ BOOST_AUTO_TEST_CASE(FormData)
 import { assert, throws } from 'noto:assert';
 
 const data = new FormData();
-assert(() => throws(() => new FormData([]), 'FormData: no matching constructor found'));
+assert(throws(() => new FormData([]), TypeError, 'FormData: no matching constructor found'));
 
 const blob = new Blob(['payload'], {type: 'text/plain'});
 const file = new File(['document'], 'document.txt', {type: 'text/plain', lastModified: 42});
@@ -392,7 +392,7 @@ const encoded = encoder.encodeInto('A😀B', destination);
 assert(() => 3 === encoded.read);
 assert(() => 5 === encoded.written);
 assert(() => '65,240,159,152,128' === Array.from(destination).join(','));
-assert(() => throws(() => encoder.encodeInto('x', new Int8Array(1))));
+assert(throws(() => encoder.encodeInto('x', new Int8Array(1)), TypeError));
 
 const decoder = new TextDecoder();
 assert(() => 'utf-8' === decoder.encoding);
@@ -408,8 +408,8 @@ assert(() => 'x' === decoder.decode(new Uint8Array([0xEF, 0xBB, 0xBF, 0x78])));
 assert(() => '\uFEFFx' === new TextDecoder('utf8', {ignoreBOM: true}).decode(
     new Uint8Array([0xEF, 0xBB, 0xBF, 0x78])));
 assert(() => '�(�' === decoder.decode(new Uint8Array([0xE2, 0x28, 0xA1])));
-assert(() => throws(() => new TextDecoder('utf-8', {fatal: true}).decode(
-    new Uint8Array([0xFF]))));
+assert(throws(() => new TextDecoder('utf-8', {fatal: true}).decode(
+    new Uint8Array([0xFF])), TypeError));
 
 const streaming = new TextDecoder('unicode-1-1-utf-8');
 assert(() => '' === streaming.decode(new Uint8Array([0xE2]), {stream: true}));
@@ -436,7 +436,7 @@ BOOST_AUTO_TEST_CASE(URL)
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 
-assert(() => throws(() => new URL('abracadabra'), 'URL constructor: invalid url [abracadabra]'));
+assert(throws(() => new URL('abracadabra'), TypeError, 'URL constructor: invalid url [abracadabra]'));
 
 const u = new URL('https://developer.mozilla.org:443/en-US/docs/Web/API/URL/host?q=host');
 assert(() => 'developer.mozilla.org:443' == u.host);
@@ -460,10 +460,10 @@ assert(() => 'http://google.com' == v.href);
 assert(() => '' == v.search);
 assert(() => !v.searchParams.has('q'));
 
-assert(() => throws(() => new Request(new URL('--google.com')), 'URL constructor: invalid url [--google.com]'));
-assert(() => throws(() => new Request(new URL('ftp://google.com')), 'Request constructor: unsupported scheme [ftp]'));
-assert(() => throws(() => fetch(new URL('ftp://google.com')), 'unsupported scheme [ftp]'));
-assert(() => throws(() => fetch(new URL('ftp://google.com'), {}), 'unsupported scheme [ftp]'));
+assert(throws(() => new Request(new URL('--google.com')), TypeError, 'URL constructor: invalid url [--google.com]'));
+assert(throws(() => new Request(new URL('ftp://google.com')), TypeError, 'Request constructor: unsupported scheme [ftp]'));
+assert(throws(() => fetch(new URL('ftp://google.com')), TypeError, 'unsupported scheme [ftp]'));
+assert(throws(() => fetch(new URL('ftp://google.com'), {}), TypeError, 'unsupported scheme [ftp]'));
 
 assert(() => null == URL.parse('--google.com'));
 assert(() => !URL.canParse('--google.com'));
@@ -515,7 +515,7 @@ assert(() => 'test.com' == w.hostname);
 assert(() => '/path' == w.pathname);
 assert(() => '?q=1' == w.search);
 
-assert(() => throws(() => w.protocol = 'aasds'));
+assert(throws(() => w.protocol = 'aasds', TypeError));
 
 w.protocol = 'http:';
 assert(() => 'http://test.com/path?q=1' == w.href);

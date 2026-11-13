@@ -133,6 +133,18 @@ void json(JSContext *ctx, JSValue glob, JSValue value, W &writer)
     JS_FreeValue(ctx, json);
 }
 
+JSValue output_replacer(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv)
+{
+    if(argc < 2) return JS_UNDEFINED;
+    if(!JS_IsSymbol(argv[1])) return JS_DupValue(ctx, argv[1]);
+
+    JSAtom atom = JS_ValueToAtom(ctx, argv[1]);
+    if(atom == JS_ATOM_NULL) return JS_EXCEPTION;
+    JSValue description = JS_AtomToString(ctx, atom);
+    JS_FreeAtom(ctx, atom);
+    return description;
+}
+
 BOOST_FORCEINLINE bool jschar(char ch, std::size_t idx)
 {
     return ch == '_' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9' && idx > 0) || ((ch == ':' || ch == '!') && idx == 0);
@@ -176,7 +188,7 @@ JSModuleDef *Engine::loader(JSContext *ctx, const char *name, void *data)
         if(engine->sopath)
         {
             std::string const path = (*engine->sopath / name).string();
-            if(void *handle = ::dlopen(path.c_str(), RTLD_NOW); handle)
+            if(void *handle = ::dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL); handle)
             {
                 if(js_module_init_fn init = (js_module_init_fn)::dlsym(handle, "js_init_module"); init)
                 {
@@ -189,7 +201,7 @@ JSModuleDef *Engine::loader(JSContext *ctx, const char *name, void *data)
             return NULL;
         }
     }
-    else if(auto url = facade::URL::parse(name); url && !url->scheme().empty())
+    else if(auto url = NOTOJS_VERSION_NS::URL::parse(name); url && !url->scheme().empty())
     {
         if(boost::urls::scheme::unknown != url->scheme_id())
         {
@@ -229,7 +241,7 @@ JSModuleDef *Engine::loader(JSContext *ctx, const char *name, void *data)
             auto cr = lmdb::cursor::open(tx, db);
             if(cr.get(k, v, MDB_FIRST)) do {
                 if(!detail::Module::is_module(v)) continue;
-                if(auto u = facade::URL::parse(v.data()); u && engine->cdn.count(u->host()))
+                if(auto u = NOTOJS_VERSION_NS::URL::parse(v.data()); u && engine->cdn.count(u->host()))
                 {
                     for(auto const &seg: u->segments())
                     {
@@ -251,7 +263,7 @@ JSModuleDef *Engine::loader(JSContext *ctx, const char *name, void *data)
             lmdb::val k{name, std::strlen(name)};
             if(lmdb::val v; db.get(tx, k, v) && detail::Module::is_module(v))
             {
-                url = facade::URL::parse(v.data());
+                url = NOTOJS_VERSION_NS::URL::parse(v.data());
             }
         }
 
@@ -392,7 +404,11 @@ boost::beast::http::status Engine::eval(JSValue &mod, W &writer, JSContext *ctx,
                 result = boost::beast::http::status::bad_request;
             }
 
-            JSValue out = JS_JSONStringify(ctx, context.output, JS_UNDEFINED, JS_UNDEFINED);
+            JSValue replacer = JS_NewCFunction(ctx, output_replacer, "", 2);
+            JSValue out = JS_IsException(replacer)
+                ? JS_EXCEPTION
+                : JS_JSONStringify(ctx, context.output, replacer, JS_UNDEFINED);
+            JS_FreeValue(ctx, replacer);
             if(JS_IsException(out))
             {
                 if(!error_)
@@ -517,16 +533,6 @@ boost::beast::http::status Engine::eval(std::string const &code, W &writer) cons
 {
     bridge::Context ctx{JS_NewContext(get_runtime())};
     return eval(code, writer, ctx.get());
-}
-
-void Engine::set_sopath(std::filesystem::path &&path)
-{
-    sopath = std::move(path);
-}
-
-void Engine::set_jspath(std::filesystem::path &&path)
-{
-    jspath = std::move(path);
 }
 
 JSContext *Engine::get_context() const
@@ -714,7 +720,10 @@ void Engine::modules(
         } while(cr.get(k, v, MDB_NEXT));
         tx.abort();
     } catch(std::runtime_error const &e) {}
-    get<Folder>().list<Writer, true>(w);
+    detail::iterate(get<Folder>().path / "lib", [&w](auto &&path){
+        if(".js" != path.extension()) return;
+        w.string(path.filename().string());
+    });
     if(jspath) detail::iterate(*jspath, [&w](auto &&path){
         if(".js" == path.extension()) w.string(path.filename().string());
     });

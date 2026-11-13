@@ -129,6 +129,15 @@ Returns **200 OK** when the file is removed, **404 Not Found** for non-`.notojs`
 
 The result API loads or executes notebook contents.
 
+A request must select exactly one response mode. Header values are matched exactly; media-range lists, parameters, and quality values are not parsed.
+
+- `Accept: application/json` selects a JSON response with `Content-Type: application/json`.
+- `Accept: text/html` selects a rendered HTML response with `Content-Type: text/html`.
+- For `GET`, when neither exact `Accept` value is present, `Sec-Fetch-Mode: navigate` selects HTML and any other `Sec-Fetch-Mode` value selects JSON. This supports browser navigation and Fetch requests.
+- For `POST` and `PUT`, `Prefer: return=minimal` selects a response without a body or `Content-Type`.
+
+Requests that select no mode or more than one mode return **406 Not Acceptable**. Non-browser clients should therefore send an exact `Accept` value. When requesting a minimal response, omit `Accept`; wildcard values such as `*/*` do not select JSON by themselves.
+
 ##### Read notebook results
 
 ```http
@@ -136,13 +145,7 @@ GET /api/v1/result/:path
 GET /r/:path
 ```
 
-Reads a `.notojs` notebook and returns its stored cell results.
-
-Response format depends on the `Accept` header:
-
-- `application/json`, `*/*`, or no `Accept` header — returns JSON.
-- `text/html` — returns rendered HTML.
-- Any other value — returns **406 Not Acceptable**.
+Reads a `.notojs` notebook and returns its stored cell results in the selected JSON or HTML response mode.
 
 If the notebook does not exist, **404 Not Found** is returned with `[]`.
 
@@ -157,12 +160,24 @@ Executes the code cells from a `.notojs` notebook and returns the execution outp
 
 Execution happens in the server process and does not fork or use a separate notebook kernel process.
 
-The request body is exposed to the executed code as global `input`:
+Import the default `noto:noto` export conventionally as `self` to access the execution context:
+
+```javascript!noplay
+import self from 'noto:noto';
+
+print(self.name);
+print(self.context);
+```
+
+`self.name` is the read-only, extensionless logical name of the notebook selected by `:path`. The request body initializes the readable/writable `self.context` value:
 
 - With `Content-Type: application/json`, the body is parsed as JSON.
 - Otherwise, the body is exposed as a string.
+- With no request body, `self.context` is `undefined`.
 
-Use `Prefer: return=minimal` to suppress the response body.
+Notebook code may replace `self.context`; assigning `undefined` clears it. The same `self.name` and `self.context` semantics apply to `PUT` execution.
+
+To suppress the response body, send exactly `Prefer: return=minimal` without an `Accept` header.
 
 ##### Execute and save notebook results
 

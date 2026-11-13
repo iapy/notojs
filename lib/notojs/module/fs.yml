@@ -33,7 +33,7 @@ text: |-
   /tmp  = /some/real/path,rw
   ```
 impl:
-  - fs::IPath
+  - noto::fs::Path
 defs:
   - type: Absolute
     base: String
@@ -269,12 +269,12 @@ methods:
       -
         - String
       -
-        - IBlob
+        - noto::Blob
       -
         - String
         - Path.WriteOptions
       -
-        - IBlob
+        - noto::Blob
         - Path.WriteOptions
     docs: Path.write
     text: |-

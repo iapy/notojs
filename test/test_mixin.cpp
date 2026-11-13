@@ -14,7 +14,7 @@ assert(() => 0 === v1.size());
 
 v1.append("foo", 2);
 assert(() => 2 === v1.size());
-assert(() => throws(() => v1.count('foo')));
+assert(throws(() => v1.count('foo'), TypeError));
 
 const v2 = new Derived();
 assert(() => 0 === v2.size());

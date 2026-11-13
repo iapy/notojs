@@ -15,10 +15,10 @@ import { HTML, html } from 'noto:core';
 const a = html('<i>test</i>');
 assert(() => a instanceof HTML);
 
-assert(() => throws(() => new HTML(), 'HTML: no constructor'));
-assert(() => throws(() => new HTML(1), 'HTML: no constructor'));
-assert(() => throws(() => new HTML(''), 'HTML: no constructor'));
-assert(() => throws(() => new HTML({data: 1}), 'HTML: no constructor'));
+assert(throws(() => new HTML(), TypeError, 'HTML: no constructor'));
+assert(throws(() => new HTML(1), TypeError, 'HTML: no constructor'));
+assert(throws(() => new HTML(''), TypeError, 'HTML: no constructor'));
+assert(throws(() => new HTML({data: 1}), TypeError, 'HTML: no constructor'));
 
 const b = html('<b>bold</b>');
 assert(() => b instanceof HTML);
@@ -47,10 +47,10 @@ import { Image, image } from 'noto:core';
 const a = image('https://imgs.xkcd.com/comics/metabolism.png');
 assert(() => a instanceof Image);
 
-assert(() => throws(() => new Image(), 'Image: no constructor'));
-assert(() => throws(() => new Image(1), 'Image: no constructor'));
-assert(() => throws(() => new Image(''), 'Image: no constructor'));
-assert(() => throws(() => new Image({data: 1}), 'Image: no constructor'));
+assert(throws(() => new Image(), TypeError, 'Image: no constructor'));
+assert(throws(() => new Image(1), TypeError, 'Image: no constructor'));
+assert(throws(() => new Image(''), TypeError, 'Image: no constructor'));
+assert(throws(() => new Image({data: 1}), TypeError, 'Image: no constructor'));
 
 const b = image('https://imgs.xkcd.com/comics/metabolism.png');
 assert(() => b instanceof Image);
@@ -79,10 +79,10 @@ import { Markdown, markdown } from 'noto:core';
 const a = markdown('# Header');
 assert(() => a instanceof Markdown);
 
-assert(() => throws(() => new Markdown(), 'Markdown: no constructor'));
-assert(() => throws(() => new Markdown(1), 'Markdown: no constructor'));
-assert(() => throws(() => new Markdown(''), 'Markdown: no constructor'));
-assert(() => throws(() => new Markdown({data: 1}), 'Markdown: no constructor'));
+assert(throws(() => new Markdown(), TypeError, 'Markdown: no constructor'));
+assert(throws(() => new Markdown(1), TypeError, 'Markdown: no constructor'));
+assert(throws(() => new Markdown(''), TypeError, 'Markdown: no constructor'));
+assert(throws(() => new Markdown({data: 1}), TypeError, 'Markdown: no constructor'));
 
 const b = markdown('# Header');
 assert(() => b instanceof Markdown);
@@ -104,8 +104,6 @@ print(a, b);
 
 BOOST_AUTO_TEST_CASE(SVG)
 {
-    db();
-
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 import { SVG, icon } from 'noto:core';
@@ -114,10 +112,10 @@ import { svg } from 'core.so';
 const a = await icon('ic/baseline-apple');
 assert(() => a instanceof SVG);
 
-assert(() => throws(() => new SVG(), 'SVG: no constructor'));
-assert(() => throws(() => new SVG(1), 'SVG: no constructor'));
-assert(() => throws(() => new SVG(''), 'SVG: no constructor'));
-assert(() => throws(() => new SVG({data: 1}), 'SVG: no constructor'));
+assert(throws(() => new SVG(), TypeError, 'SVG: no constructor'));
+assert(throws(() => new SVG(1), TypeError, 'SVG: no constructor'));
+assert(throws(() => new SVG(''), TypeError, 'SVG: no constructor'));
+assert(throws(() => new SVG({data: 1}), TypeError, 'SVG: no constructor'));
 
 assert(() => svg(a.data) instanceof SVG);
     )JS");
@@ -190,66 +188,66 @@ class Derived extends HTML {
 }
 
 // No arguments.
-assert(() => throws(() => new HTML(), message));
-assert(() => throws(() => Reflect.construct(HTML, []), message));
-assert(() => throws(() => Reflect.construct(HTML, [], Derived), message));
-assert(() => throws(() => new Derived(), message));
+assert(throws(() => new HTML(), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, []), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [], Derived), TypeError, message));
+assert(throws(() => new Derived(), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => HTML()));
+assert(throws(() => HTML(), TypeError));
 assert(() => getterCalls === 0);
 
 // Number.
-assert(() => throws(() => new HTML(1), message));
-assert(() => throws(() => Reflect.construct(HTML, [1]), message));
-assert(() => throws(() => Reflect.construct(HTML, [1], Derived), message));
-assert(() => throws(() => new Derived(1), message));
+assert(throws(() => new HTML(1), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [1]), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [1], Derived), TypeError, message));
+assert(throws(() => new Derived(1), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => HTML(1)));
+assert(throws(() => HTML(1), TypeError));
 assert(() => getterCalls === 0);
 
 // Empty string.
-assert(() => throws(() => new HTML(''), message));
-assert(() => throws(() => Reflect.construct(HTML, ['']), message));
-assert(() => throws(() => Reflect.construct(HTML, [''], Derived), message));
-assert(() => throws(() => new Derived(''), message));
+assert(throws(() => new HTML(''), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, ['']), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [''], Derived), TypeError, message));
+assert(throws(() => new Derived(''), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => HTML('')));
+assert(throws(() => HTML(''), TypeError));
 assert(() => getterCalls === 0);
 
 // Numeric data object.
-assert(() => throws(() => new HTML({data: 1}), message));
-assert(() => throws(() => Reflect.construct(HTML, [{data: 1}]), message));
-assert(() => throws(() => Reflect.construct(HTML, [{data: 1}], Derived), message));
-assert(() => throws(() => new Derived({data: 1}), message));
+assert(throws(() => new HTML({data: 1}), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [{data: 1}]), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [{data: 1}], Derived), TypeError, message));
+assert(throws(() => new Derived({data: 1}), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => HTML({data: 1})));
+assert(throws(() => HTML({data: 1}), TypeError));
 assert(() => getterCalls === 0);
 
 // String data object.
-assert(() => throws(() => new HTML({data}), message));
-assert(() => throws(() => Reflect.construct(HTML, [{data}]), message));
-assert(() => throws(() => Reflect.construct(HTML, [{data}], Derived), message));
-assert(() => throws(() => new Derived({data}), message));
+assert(throws(() => new HTML({data}), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [{data}]), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [{data}], Derived), TypeError, message));
+assert(throws(() => new Derived({data}), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => HTML({data})));
+assert(throws(() => HTML({data}), TypeError));
 assert(() => getterCalls === 0);
 
 // Existing content.
-assert(() => throws(() => new HTML(value), message));
-assert(() => throws(() => Reflect.construct(HTML, [value]), message));
-assert(() => throws(() => Reflect.construct(HTML, [value], Derived), message));
-assert(() => throws(() => new Derived(value), message));
+assert(throws(() => new HTML(value), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [value]), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [value], Derived), TypeError, message));
+assert(throws(() => new Derived(value), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => HTML(value)));
+assert(throws(() => HTML(value), TypeError));
 assert(() => getterCalls === 0);
 
 // Data getter is not invoked.
-assert(() => throws(() => new HTML(config), message));
-assert(() => throws(() => Reflect.construct(HTML, [config]), message));
-assert(() => throws(() => Reflect.construct(HTML, [config], Derived), message));
-assert(() => throws(() => new Derived(config), message));
+assert(throws(() => new HTML(config), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [config]), TypeError, message));
+assert(throws(() => Reflect.construct(HTML, [config], Derived), TypeError, message));
+assert(throws(() => new Derived(config), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => HTML(config)));
+assert(throws(() => HTML(config), TypeError));
 assert(() => getterCalls === 0);
 
 assert(() => value instanceof HTML);
@@ -284,66 +282,66 @@ class Derived extends Image {
 }
 
 // No arguments.
-assert(() => throws(() => new Image(), message));
-assert(() => throws(() => Reflect.construct(Image, []), message));
-assert(() => throws(() => Reflect.construct(Image, [], Derived), message));
-assert(() => throws(() => new Derived(), message));
+assert(throws(() => new Image(), TypeError, message));
+assert(throws(() => Reflect.construct(Image, []), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [], Derived), TypeError, message));
+assert(throws(() => new Derived(), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Image()));
+assert(throws(() => Image(), TypeError));
 assert(() => getterCalls === 0);
 
 // Number.
-assert(() => throws(() => new Image(1), message));
-assert(() => throws(() => Reflect.construct(Image, [1]), message));
-assert(() => throws(() => Reflect.construct(Image, [1], Derived), message));
-assert(() => throws(() => new Derived(1), message));
+assert(throws(() => new Image(1), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [1]), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [1], Derived), TypeError, message));
+assert(throws(() => new Derived(1), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Image(1)));
+assert(throws(() => Image(1), TypeError));
 assert(() => getterCalls === 0);
 
 // Empty string.
-assert(() => throws(() => new Image(''), message));
-assert(() => throws(() => Reflect.construct(Image, ['']), message));
-assert(() => throws(() => Reflect.construct(Image, [''], Derived), message));
-assert(() => throws(() => new Derived(''), message));
+assert(throws(() => new Image(''), TypeError, message));
+assert(throws(() => Reflect.construct(Image, ['']), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [''], Derived), TypeError, message));
+assert(throws(() => new Derived(''), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Image('')));
+assert(throws(() => Image(''), TypeError));
 assert(() => getterCalls === 0);
 
 // Numeric data object.
-assert(() => throws(() => new Image({data: 1}), message));
-assert(() => throws(() => Reflect.construct(Image, [{data: 1}]), message));
-assert(() => throws(() => Reflect.construct(Image, [{data: 1}], Derived), message));
-assert(() => throws(() => new Derived({data: 1}), message));
+assert(throws(() => new Image({data: 1}), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [{data: 1}]), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [{data: 1}], Derived), TypeError, message));
+assert(throws(() => new Derived({data: 1}), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Image({data: 1})));
+assert(throws(() => Image({data: 1}), TypeError));
 assert(() => getterCalls === 0);
 
 // String data object.
-assert(() => throws(() => new Image({data}), message));
-assert(() => throws(() => Reflect.construct(Image, [{data}]), message));
-assert(() => throws(() => Reflect.construct(Image, [{data}], Derived), message));
-assert(() => throws(() => new Derived({data}), message));
+assert(throws(() => new Image({data}), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [{data}]), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [{data}], Derived), TypeError, message));
+assert(throws(() => new Derived({data}), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Image({data})));
+assert(throws(() => Image({data}), TypeError));
 assert(() => getterCalls === 0);
 
 // Existing content.
-assert(() => throws(() => new Image(value), message));
-assert(() => throws(() => Reflect.construct(Image, [value]), message));
-assert(() => throws(() => Reflect.construct(Image, [value], Derived), message));
-assert(() => throws(() => new Derived(value), message));
+assert(throws(() => new Image(value), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [value]), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [value], Derived), TypeError, message));
+assert(throws(() => new Derived(value), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Image(value)));
+assert(throws(() => Image(value), TypeError));
 assert(() => getterCalls === 0);
 
 // Data getter is not invoked.
-assert(() => throws(() => new Image(config), message));
-assert(() => throws(() => Reflect.construct(Image, [config]), message));
-assert(() => throws(() => Reflect.construct(Image, [config], Derived), message));
-assert(() => throws(() => new Derived(config), message));
+assert(throws(() => new Image(config), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [config]), TypeError, message));
+assert(throws(() => Reflect.construct(Image, [config], Derived), TypeError, message));
+assert(throws(() => new Derived(config), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Image(config)));
+assert(throws(() => Image(config), TypeError));
 assert(() => getterCalls === 0);
 
 assert(() => value instanceof Image);
@@ -378,66 +376,66 @@ class Derived extends Markdown {
 }
 
 // No arguments.
-assert(() => throws(() => new Markdown(), message));
-assert(() => throws(() => Reflect.construct(Markdown, []), message));
-assert(() => throws(() => Reflect.construct(Markdown, [], Derived), message));
-assert(() => throws(() => new Derived(), message));
+assert(throws(() => new Markdown(), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, []), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [], Derived), TypeError, message));
+assert(throws(() => new Derived(), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Markdown()));
+assert(throws(() => Markdown(), TypeError));
 assert(() => getterCalls === 0);
 
 // Number.
-assert(() => throws(() => new Markdown(1), message));
-assert(() => throws(() => Reflect.construct(Markdown, [1]), message));
-assert(() => throws(() => Reflect.construct(Markdown, [1], Derived), message));
-assert(() => throws(() => new Derived(1), message));
+assert(throws(() => new Markdown(1), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [1]), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [1], Derived), TypeError, message));
+assert(throws(() => new Derived(1), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Markdown(1)));
+assert(throws(() => Markdown(1), TypeError));
 assert(() => getterCalls === 0);
 
 // Empty string.
-assert(() => throws(() => new Markdown(''), message));
-assert(() => throws(() => Reflect.construct(Markdown, ['']), message));
-assert(() => throws(() => Reflect.construct(Markdown, [''], Derived), message));
-assert(() => throws(() => new Derived(''), message));
+assert(throws(() => new Markdown(''), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, ['']), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [''], Derived), TypeError, message));
+assert(throws(() => new Derived(''), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Markdown('')));
+assert(throws(() => Markdown(''), TypeError));
 assert(() => getterCalls === 0);
 
 // Numeric data object.
-assert(() => throws(() => new Markdown({data: 1}), message));
-assert(() => throws(() => Reflect.construct(Markdown, [{data: 1}]), message));
-assert(() => throws(() => Reflect.construct(Markdown, [{data: 1}], Derived), message));
-assert(() => throws(() => new Derived({data: 1}), message));
+assert(throws(() => new Markdown({data: 1}), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [{data: 1}]), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [{data: 1}], Derived), TypeError, message));
+assert(throws(() => new Derived({data: 1}), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Markdown({data: 1})));
+assert(throws(() => Markdown({data: 1}), TypeError));
 assert(() => getterCalls === 0);
 
 // String data object.
-assert(() => throws(() => new Markdown({data}), message));
-assert(() => throws(() => Reflect.construct(Markdown, [{data}]), message));
-assert(() => throws(() => Reflect.construct(Markdown, [{data}], Derived), message));
-assert(() => throws(() => new Derived({data}), message));
+assert(throws(() => new Markdown({data}), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [{data}]), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [{data}], Derived), TypeError, message));
+assert(throws(() => new Derived({data}), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Markdown({data})));
+assert(throws(() => Markdown({data}), TypeError));
 assert(() => getterCalls === 0);
 
 // Existing content.
-assert(() => throws(() => new Markdown(value), message));
-assert(() => throws(() => Reflect.construct(Markdown, [value]), message));
-assert(() => throws(() => Reflect.construct(Markdown, [value], Derived), message));
-assert(() => throws(() => new Derived(value), message));
+assert(throws(() => new Markdown(value), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [value]), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [value], Derived), TypeError, message));
+assert(throws(() => new Derived(value), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Markdown(value)));
+assert(throws(() => Markdown(value), TypeError));
 assert(() => getterCalls === 0);
 
 // Data getter is not invoked.
-assert(() => throws(() => new Markdown(config), message));
-assert(() => throws(() => Reflect.construct(Markdown, [config]), message));
-assert(() => throws(() => Reflect.construct(Markdown, [config], Derived), message));
-assert(() => throws(() => new Derived(config), message));
+assert(throws(() => new Markdown(config), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [config]), TypeError, message));
+assert(throws(() => Reflect.construct(Markdown, [config], Derived), TypeError, message));
+assert(throws(() => new Derived(config), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => Markdown(config)));
+assert(throws(() => Markdown(config), TypeError));
 assert(() => getterCalls === 0);
 
 assert(() => value instanceof Markdown);
@@ -472,66 +470,66 @@ class Derived extends SVG {
 }
 
 // No arguments.
-assert(() => throws(() => new SVG(), message));
-assert(() => throws(() => Reflect.construct(SVG, []), message));
-assert(() => throws(() => Reflect.construct(SVG, [], Derived), message));
-assert(() => throws(() => new Derived(), message));
+assert(throws(() => new SVG(), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, []), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [], Derived), TypeError, message));
+assert(throws(() => new Derived(), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => SVG()));
+assert(throws(() => SVG(), TypeError));
 assert(() => getterCalls === 0);
 
 // Number.
-assert(() => throws(() => new SVG(1), message));
-assert(() => throws(() => Reflect.construct(SVG, [1]), message));
-assert(() => throws(() => Reflect.construct(SVG, [1], Derived), message));
-assert(() => throws(() => new Derived(1), message));
+assert(throws(() => new SVG(1), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [1]), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [1], Derived), TypeError, message));
+assert(throws(() => new Derived(1), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => SVG(1)));
+assert(throws(() => SVG(1), TypeError));
 assert(() => getterCalls === 0);
 
 // Empty string.
-assert(() => throws(() => new SVG(''), message));
-assert(() => throws(() => Reflect.construct(SVG, ['']), message));
-assert(() => throws(() => Reflect.construct(SVG, [''], Derived), message));
-assert(() => throws(() => new Derived(''), message));
+assert(throws(() => new SVG(''), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, ['']), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [''], Derived), TypeError, message));
+assert(throws(() => new Derived(''), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => SVG('')));
+assert(throws(() => SVG(''), TypeError));
 assert(() => getterCalls === 0);
 
 // Numeric data object.
-assert(() => throws(() => new SVG({data: 1}), message));
-assert(() => throws(() => Reflect.construct(SVG, [{data: 1}]), message));
-assert(() => throws(() => Reflect.construct(SVG, [{data: 1}], Derived), message));
-assert(() => throws(() => new Derived({data: 1}), message));
+assert(throws(() => new SVG({data: 1}), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [{data: 1}]), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [{data: 1}], Derived), TypeError, message));
+assert(throws(() => new Derived({data: 1}), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => SVG({data: 1})));
+assert(throws(() => SVG({data: 1}), TypeError));
 assert(() => getterCalls === 0);
 
 // String data object.
-assert(() => throws(() => new SVG({data}), message));
-assert(() => throws(() => Reflect.construct(SVG, [{data}]), message));
-assert(() => throws(() => Reflect.construct(SVG, [{data}], Derived), message));
-assert(() => throws(() => new Derived({data}), message));
+assert(throws(() => new SVG({data}), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [{data}]), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [{data}], Derived), TypeError, message));
+assert(throws(() => new Derived({data}), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => SVG({data})));
+assert(throws(() => SVG({data}), TypeError));
 assert(() => getterCalls === 0);
 
 // Existing content.
-assert(() => throws(() => new SVG(value), message));
-assert(() => throws(() => Reflect.construct(SVG, [value]), message));
-assert(() => throws(() => Reflect.construct(SVG, [value], Derived), message));
-assert(() => throws(() => new Derived(value), message));
+assert(throws(() => new SVG(value), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [value]), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [value], Derived), TypeError, message));
+assert(throws(() => new Derived(value), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => SVG(value)));
+assert(throws(() => SVG(value), TypeError));
 assert(() => getterCalls === 0);
 
 // Data getter is not invoked.
-assert(() => throws(() => new SVG(config), message));
-assert(() => throws(() => Reflect.construct(SVG, [config]), message));
-assert(() => throws(() => Reflect.construct(SVG, [config], Derived), message));
-assert(() => throws(() => new Derived(config), message));
+assert(throws(() => new SVG(config), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [config]), TypeError, message));
+assert(throws(() => Reflect.construct(SVG, [config], Derived), TypeError, message));
+assert(throws(() => new Derived(config), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => SVG(config)));
+assert(throws(() => SVG(config), TypeError));
 assert(() => getterCalls === 0);
 
 assert(() => value instanceof SVG);
@@ -566,66 +564,66 @@ class Derived extends XML {
 }
 
 // No arguments.
-assert(() => throws(() => new XML(), message));
-assert(() => throws(() => Reflect.construct(XML, []), message));
-assert(() => throws(() => Reflect.construct(XML, [], Derived), message));
-assert(() => throws(() => new Derived(), message));
+assert(throws(() => new XML(), TypeError, message));
+assert(throws(() => Reflect.construct(XML, []), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [], Derived), TypeError, message));
+assert(throws(() => new Derived(), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => XML()));
+assert(throws(() => XML(), TypeError));
 assert(() => getterCalls === 0);
 
 // Number.
-assert(() => throws(() => new XML(1), message));
-assert(() => throws(() => Reflect.construct(XML, [1]), message));
-assert(() => throws(() => Reflect.construct(XML, [1], Derived), message));
-assert(() => throws(() => new Derived(1), message));
+assert(throws(() => new XML(1), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [1]), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [1], Derived), TypeError, message));
+assert(throws(() => new Derived(1), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => XML(1)));
+assert(throws(() => XML(1), TypeError));
 assert(() => getterCalls === 0);
 
 // Empty string.
-assert(() => throws(() => new XML(''), message));
-assert(() => throws(() => Reflect.construct(XML, ['']), message));
-assert(() => throws(() => Reflect.construct(XML, [''], Derived), message));
-assert(() => throws(() => new Derived(''), message));
+assert(throws(() => new XML(''), TypeError, message));
+assert(throws(() => Reflect.construct(XML, ['']), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [''], Derived), TypeError, message));
+assert(throws(() => new Derived(''), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => XML('')));
+assert(throws(() => XML(''), TypeError));
 assert(() => getterCalls === 0);
 
 // Numeric data object.
-assert(() => throws(() => new XML({data: 1}), message));
-assert(() => throws(() => Reflect.construct(XML, [{data: 1}]), message));
-assert(() => throws(() => Reflect.construct(XML, [{data: 1}], Derived), message));
-assert(() => throws(() => new Derived({data: 1}), message));
+assert(throws(() => new XML({data: 1}), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [{data: 1}]), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [{data: 1}], Derived), TypeError, message));
+assert(throws(() => new Derived({data: 1}), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => XML({data: 1})));
+assert(throws(() => XML({data: 1}), TypeError));
 assert(() => getterCalls === 0);
 
 // String data object.
-assert(() => throws(() => new XML({data}), message));
-assert(() => throws(() => Reflect.construct(XML, [{data}]), message));
-assert(() => throws(() => Reflect.construct(XML, [{data}], Derived), message));
-assert(() => throws(() => new Derived({data}), message));
+assert(throws(() => new XML({data}), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [{data}]), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [{data}], Derived), TypeError, message));
+assert(throws(() => new Derived({data}), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => XML({data})));
+assert(throws(() => XML({data}), TypeError));
 assert(() => getterCalls === 0);
 
 // Existing content.
-assert(() => throws(() => new XML(value), message));
-assert(() => throws(() => Reflect.construct(XML, [value]), message));
-assert(() => throws(() => Reflect.construct(XML, [value], Derived), message));
-assert(() => throws(() => new Derived(value), message));
+assert(throws(() => new XML(value), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [value]), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [value], Derived), TypeError, message));
+assert(throws(() => new Derived(value), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => XML(value)));
+assert(throws(() => XML(value), TypeError));
 assert(() => getterCalls === 0);
 
 // Data getter is not invoked.
-assert(() => throws(() => new XML(config), message));
-assert(() => throws(() => Reflect.construct(XML, [config]), message));
-assert(() => throws(() => Reflect.construct(XML, [config], Derived), message));
-assert(() => throws(() => new Derived(config), message));
+assert(throws(() => new XML(config), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [config]), TypeError, message));
+assert(throws(() => Reflect.construct(XML, [config], Derived), TypeError, message));
+assert(throws(() => new Derived(config), TypeError, message));
 // QuickJS may reject a plain call before invoking the native callback.
-assert(() => throws(() => XML(config)));
+assert(throws(() => XML(config), TypeError));
 assert(() => getterCalls === 0);
 
 assert(() => value instanceof XML);
@@ -1315,10 +1313,10 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -1326,28 +1324,28 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -1405,10 +1403,10 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -1416,28 +1414,28 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -1495,10 +1493,10 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -1506,28 +1504,28 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -1585,10 +1583,10 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -1596,28 +1594,28 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -1675,10 +1673,10 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -1686,28 +1684,28 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -1765,10 +1763,10 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -1776,28 +1774,28 @@ const nativeCopyOfInput = core.html(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -1876,10 +1874,10 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -1887,28 +1885,28 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -1966,10 +1964,10 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -1977,28 +1975,28 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -2056,10 +2054,10 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -2067,28 +2065,28 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -2146,10 +2144,10 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -2157,28 +2155,28 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -2236,10 +2234,10 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -2247,28 +2245,28 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -2326,10 +2324,10 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -2337,28 +2335,28 @@ const nativeCopyOfInput = core.image(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -2437,10 +2435,10 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -2448,28 +2446,28 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -2527,10 +2525,10 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -2538,28 +2536,28 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -2617,10 +2615,10 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -2628,28 +2626,28 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -2707,10 +2705,10 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -2718,28 +2716,28 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -2797,10 +2795,10 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -2808,28 +2806,28 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -2887,10 +2885,10 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -2898,28 +2896,28 @@ const nativeCopyOfInput = core.markdown(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -2999,10 +2997,10 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -3010,28 +3008,28 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -3089,10 +3087,10 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -3100,28 +3098,28 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -3179,10 +3177,10 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -3190,28 +3188,28 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -3269,10 +3267,10 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -3280,28 +3278,28 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -3359,10 +3357,10 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -3370,28 +3368,28 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -3449,10 +3447,10 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -3460,28 +3458,28 @@ const nativeCopyOfInput = core.svg(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -3560,10 +3558,10 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -3571,28 +3569,28 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -3650,10 +3648,10 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -3661,28 +3659,28 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -3740,10 +3738,10 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -3751,28 +3749,28 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -3830,10 +3828,10 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -3841,28 +3839,28 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -3920,10 +3918,10 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -3931,28 +3929,28 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -4010,10 +4008,10 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => Object.keys(value).join(',') === 'data');
     assert(() => matchesContent(value));
 
-    assert(() => throws(() => { value.data = 'changed'; }));
-    assert(() => throws(() => { delete value.data; }));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {value: 'changed'})));
-    assert(() => throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'})));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
+    assert(throws(() => { delete value.data; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {value: 'changed'}), TypeError));
+    assert(throws(() => Object.defineProperty(value, 'data', {get: () => 'changed'}), TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.deleteProperty(value, 'data'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
@@ -4021,28 +4019,28 @@ const nativeCopyOfInput = core.xml(fromInput.data);
     assert(() => !Reflect.defineProperty(value, 'data', {configurable: true}));
     assert(() => !Reflect.defineProperty(value, 'data', {enumerable: false}));
 
-    assert(() => throws(() => { value.extra = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'extra', {value: replacement})));
+    assert(throws(() => { value.extra = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'extra', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'extra', replacement));
     assert(() => !Reflect.defineProperty(value, 'extra', {value: replacement}));
     assert(() => !value.hasOwnProperty('extra'));
 
-    assert(() => throws(() => { value[symbol] = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, symbol, {value: replacement})));
+    assert(throws(() => { value[symbol] = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, symbol, {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, symbol, replacement));
     assert(() => !Reflect.defineProperty(value, symbol, {value: replacement}));
     assert(() => !value.hasOwnProperty(symbol));
 
-    assert(() => throws(() => { value.toJSON = replacement; }));
-    assert(() => throws(() => Object.defineProperty(value, 'toJSON', {value: replacement})));
+    assert(throws(() => { value.toJSON = replacement; }, TypeError));
+    assert(throws(() => Object.defineProperty(value, 'toJSON', {value: replacement}), TypeError));
     assert(() => !Reflect.set(value, 'toJSON', replacement));
     assert(() => !Reflect.defineProperty(value, 'toJSON', {value: replacement}));
     assert(() => !value.hasOwnProperty('toJSON'));
     assert(() => Object.getOwnPropertySymbols(value).length === 0);
-    assert(() => throws(() => Object.setPrototypeOf(value, {})));
+    assert(throws(() => Object.setPrototypeOf(value, {}), TypeError));
     assert(() => !Reflect.setPrototypeOf(value, {}));
     assert(() => !Reflect.setPrototypeOf(value, null));
-    assert(() => throws(() => { value.__proto__ = {}; }));
+    assert(throws(() => { value.__proto__ = {}; }, TypeError));
     // Non-extensibility still permits operations that do not change the object.
     assert(() => Reflect.setPrototypeOf(value, prototype));
     assert(() => Reflect.defineProperty(value, 'data', {value: data}));
@@ -4093,11 +4091,11 @@ assert(() => descriptor.enumerable === false);
 assert(() => descriptor.writable === false);
 assert(() => descriptor.configurable === false);
 assert(() => Object.keys(value).join(',') === 'data');
-assert(() => throws(() => JSON.stringify(value), 'HTML cannot be serialized'));
+assert(throws(() => JSON.stringify(value), TypeError, 'HTML cannot be serialized'));
 
-assert(() => throws(() => { value['.json'] = true; }));
-assert(() => throws(() => { delete value['.json']; }));
-assert(() => throws(() => Object.defineProperty(value, '.json', {value: true})));
+assert(throws(() => { value['.json'] = true; }, TypeError));
+assert(throws(() => { delete value['.json']; }, TypeError));
+assert(throws(() => Object.defineProperty(value, '.json', {value: true}), TypeError));
 assert(() => !Reflect.set(value, '.json', true));
 assert(() => !Reflect.deleteProperty(value, '.json'));
 assert(() => !Reflect.defineProperty(value, '.json', {value: true}));
@@ -4111,8 +4109,8 @@ assert(() => !Reflect.setPrototypeOf(value, {}));
 assert(() => value['.json'] === false);
 assert(() => value.data === data);
 assert(() => Object.isFrozen(value));
-assert(() => throws(() => value.toJSON(), 'HTML cannot be serialized'));
-assert(() => throws(() => JSON.stringify(value), 'HTML cannot be serialized'));
+assert(throws(() => value.toJSON(), TypeError, 'HTML cannot be serialized'));
+assert(throws(() => JSON.stringify(value), TypeError, 'HTML cannot be serialized'));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -4161,7 +4159,7 @@ assert(() => record.sign === emptyContent[0].toJSON().sign);
     assert(() => Object.isFrozen(value));
     assert(() => !Object.isExtensible(value));
     assert(() => Object.keys(value).length === 0);
-    assert(() => throws(() => { value.data = 'changed'; }));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
     assert(() => !value.hasOwnProperty('data'));
@@ -4189,7 +4187,7 @@ assert(() => record.sign === emptyContent[0].toJSON().sign);
     assert(() => Object.isFrozen(value));
     assert(() => !Object.isExtensible(value));
     assert(() => Object.keys(value).length === 0);
-    assert(() => throws(() => { value.data = 'changed'; }));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
     assert(() => !value.hasOwnProperty('data'));
@@ -4217,7 +4215,7 @@ assert(() => record.sign === emptyContent[0].toJSON().sign);
     assert(() => Object.isFrozen(value));
     assert(() => !Object.isExtensible(value));
     assert(() => Object.keys(value).length === 0);
-    assert(() => throws(() => { value.data = 'changed'; }));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
     assert(() => !value.hasOwnProperty('data'));
@@ -4245,7 +4243,7 @@ assert(() => record.sign === emptyContent[0].toJSON().sign);
     assert(() => Object.isFrozen(value));
     assert(() => !Object.isExtensible(value));
     assert(() => Object.keys(value).length === 0);
-    assert(() => throws(() => { value.data = 'changed'; }));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
     assert(() => !value.hasOwnProperty('data'));
@@ -4273,7 +4271,7 @@ assert(() => record.sign === emptyContent[0].toJSON().sign);
     assert(() => Object.isFrozen(value));
     assert(() => !Object.isExtensible(value));
     assert(() => Object.keys(value).length === 0);
-    assert(() => throws(() => { value.data = 'changed'; }));
+    assert(throws(() => { value.data = 'changed'; }, TypeError));
     assert(() => !Reflect.set(value, 'data', 'changed'));
     assert(() => !Reflect.defineProperty(value, 'data', {value: 'changed'}));
     assert(() => !value.hasOwnProperty('data'));
@@ -4303,7 +4301,7 @@ assert(() => Object.keys(value).join(',') === 'data');
 assert(() => !Reflect.set(value, '.json', true));
 assert(() => !Reflect.deleteProperty(value, '.json'));
 assert(() => !Reflect.defineProperty(value, '.json', {value: true}));
-assert(() => throws(() => JSON.stringify(value), 'HTML cannot be serialized'));
+assert(throws(() => JSON.stringify(value), TypeError, 'HTML cannot be serialized'));
     )JS", ctx, "native-content-immutability");
 
     BOOST_TEST(get_error() == std::nullopt);

@@ -7,8 +7,6 @@ BOOST_FIXTURE_TEST_SUITE(DB, notojs::testing::Fixture)
 
 BOOST_AUTO_TEST_CASE(ExportedClassesAreNotConstructible)
 {
-    db();
-
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 import { Database, System, ErrorLog, HTTPData } from 'noto:db';
@@ -19,10 +17,10 @@ for(const [Type, message] of [
     [ErrorLog, 'ErrorLog: no constructor'],
     [HTTPData, 'HTTPData: no constructor']
 ]) {
-    assert(() => throws(() => new Type(), message));
-    assert(() => throws(() => new Type('test'), message));
-    assert(() => throws(() => new Type(1), message));
-    assert(() => throws(() => new Type({}), message));
+    assert(throws(() => new Type(), TypeError, message));
+    assert(throws(() => new Type('test'), TypeError, message));
+    assert(throws(() => new Type(1), TypeError, message));
+    assert(throws(() => new Type({}), TypeError, message));
 }
     )JS");
 
@@ -31,8 +29,6 @@ for(const [Type, message] of [
 
 BOOST_AUTO_TEST_CASE(OpenOverloads)
 {
-    db();
-
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 import { open, ErrorLog, HTTPData, System } from 'noto:db';
@@ -44,12 +40,46 @@ assert(() => open('sys:errorlog') instanceof ErrorLog);
 assert(() => open('sys:httpdata') instanceof HTTPData);
 assert(() => open('sys:other') instanceof System);
 assert(() => open('var:test') instanceof System);
-assert(() => throws(() => open('test', 1), 'No matching function overload found'));
-assert(() => throws(() => open(null), 'No matching function overload found'));
-assert(() => throws(() => open('test', 'bad::name'), 'No matching function overload found'));
-assert(() => throws(() => open('test', 'sys:errorlog'), 'No matching function overload found'));
-assert(() => throws(() => open('sys:errorlog', 'test'), 'No matching function overload found'));
-assert(() => throws(() => open('sys:errorlog', 'sys:httpdata'), 'No matching function overload found'));
+assert(throws(() => open('test', 1), TypeError, 'No matching function overload found'));
+assert(throws(() => open(null), TypeError, 'No matching function overload found'));
+assert(throws(() => open('test', 'bad::name'), TypeError, 'No matching function overload found'));
+assert(throws(() => open('test', 'sys:errorlog'), TypeError, 'No matching function overload found'));
+assert(throws(() => open('sys:errorlog', 'test'), TypeError, 'No matching function overload found'));
+assert(throws(() => open('sys:errorlog', 'sys:httpdata'), TypeError, 'No matching function overload found'));
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(SDK)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+import { open, DBException } from 'noto:db';
+import { count } from 'db.so'
+
+const db = open('test:a', 'test:b');
+
+db.rw((a, b) => {
+    assert(() => 0 == count(a));
+    assert(() => 0 == count(b));
+
+    a.set('a', 'b');
+    b.set('b', {x: 1, y: 'foo'});
+    b.set('c', {x: 2, y: 'bar'});
+});
+
+let tx;
+db.ro((a, b) => {
+    tx = [a, b]
+    assert(() => 1 == count(a));
+    assert(() => 2 == count(b));
+});
+
+assert(throws(() => count(tx[0]), DBException, 'Transaction was closed'));
+assert(throws(() => count(tx[1]), DBException, 'Transaction was closed'));
+
+db.drop();
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -57,19 +87,17 @@ assert(() => throws(() => open('sys:errorlog', 'sys:httpdata'), 'No matching fun
 
 BOOST_AUTO_TEST_CASE(CRUD)
 {
-    db();
-
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
-import { open } from 'noto:db';
+import { open, DBException } from 'noto:db';
 
-assert(() => throws(() => open(), 'No matching function overload found'));
-assert(() => throws(() => open(1), 'No matching function overload found'));
-assert(() => throws(() => open(''), 'No matching function overload found'));
-assert(() => throws(() => open(':'), 'No matching function overload found'));
-assert(() => throws(() => open('a::b'), 'No matching function overload found'));
-assert(() => throws(() => open('a:b:'), 'No matching function overload found'));
-assert(() => throws(() => open('sys:a', 'b'), 'No matching function overload found'));
+assert(throws(() => open(), TypeError, 'No matching function overload found'));
+assert(throws(() => open(1), TypeError, 'No matching function overload found'));
+assert(throws(() => open(''), TypeError, 'No matching function overload found'));
+assert(throws(() => open(':'), TypeError, 'No matching function overload found'));
+assert(throws(() => open('a::b'), TypeError, 'No matching function overload found'));
+assert(throws(() => open('a:b:'), TypeError, 'No matching function overload found'));
+assert(throws(() => open('sys:a', 'b'), TypeError, 'No matching function overload found'));
 
 const db = open('test:a', 'test:b');
 assert(() => 2 == db.length);
@@ -106,10 +134,10 @@ db.ro((a, b) => {
     assert(() => 0 == b.stat.entries);
 });
 
-assert(() => throws(() => tx.get('a'), 'Transaction is finished'));
-assert(() => throws(() => db.ro((a) => a.set('a', 'b')), 'mdb_put'));
+assert(throws(() => tx.get('a'), DBException, 'Transaction was closed'));
+assert(throws(() => db.ro((a) => a.set('a', 'b')), DBException, 'mdb_put'));
 
-assert(() => throws(() => db.rw((a, b) => {
+assert(throws(() => db.rw((a, b) => {
     a.set('a', 'b');
     b.set('b', 1);
     throw '';
@@ -143,8 +171,6 @@ db.drop();
 
 BOOST_AUTO_TEST_CASE(Iterate)
 {
-    db();
-
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 import { open } from 'noto:db';
@@ -208,11 +234,11 @@ assert(() => is_same(['a', ['a']], arr[0]));
 assert(() => is_same(['b', ['b']], arr[1]));
 assert(() => is_same(['c', ['c']], arr[2]));
 
-assert(() => throws(() => db.ro(a => {
+assert(throws(() => db.ro(a => {
     a.each(() => {
         throw new Error('Dummy');
     });
-}), 'Dummy'));
+}), Error, 'Dummy'));
 
 db.drop();
 
@@ -225,7 +251,7 @@ db.rw((a) => {
 });
 
 arr = new Array();
-db.rw((a) => a.each((k, v) => {
+db.ro((a) => a.each((k, v) => {
     arr.push(k);
 }));
 
@@ -233,6 +259,12 @@ assert(() => is_same([-2,-1,0,1,2], arr));
 
 arr = db.ro(a => a.map(k => k));
 assert(() => is_same([-2,-1,0,1,2], arr));
+
+arr = db.ro(a => Array.from(a)).map(k => k[0]);
+assert(() => is_same([-2,-1,0,1,2], arr));
+
+arr = db.ro(a => Array.from(a)).map(k => k[1]);
+assert(() => is_same(['a','b','c','d','e'], arr));
 
 db.drop();
     )JS");
@@ -242,8 +274,6 @@ db.drop();
 
 BOOST_AUTO_TEST_CASE(Ranges)
 {
-    db();
-
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 import { open } from 'noto:db';
@@ -276,15 +306,15 @@ function mrange(r) {
     db.ro((a) => a.map(r, () => {}));
 }
 
-assert(() => throws(() => range([]), 'Expecting array of size 2'));
-assert(() => throws(() => range(['a']), 'Expecting array of size 2'));
-assert(() => throws(() => range(['a', {}]), 'Expecting number, string or null'));
-assert(() => throws(() => range([{}, 'a']), 'Expecting number, string or null'));
+assert(throws(() => range([]), TypeError, 'Expecting array of size 2'));
+assert(throws(() => range(['a']), TypeError, 'Expecting array of size 2'));
+assert(throws(() => range(['a', {}]), TypeError, 'Expecting number, string or null'));
+assert(throws(() => range([{}, 'a']), TypeError, 'Expecting number, string or null'));
 
-assert(() => throws(() => mrange([]), 'Expecting array of size 2'));
-assert(() => throws(() => mrange(['a']), 'Expecting array of size 2'));
-assert(() => throws(() => mrange(['a', {}]), 'Expecting number, string or null'));
-assert(() => throws(() => mrange([{}, 'a']), 'Expecting number, string or null'));
+assert(throws(() => mrange([]), TypeError, 'Expecting array of size 2'));
+assert(throws(() => mrange(['a']), TypeError, 'Expecting array of size 2'));
+assert(throws(() => mrange(['a', {}]), TypeError, 'Expecting number, string or null'));
+assert(throws(() => mrange([{}, 'a']), TypeError, 'Expecting number, string or null'));
 
 let arr = new Array();
 db.ro((a) => a.each(['b', 'd'], (k, v) => {
@@ -337,18 +367,18 @@ arr = db.ro((a) => a.map([null, null], (k, v) => {
 }));
 assert(() => is_same(['a', 'b', 'c', 'd', 'e'], arr));
 
-assert(() => throws(() => db.ro(a => {
+assert(throws(() => db.ro(a => {
     a.each(['a', null], () => {
         throw new Error('Dummy');
     });
-}), 'Dummy'));
+}), Error, 'Dummy'));
 
-assert(() => throws(() => db.ro(a => {
+assert(throws(() => db.ro(a => {
     a.map(['a', null], (k) => {
         if(k == 'b') throw new Error('Dummy');
         return k;
     });
-}), 'Dummy'));
+}), Error, 'Dummy'));
 
 db.drop();
 
@@ -380,8 +410,6 @@ db.drop();
 
 BOOST_AUTO_TEST_CASE(Reduce)
 {
-    db();
-
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
 import { open } from 'noto:db';
@@ -477,6 +505,49 @@ arr = db.ro(d => d.reduce((acc, k) => null, 0));
 assert(() => null == arr);
 
 db.drop();
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(CustomHandler)
+{
+    eval(R"JS(
+import { assert, throws } from 'noto:assert';
+import { open, DBException } from 'noto:db';
+
+const database = open('var:test:database');
+assert(() => 1 === database.length);
+
+let escaped;
+database.rw(handle => {
+    escaped = handle;
+    assert(() => 0 === handle.count);
+    assert(() => null === handle.get('key'));
+    handle.put('key', 'value');
+    assert(() => 1 === handle.count);
+    assert(() => 'value' === handle.get('key'));
+});
+
+database.ro(handle => {
+    assert(() => 1 === handle.count);
+    assert(() => 'value' === handle.get('key'));
+});
+
+assert(throws(
+    () => escaped.get('key'),
+    DBException,
+    'Transaction was closed'
+));
+
+assert(throws(() => database.rw(handle => {
+    handle.put('rollback', 'value');
+    throw new Error('rollback');
+}), Error, 'rollback'));
+
+database.ro(handle => {
+    assert(() => null === handle.get('rollback'));
+});
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);

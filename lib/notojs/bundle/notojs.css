@@ -3,6 +3,16 @@
     --nj-max-editor-width: 950px;
     --nj-editor-width-diff: 700;
     --nj-block-padding: 5px;
+    --nj-color-0: #1f77b4;
+    --nj-color-1: #ff7f0e;
+    --nj-color-2: #2ca02c;
+    --nj-color-3: #d62728;
+    --nj-color-4: #9467bd;
+    --nj-color-5: #8c564b;
+    --nj-color-6: #e377c2;
+    --nj-color-7: #7f7f7f;
+    --nj-color-8: #bcbd22;
+    --nj-color-9: #17becf;
     --nj-font-size-h1: 1.8em;
     --nj-font-size-h2: 1.5em;
     --nj-font-size-h3: 1.25em;
@@ -79,6 +89,9 @@ nj-view {
     background-color: white !important;
     margin: 0 0 0.5em 0;
 }
+div.nj-block + nj-view {
+    margin-top: 0.5em;
+}
 nj-view > div.nj-block {
     transform-origin: top left;
     background: transparent !important;
@@ -106,7 +119,6 @@ div.nj-block .nj-text:first-of-type {
 div.nj-block .nj-html {
     margin: auto !important;
     font-family: var(--nj-body-font);
-    width: 100%;
 }
 div.nj-block > .nj-error {
     font-family: var(--nj-monospaced) !important;

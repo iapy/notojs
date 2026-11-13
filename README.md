@@ -20,21 +20,21 @@
 
 ## Repository layout
 
-- `app/` Main `notojs` executable and example `notojs.ini`
-- `ext/` Optional native modules and plugins
+- `app/` Main `notojs` executable and configuration template
 - `lib/` **NotoJS** implementation and third-party submodules
 - `sdk/` Public C++ API headers and plugin CMake helper
+- `std/` Standard native modules and server plugins
 - `test/` `boost::test` tests
-- `tool/` Development tooling (built separately, not documented)
 
 ## Requirements
 
 **NotoJS** is a C++17 CMake project. The top-level build expects:
 
-- CMake 3.12+
+- CMake 3.18+
 - C++17 compiler
-- Boost components: `filesystem`, `iostreams`, `process`, `program_options`, `url`
+- Boost components: `filesystem`, `iostreams`, `program_options`, `url`, plus `process` with Boost 1.84+
 - OpenSSL
+- Make, used to build the bundled QuickJS and LMDB libraries
 - Git submodules initialized
 
 Optional dependencies:
@@ -72,9 +72,11 @@ The main executable is built as:
 build/app/notojs
 ```
 
-Run tests, if desired:
+Tests are disabled by default. Enable, build, and run them with:
 
 ```sh
+cmake -S . -B build -DNOTOJS_BUILD_TESTS=ON
+cmake --build build
 ctest --test-dir build
 ```
 
@@ -86,7 +88,7 @@ Install the complete runtime using CMake's generated installation script:
 cmake --install build
 ```
 
-Use `sudo` when the selected prefix is not writable by the current user. The installation creates the following layout under `CMAKE_INSTALL_PREFIX`:
+Use `sudo` when the selected prefix is not writable by the current user. The installation includes the following paths under `CMAKE_INSTALL_PREFIX`:
 
 ```text
 bin/notojs                      NotoJS executable
@@ -96,9 +98,9 @@ lib/notojs/stdlib/crypto.so     Standard native module
 lib/notojs/stdlib/gzip.so       Optional, when zlib is available
 lib/notojs/stdlib/yaml.so       YAML parser and emitter
 lib/notojs/stdlib/zip.so        Optional, when libzip is available
-lib/notojs/script/charts.js     Chart renderer
-lib/notojs/script/tables.js     Table renderer
-lib/notojs/plugin/              Server plugin directory
+lib/notojs/script/chart.js      Chart renderer
+lib/notojs/script/table.js      Table renderer
+lib/notojs/plugin/cron.so       Scheduled notebook plugin
 ```
 
 The generated `etc/notojs.ini` uses the configured installation prefix for the JavaScript module path, native module path, documentation suite, and plugin directory. No post-install copying or path editing is required.
@@ -129,27 +131,43 @@ http://127.0.0.1:8000/#doc
 
 ## Renderers
 
-The `charts.js` and `tables.js` renderer bundles are built with the default build and installed automatically into `lib/notojs/script`, which the generated configuration sets as `[engine].jspath`.
+The `chart.js` and `table.js` renderer bundles are built with the default build and installed automatically into `lib/notojs/script`, which the generated configuration sets as `[engine].jspath`.
 
 For development without installing, the renderer targets can be rebuilt independently:
 
 ```sh
-cmake --build build --target charts tables
+cmake --build build --target chart table
 ```
 
 Their build-tree outputs are:
 
 ```text
-build/lib/notojs/bundle/render/charts.js
-build/lib/notojs/bundle/render/tables.js
+build/lib/notojs/bundle/render/chart.js
+build/lib/notojs/bundle/render/table.js
 ```
+
+## Scheduled notebooks
+
+The `cron` server plugin executes top-level notebooks according to schedule suffixes in their names. Enable it with a shared notebook-name prefix:
+
+```ini
+[plugin:cron]
+prefix = cron-
+```
+
+With this configuration, fixed-time notebook filenames use `cron-HH:MM.notojs`, where `HH:MM` is a valid 24-hour local time. For example, `cron-09:30.notojs` runs daily at 09:30 local time.
+
+Recurring notebook filenames use `cron-Xm.notojs`, where `X` is a positive number of minutes that divides 1440 evenly. Recurring schedules are anchored to local midnight, so `cron-90m.notojs` runs at 00:00, 01:30, 03:00, and every 90 minutes thereafter.
+
+Schedules are updated when matching notebooks are created, renamed, or removed. Missed executions are not replayed, and a notebook is not queued again while its previous execution is pending or running.
 
 ## Included extensions
 
 - standard module `std/crypto` — random bytes, hashing, HMAC, and hex utilities; always installed as `crypto.so`.
 - optional standard module `std/gzip` — gzip file support; installed as `gzip.so` when zlib is available.
+- standard module `std/yaml` — YAML parsing and emission; always installed as `yaml.so`.
 - optional standard module `std/zip` — ZIP archive support; installed as `zip.so` when libzip is available.
-- plugin `ext/inotify` — filesystem watcher plugin using FSEvents on macOS and inotify on Linux.
+- standard plugin `std/cron` — fixed-time and recurring scheduled notebook execution; always installed as `cron.so`.
 
 ## Screenshots
 

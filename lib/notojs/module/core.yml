@@ -47,13 +47,13 @@ args:
   -
     - String
   -
-    - IURL
+    - NOTOJS_VERSION_NS::URL
   -
     - SVG
   -
     - Image
   -
-    - IBlob
+    - NOTOJS_VERSION_NS::Blob
 text: |-
   Returns an `Image` object.
 

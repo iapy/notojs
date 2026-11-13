@@ -5,6 +5,38 @@
 
 BOOST_FIXTURE_TEST_SUITE(Crypto, notojs::testing::Fixture)
 
+BOOST_AUTO_TEST_CASE(Storage)
+{
+    eval(R"JS(
+import { assert } from 'noto:assert';
+import { Storage as EncryptedStorage } from 'crypto.so';
+
+const storage = new EncryptedStorage('crypto-object-test');
+storage.clear();
+
+storage.setItem('string', '{"value":42}');
+storage.setItem('object', {
+    value: 42,
+    nested: {enabled: true},
+    items: ['one', 2, null]
+});
+storage.setItem('number', 42);
+
+assert(() => storage.length === 3);
+assert(() => storage.getItem('string') === '{"value":42}');
+assert(() => storage.getItem('object').value === 42);
+assert(() => storage.getItem('object').nested.enabled === true);
+assert(() => storage.getItem('object').items[0] === 'one');
+assert(() => storage.getItem('object').items[1] === 2);
+assert(() => storage.getItem('object').items[2] === null);
+assert(() => storage.getItem('number') === 42);
+
+storage.clear();
+    )JS");
+
+    BOOST_TEST(get_error() == std::nullopt);
+}
+
 BOOST_AUTO_TEST_CASE(SHA1)
 {
     eval(R"JS(

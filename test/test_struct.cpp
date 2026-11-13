@@ -9,10 +9,10 @@ BOOST_AUTO_TEST_CASE(Struct)
 import { assert, throws } from 'noto:assert';
 import { Configurable } from 'struct.so';
 
-assert(() => throws(() => new Configurable(), "Configurable: no matching constructor found"));
-assert(() => throws(() => new Configurable({path: 1}), "Configurable: no matching constructor found"));
-assert(() => throws(() => new Configurable({body: 1}), "Configurable: no matching constructor found"));
-assert(() => throws(() => new Configurable({method: 'XXX'}), "Configurable constructor: invalid method [XXX]"));
+assert(throws(() => new Configurable(), TypeError, "Configurable: no matching constructor found"));
+assert(throws(() => new Configurable({path: 1}), TypeError, "Configurable: no matching constructor found"));
+assert(throws(() => new Configurable({body: 1}), TypeError, "Configurable: no matching constructor found"));
+assert(throws(() => new Configurable({method: 'XXX'}), TypeError, "Configurable constructor: invalid method [XXX]"));
 
 let a = new Configurable({});
 assert(() => '' == a.config);

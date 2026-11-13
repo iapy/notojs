@@ -1,22 +1,15 @@
-cmake_minimum_required(VERSION 3.12)
-project(notojs LANGUAGES C CXX)
+cmake_minimum_required(VERSION 3.18)
+project(notojs VERSION 0.5.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang)$")
-    add_compile_options(-Wno-c99-designator)
-endif()
-option(ENABLE_DEBUG_LOGGING "Enable debug logging" OFF)
+option(NOTOJS_BUILD_TESTS "Build tests" OFF)
+option(NOTOJS_DEBUG_LOGGING "Debug logging" OFF)
+option(NOTOJS_INSTALL_DEVKIT "Install devkit" ON)
 
-if((NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    OR CMAKE_BUILD_TYPE STREQUAL "Release")
-option(STRIP_NOTOJS_BINARY "Strip notojs binary" ON)
-else()
-option(STRIP_NOTOJS_BINARY "Strip notojs binary" OFF)
-endif()
-
-find_package(Boost CONFIG REQUIRED COMPONENTS filesystem iostreams program_options url)
+find_package(Boost CONFIG REQUIRED COMPONENTS
+    filesystem iostreams program_options url)
 find_package(OpenSSL)
 find_package(libzip QUIET)
 find_package(ZLIB QUIET)
@@ -25,19 +18,31 @@ if(${Boost_VERSION} VERSION_GREATER_EQUAL "1.84")
     find_package(Boost CONFIG REQUIRED COMPONENTS process)
 endif()
 
-include_directories(${CMAKE_SOURCE_DIR}/sdk ${CMAKE_SOURCE_DIR}/lib ${Boost_INCLUDE_DIRS})
+include(${PROJECT_SOURCE_DIR}/sdk/notojs.cmake)
+include_directories(
+    ${CMAKE_SOURCE_DIR}/sdk
+    ${CMAKE_SOURCE_DIR}/lib
+    ${Boost_INCLUDE_DIRS})
+
+string(REPLACE "." "_" NOTOJS_VERSION_NS "${CMAKE_PROJECT_VERSION}")
+string(PREPEND NOTOJS_VERSION_NS version_)
+
+add_compile_definitions(NOTOJS_VERSION="${CMAKE_PROJECT_VERSION}")
+add_compile_definitions(NOTOJS_VERSION_NS=${NOTOJS_VERSION_NS})
+
 set(CMAKE_CXX_FLAGS_RELEASE "-O2" CACHE STRING "Release flags" FORCE)
-include(${PROJECT_SOURCE_DIR}/app/version.cmake)
 
 add_subdirectory(app)
-add_subdirectory(ext)
 add_subdirectory(lib)
 add_subdirectory(std)
 
-add_subdirectory(test)
+if(${NOTOJS_INSTALL_DEVKIT})
+add_subdirectory(sdk)
+endif()
 
-install(CODE [[
-  file(MAKE_DIRECTORY
-    "${CMAKE_INSTALL_PREFIX}/lib/notojs/script"
-  )
-]])
+if(${NOTOJS_BUILD_TESTS})
+enable_testing()
+add_subdirectory(test)
+endif()
+
+notojs_package(MAINTAINER "Alex Polyakov")

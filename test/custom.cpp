@@ -36,7 +36,7 @@ JSValue factory_1(JSContext *ctx, bridge::String data)
 {
     bridge::Strong<bridge::Object> obj{ctx, bridge::Object{ctx}};
     obj.set("data", JS_DupValue(ctx, data));
-    return Custom::ctor(ctx, std::move(obj));
+    return Custom::ctor(ctx, &obj);
 }
 
 using consume = bridge::Function<&consume_0>;

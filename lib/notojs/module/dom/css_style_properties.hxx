@@ -146,9 +146,10 @@ struct CSSStyleProperties : bridge::Interface<CSSStyleProperties, dom::CSSStyleP
         ), ref().impl);
     }
 
-    void set_property(JSContext *ctx, char const *n, JSValueConst value)
+    int set_property(JSContext *ctx, char const *n, JSValueConst value)
     {
         if(!ref().impl.index()) std::get<0>(ref().impl).set_property(ref(), n, bridge::Value{ctx, value}.toString());
+        return 1;
     }
 
     BOOST_FORCEINLINE static void free(dom::CSSStyleProperties &self)

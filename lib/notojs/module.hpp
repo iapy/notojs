@@ -5,6 +5,7 @@
 #include <boost/url.hpp>
 #include <unordered_map>
 #include <filesystem>
+#include <functional>
 #include <string>
 
 struct JSContext;
@@ -14,13 +15,15 @@ struct JSValue;
 
 namespace notojs {
 
-class Config;
 class Global;
-class Plugin;
 class Server;
 
 class Module : public Requires<Global, Server>
 {
+    void configure(detail::Config const &);
+    friend class Config;
+    friend class Plugin;
+ 
 public:
     static constexpr std::integral_constant<int, 0> MODULE = {};
     static constexpr std::integral_constant<int, 1> SCRIPT = {};
@@ -53,12 +56,7 @@ private:
         JSModuleDef *(*init3)(JSContext *, const char *);
     };
     std::unordered_map<std::string, Impl> const modules;
-    std::unordered_map<std::string, decltype(Impl{}.init3)> plugins;
-
-private:
-    void configure(detail::Config const &);
-    friend class Config;
-    friend class Plugin;
+    std::unordered_map<std::string, std::function<JSModuleDef *(JSContext *ctx, char const *)>> plugins;
 };
 
 } // namespace notojs

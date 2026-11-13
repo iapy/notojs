@@ -1,10 +1,12 @@
 text: |-
-  `gzip.so` provides the `gzip` function for reading and writing **gzip** files.
+  `gzip.so` provides a default-exported `gzip` factory for reading and writing
+  **gzip** files. The factory is not available as a named export.
 
-  ###### Exports
-  - `class GZip`
-  - `class GZipError`
+  ###### Default export
   - `function gzip`
+
+  ###### Named exports
+  - `class GZipError`
 also:
   - topic:gzip
 ---
@@ -51,22 +53,10 @@ methods:
       -
         - String
       -
-        - IBlob
+        - noto::Blob
     docs: GZip.write
     text: |-
       Compresses `arg0`, which may be a `String` or `Blob`, and writes it to the **gzip** file.
 
       Returns a `Promise` that resolves to the number of uncompressed input bytes written.
       Throws `GZipError` if the path is read-only or the output file cannot be opened.
----
-function: gzip
-args:
-  -
-    - fs::IPath
-docs: gzip
-text: |-
-  Creates a `GZip` instance.
-
-  Returns a `GZip` instance with `arg0` as the path to the **gzip** file.
-
-  ###### Default export

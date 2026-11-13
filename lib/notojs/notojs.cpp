@@ -118,6 +118,43 @@ JSCFunctionListEntry const SVG::funcs[2] = {
     JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&SVG::toJSON>::invoke),
 };
 
+JSValue Version::toString(JSContext *ctx)
+{
+    return bridge::String(ctx, ref());
+}
+
+JSValue Version::major(JSContext *ctx) const
+{
+    return bridge::Number{ctx, std::atoi(ref().c_str())};
+}
+
+JSValue Version::minor(JSContext *ctx) const
+{
+    return bridge::Number{ctx, std::atoi(ref().c_str() + ref().find_first_of('.') + 1)};
+}
+
+JSValue Version::patch(JSContext *ctx) const
+{
+    return bridge::Number{ctx, std::atoi(ref().c_str() + ref().find_last_of('.') + 1)};
+}
+
+std::vector<std::string> Version::own_properties() const
+{
+    return {"major", "minor", "patch"};
+}
+
+JSCFunctionListEntry const Version::funcs[5] = {
+    JS_CGETSET_DEF("major", &bridge::Getter<&Version::major>, NULL),
+    JS_CGETSET_DEF("minor", &bridge::Getter<&Version::minor>, NULL),
+    JS_CGETSET_DEF("patch", &bridge::Getter<&Version::patch>, NULL),
+    JS_CFUNC_DEF("toJSON", 0, &bridge::Function<&Version::toString>::invoke),
+    JS_CFUNC_DEF("toString", 0, &bridge::Function<&Version::toString>::invoke),
+};
+
+JSClassExoticMethods Version::exoticMethods = {
+    .get_own_property_names = &bridge::own_properties<Version>
+};
+
 JSValue XML::toJSON(JSContext *ctx) const
 {
     return content(ctx, "notojs.XML", *this);

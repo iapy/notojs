@@ -1,4 +1,3 @@
-#include "quickjs/quickjs.h"
 #include <notojs/module/fs.hpp>
 #include <bridge.hpp>
 #include <engine.hpp>
@@ -6,7 +5,6 @@
 #include <module.hpp>
 
 #include <filesystem>
-#include <iostream>
 #include <fstream>
 #include <map>
 #include <chrono>
@@ -15,27 +13,9 @@
 namespace notojs {
 namespace {
 
-struct Mount
-{
-    enum Flag
-    {
-        UNDEFINED = 0,
-        RO = 1,
-        RW = 2
-    };
-
-    std::filesystem::path path;
-    Flag flag;
-
-    BOOST_FORCEINLINE static Flag parse(std::string_view const &flag)
-    {
-        return flag == "rw" ? RW : (flag == "ro" ? RO : UNDEFINED);
-    }
-};
-
 std::map
 <
-    std::filesystem::path, Mount,
+    std::filesystem::path, NOTOJS_VERSION_NS::fs::Path::type,
     std::greater<std::filesystem::path>
 > mount;
 
@@ -105,7 +85,7 @@ protected:
 
     Then then(JSContext *ctx, JSValue &v) override
     {
-        return (v = facade::Blob::make(ctx, std::move(data), mime)), Resolve;
+        return (v = NOTOJS_VERSION_NS::Blob::make(ctx, std::move(data), mime)), Resolve;
     }
 
 private:
@@ -133,7 +113,7 @@ protected:
 
     Then then(JSContext *ctx, JSValue &v) override
     {
-        return (v = facade::File::make(ctx, std::move(data), name, time)), Resolve;
+        return (v = NOTOJS_VERSION_NS::File::make(ctx, std::move(data), name, time)), Resolve;
     }
 
 private:
@@ -162,7 +142,7 @@ protected:
 
     Then then(JSContext *ctx, JSValue &v) override
     {
-        return (v = facade::File::make(ctx, std::move(data), name, time, type)), Resolve;
+        return (v = NOTOJS_VERSION_NS::File::make(ctx, std::move(data), name, time, type)), Resolve;
     }
 
 private:
@@ -209,7 +189,7 @@ notojs::Task::Then Read<bridge::Object>::then(JSContext *ctx, JSValue &v)
 template<>
 notojs::Task::Then Read<std::vector<std::uint8_t>>::then(JSContext *ctx, JSValue &v)
 {
-    return (v = facade::Blob::make(ctx, std::move(data))), Resolve;
+    return (v = NOTOJS_VERSION_NS::Blob::make(ctx, std::move(data))), Resolve;
 }
 
 template<>
@@ -255,20 +235,19 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
             return (message = "Not mounted", false);
         }
 
-        template<typename T>
+        template<typename T = NOTOJS_VERSION_NS::fs::Path::type>
         static T normalize(std::filesystem::path const &p)
         {
             for(auto const &[q, c]: mount)
             {
                 auto const r = p.lexically_relative(q);
-                if(auto s = r.u8string(); '.' != s[0] || 1 == s.size())
-                {
-                    if constexpr (std::is_same_v<T, bool>) return true;
-                    else return {(c.path / r).lexically_normal(), '.' == s[0] ? Mount::RO : c.flag};
-                }
+                if(r.empty() || r.is_absolute() || *r.begin() == "..") continue;
+
+                if constexpr (std::is_same_v<T, bool>) return true;
+                else return {(c.path / r).lexically_normal(), r == "." ? NOTOJS_VERSION_NS::fs::Path::RO : c.flag};
             }
             if constexpr (std::is_same_v<T, bool>) return false;
-            else return {std::filesystem::path{}, Mount::UNDEFINED};
+            else return {std::filesystem::path{}, NOTOJS_VERSION_NS::fs::Path::UNMOUNTED};
         }
 
         BOOST_FORCEINLINE operator std::filesystem::path() const
@@ -307,7 +286,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
 
     JSValue blob_0(JSContext *ctx)
     {
-        auto [path, _] = Absolute::normalize<Mount>(ref());
+        auto [path, _] = Absolute::normalize(ref());
 
         std::error_code ec;
         if(std::filesystem::is_regular_file(path, ec))
@@ -320,7 +299,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
 
     JSValue blob_1(JSContext *ctx, bridge::String mime)
     {
-        auto [path, _] = Absolute::normalize<Mount>(ref());
+        auto [path, _] = Absolute::normalize(ref());
 
         std::error_code ec;
         if(std::filesystem::is_regular_file(path, ec))
@@ -335,7 +314,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
 
     JSValue file_0(JSContext *ctx)
     {
-        auto [path, _] = Absolute::normalize<Mount>(ref());
+        auto [path, _] = Absolute::normalize(ref());
 
         std::error_code ec;
         std::filesystem::file_time_type time;
@@ -352,7 +331,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
 
     JSValue file_1(JSContext *ctx, bridge::String mime)
     {
-        auto [path, _] = Absolute::normalize<Mount>(ref());
+        auto [path, _] = Absolute::normalize(ref());
 
         std::error_code ec;
         std::filesystem::file_time_type time;
@@ -375,7 +354,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
     JSValue check_(JSContext *ctx) const
     {
         std::error_code ec;
-        auto [path, _] = Absolute::normalize<Mount>(ref());
+        auto [path, _] = Absolute::normalize(ref());
         if (bool b = fn(path, ec); ec)
             return FileSystemError::throw_(ctx, std::move(ec));
         else return b ? JS_TRUE : JS_FALSE;
@@ -393,10 +372,10 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
     JSValue copy_0(JSContext *ctx, Path other) const
     {
         std::error_code ec;
-        auto [path, _] = Absolute::normalize<Mount>(ref());
-        auto [that, g] = Absolute::normalize<Mount>(other.ref());
+        auto [path, _] = Absolute::normalize(ref());
+        auto [that, g] = Absolute::normalize(other.ref());
 
-        if (!(g & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if (g != NOTOJS_VERSION_NS::fs::Path::RW) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
         if (std::filesystem::copy(path, that, opts, ec); ec) return FileSystemError::throw_(ctx, std::move(ec));
 
         return JS_UNDEFINED;
@@ -427,7 +406,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
 
     JSValue json(JSContext *ctx)
     {
-        auto [path, _] = Absolute::normalize<Mount>(ref());
+        auto [path, _] = Absolute::normalize(ref());
 
         std::error_code ec;
         if(std::filesystem::is_regular_file(path, ec))
@@ -441,11 +420,11 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
     JSValue move(JSContext *ctx, Path other) const
     {
         std::error_code ec;
-        auto [path, f] = Absolute::normalize<Mount>(ref());
-        auto [that, g] = Absolute::normalize<Mount>(other.ref());
+        auto [path, f] = Absolute::normalize(ref());
+        auto [that, g] = Absolute::normalize(other.ref());
 
-        if (!(g & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
-        if (!(f & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if (g != NOTOJS_VERSION_NS::fs::Path::RW) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if (f != NOTOJS_VERSION_NS::fs::Path::RW) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
         if (std::filesystem::rename(path, that, ec); ec) return FileSystemError::throw_(ctx, std::move(ec));
 
         return JS_UNDEFINED;
@@ -462,8 +441,8 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
     JSValue mkdir_0(JSContext *ctx) const
     {
         std::error_code ec;
-        auto [path, flag] = Absolute::normalize<Mount>(ref());
-        if (!(flag & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        auto [path, flag] = Absolute::normalize(ref());
+        if (flag != NOTOJS_VERSION_NS::fs::Path::RW) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
         if (auto result = std::filesystem::create_directory(path, ec); ec)
             return FileSystemError::throw_(ctx, std::move(ec));
@@ -475,8 +454,8 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         if(auto o = opts.get<bridge::Boolean>("recursive"); o && *o)
         {
             std::error_code ec;
-            auto [path, flag] = Absolute::normalize<Mount>(ref());
-            if (!(flag & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+            auto [path, flag] = Absolute::normalize(ref());
+            if (flag != NOTOJS_VERSION_NS::fs::Path::RW) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
             if (auto result = std::filesystem::create_directories(path, ec); ec)
                 return FileSystemError::throw_(ctx, std::move(ec));
@@ -493,7 +472,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
 
     JSValue native(JSContext *ctx) const
     {
-        auto [path, _] = Absolute::normalize<Mount>(ref());
+        auto [path, _] = Absolute::normalize(ref());
         return bridge::String(ctx, path.u8string());
     }
 
@@ -506,7 +485,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
 
     JSValue text(JSContext *ctx)
     {
-        auto [path, _] = Absolute::normalize<Mount>(ref());
+        auto [path, _] = Absolute::normalize(ref());
 
         std::error_code ec;
         if(std::filesystem::is_regular_file(path, ec))
@@ -528,9 +507,9 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
     JSValue remove_0(JSContext *ctx) const
     {
         std::error_code ec;
-        auto [path, flag] = Absolute::normalize<Mount>(ref());
+        auto [path, flag] = Absolute::normalize(ref());
 
-        if (!(flag & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if (flag != NOTOJS_VERSION_NS::fs::Path::RW) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
         if (std::filesystem::remove(path, ec); ec)
             return FileSystemError::throw_(ctx, std::move(ec));
@@ -542,9 +521,9 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
         if(auto o = opts.get<bridge::Boolean>("recursive"); o && *o)
         {
             std::error_code ec;
-            auto [path, flag] = Absolute::normalize<Mount>(ref());
+            auto [path, flag] = Absolute::normalize(ref());
 
-            if (!(flag & Mount::RW)) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+            if (flag != NOTOJS_VERSION_NS::fs::Path::RW) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
             if (auto count = std::filesystem::remove_all(path, ec); ec)
                 return FileSystemError::throw_(ctx, std::move(ec));
@@ -562,7 +541,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
     JSValue size(JSContext *ctx) const
     {
         std::error_code ec;
-        auto [path, _] = Absolute::normalize<Mount>(ref());
+        auto [path, _] = Absolute::normalize(ref());
         if (auto s = std::filesystem::file_size(path, ec); ec)
             return FileSystemError::throw_(ctx, std::move(ec));
         else return bridge::Number(ctx, static_cast<std::int64_t>(s));
@@ -571,7 +550,7 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
     JSValue sym(JSValue self, JSContext *ctx)
     {
         std::error_code ec;
-        auto [path, _] = Absolute::normalize<Mount>(ref());
+        auto [path, _] = Absolute::normalize(ref());
         if(auto it = std::filesystem::directory_iterator(path, ec); ec)
             return FileSystemError::throw_(ctx, std::move(ec));
         else return bridge::Iterator<Iterator>::make(ctx, self, Iterator(std::move(it), ref()), Iterator());
@@ -589,9 +568,9 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
     JSValue write_0(JSContext *ctx, T data)
     {
         std::error_code ec;
-        auto [path, flag] = Absolute::normalize<Mount>(ref());
+        auto [path, flag] = Absolute::normalize(ref());
 
-        if(!(flag & Mount::RW))
+        if(flag != NOTOJS_VERSION_NS::fs::Path::RW)
             return FileSystemError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
         if(!std::filesystem::exists(path) || std::filesystem::is_regular_file(path, ec))
@@ -621,17 +600,16 @@ struct Path : bridge::Interface<Path, std::filesystem::path>
     using write = bridge::Function
     <
         &Path::write_0<bridge::String, std::ios_base::out | std::ios_base::binary>,
-        &Path::write_0<facade::Blob,   std::ios_base::out | std::ios_base::binary>,
+        &Path::write_0<NOTOJS_VERSION_NS::Blob,   std::ios_base::out | std::ios_base::binary>,
         &Path::write_1<bridge::String, std::ios_base::out | std::ios_base::binary>,
-        &Path::write_1<facade::Blob,   std::ios_base::out | std::ios_base::binary>
+        &Path::write_1<NOTOJS_VERSION_NS::Blob,   std::ios_base::out | std::ios_base::binary>
     >;
 
-    struct I : Base::I<I, fs::IPath>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::fs::Path>
     {
-        std::pair<std::filesystem::path, bool> native() const override
+        NOTOJS_VERSION_NS::fs::Path::type native() const override
         {
-            auto [path, flag] = Absolute::normalize<Mount>(ref);
-            return {std::move(path), flag & Mount::RW};
+            return Absolute::normalize(ref);
         }
         using Base::Base;
     };
@@ -653,7 +631,7 @@ JSValue Path::writer<bridge::String>(JSContext *ctx, std::ofstream &&stream, bri
 }
 
 template<>
-JSValue Path::writer<notojs::IBlob::Impl>(JSContext *ctx, std::ofstream &&stream, notojs::IBlob::Impl &&data)
+JSValue Path::writer<NOTOJS_VERSION_NS::Blob>(JSContext *ctx, std::ofstream &&stream, NOTOJS_VERSION_NS::Blob &&data)
 {
     if(!stream.is_open()) return FileSystemError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
     return std::make_shared<Write<std::shared_ptr<std::vector<uint8_t>>>>(std::move(stream), data->copy())->run(ctx);
@@ -708,7 +686,7 @@ int init(JSContext *ctx, JSModuleDef *m)
     {
         bridge::Object o{ctx};
         o.set("path", bridge::String(ctx, k));
-        o.set("flag", bridge::String(ctx, std::string_view{m.flag == Mount::RW ? "rw" : "ro"}));
+        o.set("flag", bridge::String(ctx, std::string_view{m.flag == NOTOJS_VERSION_NS::fs::Path::RW ? "rw" : "ro"}));
         mounts.append(o);
     }
     JS_SetModuleExport(ctx, m, "mounts", mounts);
@@ -737,11 +715,14 @@ void notojs_init_fs(detail::Config const &cfg)
         {
             auto const &s = v.get_value<std::string>();
             auto const p = s.rfind(',');
+            auto const f = p == std::string::npos ? NOTOJS_VERSION_NS::fs::Path::RO : std::invoke([](auto &&flag){
+                return flag == "rw" ? NOTOJS_VERSION_NS::fs::Path::RW
+                    : (flag == "ro" ? NOTOJS_VERSION_NS::fs::Path::RO : NOTOJS_VERSION_NS::fs::Path::UNMOUNTED);
+            }, s.substr(p + 1));
 
-            auto const f = p == std::string::npos ? Mount::RO : Mount::parse(s.substr(p + 1));
-            if(f == Mount::UNDEFINED) throw std::invalid_argument("Unexpected mount mode: " + s.substr(p + 1));
+            if(f == NOTOJS_VERSION_NS::fs::Path::UNMOUNTED) throw std::invalid_argument("Unexpected mount mode: " + s.substr(p + 1));
 
-            mount.insert({k, Mount{
+            mount.insert({k, NOTOJS_VERSION_NS::fs::Path::type{
                 .path = s.substr(0, p),
                 .flag = f
             }});
@@ -760,41 +741,37 @@ JSModuleDef *notojs_init_fs(JSContext *ctx, const char *name)
     return mod;
 }
 
-JSValue fs::IPath::Static::make(JSContext *ctx, std::filesystem::path &&p)
+JSValue NOTOJS_VERSION_NS::fs::Path::make(JSContext *ctx, std::filesystem::path &&p)
 {
     if(!p.is_absolute())
         return JS_ThrowTypeError(ctx, "Expecting absolute path");
-    if(auto [path, mode] = notojs::Path::Absolute::normalize<notojs::Mount>(p); notojs::Mount::UNDEFINED != mode)
+    if(auto [path, mode] = notojs::Path::Absolute::normalize(p); NOTOJS_VERSION_NS::fs::Path::UNMOUNTED != mode)
         return notojs::Path::from(ctx, std::move(p));
     return JS_ThrowTypeError(ctx, "Not mounted");
 }
 
-std::filesystem::path fs::IPath::Static::v2n(std::filesystem::path const &p)
+NOTOJS_VERSION_NS::fs::Path::type NOTOJS_VERSION_NS::fs::Path::v2n(std::filesystem::path const &p)
 {
-    if(!p.is_absolute())
-        throw std::runtime_error("Not absolute: " + p.u8string());
-
-    auto [path, mode] = Path::Absolute::normalize<Mount>(p.lexically_normal());
-    if(Mount::UNDEFINED == mode)
-        throw std::runtime_error("Not mounted: " + p.u8string());
-    return path;
+    if(!p.is_absolute()) return {p, NOTOJS_VERSION_NS::fs::Path::UNMOUNTED};
+    return notojs::Path::Absolute::normalize(p.lexically_normal());
 }
 
-std::filesystem::path fs::IPath::Static::n2v(std::filesystem::path const &p)
+NOTOJS_VERSION_NS::fs::Path::type NOTOJS_VERSION_NS::fs::Path::n2v(std::filesystem::path const &p)
 {
-    if(!p.is_absolute())
-        throw std::runtime_error("Not absolute: " + p.u8string());
+    if(!p.is_absolute()) return {p, UNMOUNTED};
 
     auto const path = p.lexically_normal();
+    type result{{}, UNMOUNTED};
     for(auto const &[v, m]: mount)
     {
-        auto const root = m.path.lexically_normal();
-        auto const r = path.lexically_relative(root);
-        if(auto s = r.u8string(); '.' != s[0] || 1 == s.size())
-            return (v / r).lexically_normal();
-    }
+        auto const r = path.lexically_relative(m.path.lexically_normal());
+        if(r.empty() || r.is_absolute() || *r.begin() == "..") continue;
 
-    throw std::runtime_error("Not mounted: " + p.u8string());
+        if(m.flag > result.flag)
+            result = {(v / r).lexically_normal(), m.flag};
+        if(result.flag == RW) break;
+    }
+    return result;
 }
 
 } // namespace notojs

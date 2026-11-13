@@ -34,7 +34,12 @@ and renders the returned notebook output into the `div`.
 ### Execute with text input
 
 If a `div[data-notojs]` contains text and has no child elements, that text is sent to the notebook with a `POST` request.
-The text becomes the request body and can be used by the notebook as its input data.
+The text becomes the request body and is available through `self.context`, where `self` is the default `noto:noto` export:
+
+```javascript!noplay
+import self from 'noto:noto';
+print(self.context);
+```
 
 ```html
 <script src="/notojs/client.js"></script>
@@ -111,7 +116,7 @@ Supported `config` fields:
 
 - `text` — sends a `POST` request with this string as the request body.
 - `json` — sends a `POST` request with this value serialized as JSON and `Content-Type: application/json`.
-- `grid` — optional rendering grid object. Use this to customize where renderer output is inserted instead of using the default NotoJS output grid. The object may define `container(type)`, where `type` is the renderer type string, such as `notojs.Render/charts.js`. Return a DOM element to receive that renderer's output.
+- `grid` — optional rendering grid object. Use this to customize where renderer output is inserted instead of using the default NotoJS output grid. The object may define `container(type)`, where `type` is the renderer type string, such as `notojs.Render/chart.js`. Return a DOM element to receive that renderer's output.
 
 Examples:
 
@@ -141,7 +146,7 @@ NotoJS.render(document.querySelector('#Charts'), 'Charts', {
   json: { max: 20 },
   grid: new class {
     container(type) {
-      if (type === 'notojs.Render/charts.js') {
+      if (type === 'notojs.Render/chart.js') {
         return document
           .querySelector('#Charts')
           .appendChild(document.createElement('div'));

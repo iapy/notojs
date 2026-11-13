@@ -2,6 +2,7 @@
 #include <notojs/folder.hpp>
 #include <notojs/logger.hpp>
 #include <notojs/server.hpp>
+#include <module.hpp>
 #include <notodb.hpp>
 
 #include <lmdbxx/lmdb++.h>
@@ -19,7 +20,7 @@ std::atomic<std::uint32_t> index{0};
 void Errors::error(std::string const &source, std::string &&json, std::optional<std::string> &&stack)
 {
     std::array<std::uint8_t, sizeof(std::uint64_t) + sizeof(std::uint32_t)> key;
-    *reinterpret_cast<std::uint64_t*>(&key[0]) = DB::host_to_db(
+    *reinterpret_cast<std::uint64_t*>(&key[0]) = NOTOJS_VERSION_NS::db::host_to_db(
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count());
     *reinterpret_cast<std::uint32_t*>(&key[sizeof(std::uint64_t)]) = ++index;

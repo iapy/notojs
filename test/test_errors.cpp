@@ -9,7 +9,7 @@ BOOST_AUTO_TEST_CASE(Throw)
 import { assert, throws } from 'noto:assert';
 import { raise, TestError } from 'errors.so';
 
-assert(() => throws(() => raise()));
+assert(throws(() => raise(), TestError));
 
 try {
     raise();

@@ -24,90 +24,165 @@ public:
 JSValue assert(JSContext *ctx, bridge::Lambda lambda)
 {
     using namespace bridge;
-    if(auto res = lambda(); !bridge::Boolean::check(ctx, res))
+    if(auto res = lambda(); JS_IsException(res))
     {
-        String expr{ctx, lambda};
+        return res.release();
+    }
+    else if(!bridge::Boolean::check(ctx, res))
+    {
+        Strong<String> expr{ctx, JS_ToString(ctx, lambda)};
+        if(JS_IsException(expr)) return JS_EXCEPTION;
         return JS_ThrowTypeError(ctx, "Expecting bool: %s", static_cast<std::string_view const &>(expr).data());
     }
     else if(!JS_ToBool(ctx, res))
     {
-        String expr{ctx, lambda};
+        Strong<String> expr{ctx, JS_ToString(ctx, lambda)};
+        if(JS_IsException(expr)) return JS_EXCEPTION;
         if(std::cmatch m; std::regex_match(std::begin(expr), std::end(expr), m, std::regex{R"(\s*\(\s*\)\s*=>\s*(.+))"}))
-        {
             return AssertionError::throw_(ctx, AssertionError{m[1]});
-        }
         else
-        {
             return AssertionError::throw_(ctx, AssertionError{expr});
-        }
     }
     ++assertions;
     return JS_UNDEFINED;
 }
 
-JSValue throws_1(JSContext *ctx, bridge::Lambda lambda)
+JSValue throws_match(JSContext *ctx, JSValueConst error, JSValueConst type, JSValueConst message)
 {
     using namespace bridge;
-    if(auto res = lambda(); Promise::check(ctx, res))
+    if(!JS_IsUndefined(type))
     {
-        auto p = Promise{ctx, res}.wrap(
-            [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv){
-                return JS_FALSE;
-            },
-            [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv){
-                return JS_TRUE;
-            }
-        );
-
-        auto *ptr = Global::Context::ptr(ctx);
-        ptr->wait(ctx);
-
-        return JS_PromiseResult(ctx, p);
+        if(int match = JS_IsInstanceOf(ctx, error, type); match < 0) return JS_EXCEPTION;
+        else if(!match) return JS_FALSE;
     }
-    else
+    if(JS_IsUndefined(message)) return JS_TRUE;
+
+    Strong<void> msg{ctx, JS_IsNull(error) || JS_IsUndefined(error)
+        ? JS_UNDEFINED : JS_GetPropertyStr(ctx, error, "message"), false};
+
+    if(JS_IsException(msg)) return JS_EXCEPTION;
+    if(!JS_IsString(msg))
     {
-        return Error::check(ctx, res) ? JS_TRUE : JS_FALSE;
+        JS_FreeValue(ctx, msg.swap(JS_ToString(ctx, error)));
+        if(JS_IsException(msg)) return JS_EXCEPTION;
     }
+    return JS_NewBool(ctx, static_cast<std::string_view const &>(String{ctx, message})
+        == static_cast<std::string_view const &>(String{ctx, msg}));
+}
+
+JSValue throws_call(JSContext *ctx, bridge::Lambda lambda, bridge::Value type, bridge::Value message)
+{
+    using namespace bridge;
+    auto res = lambda();
+    if(JS_IsException(res))
+    {
+        Strong<void> error{ctx, JS_GetException(ctx), false};
+        return throws_match(ctx, error, type, message);
+    }
+    if(!Promise::check(ctx, res)) return JS_FALSE;
+
+    auto p = Promise{ctx, res}.wrap(
+        [](JSContext *, JSValueConst, int, JSValueConst *){
+            return JS_UNDEFINED;
+        },
+        [](JSContext *ctx, JSValueConst, int argc, JSValueConst *argv){
+            // Box the rejection so even undefined and thenables remain distinct from fulfillment.
+            bridge::Strong<void> result{ctx, JS_NewObjectProto(ctx, JS_NULL), false};
+            if(JS_IsException(result)) return JS_EXCEPTION;
+            if(JS_SetPropertyStr(ctx, result, "error", argc ? JS_DupValue(ctx, argv[0]) : JS_UNDEFINED) < 0)
+                return JS_EXCEPTION;
+            return result.release();
+        }
+    );
+    if(JS_IsException(p)) return JS_EXCEPTION;
+
+    auto *context = Global::Context::ptr(ctx);
+    context->wait(ctx);
+    if(context->perror)
+    {
+        JSValue error = *context->perror;
+        context->perror.reset();
+        return JS_Throw(ctx, error);
+    }
+    if(JS_PromiseState(ctx, p) == JS_PROMISE_PENDING) return JS_FALSE;
+
+    Strong<void> result{ctx, JS_PromiseResult(ctx, p), false};
+    if(JS_PromiseState(ctx, p) == JS_PROMISE_REJECTED)
+    {
+        // Reading a rejection does not mark it handled in QuickJS.
+        auto ignore = [](JSContext *, JSValueConst, int, JSValueConst *){ return JS_UNDEFINED; };
+        auto handled = p.wrap(ignore, ignore);
+        if(JS_IsException(handled)) return JS_EXCEPTION;
+        return JS_Throw(ctx, result.release());
+    }
+    if(JS_IsUndefined(result)) return JS_FALSE;
+
+    Strong<void> error{ctx, JS_GetPropertyStr(ctx, result, "error"), false};
+    if(JS_IsException(error)) return JS_EXCEPTION;
+    return throws_match(ctx, error, type, message);
+}
+
+JSValue throws_description(JSContext *ctx, bridge::Lambda lambda, bridge::Value type, bridge::Value message)
+{
+    using namespace bridge;
+
+    Strong<String> source{ctx, JS_ToString(ctx, lambda)};
+    if(JS_IsException(source)) return JS_EXCEPTION;
+
+    std::string description = "throws(" + static_cast<std::string>(source);
+    if(!JS_IsUndefined(type))
+    {
+        Strong<Value> name{ctx, JS_GetPropertyStr(ctx, type, "name")};
+        if(JS_IsException(name)) return JS_EXCEPTION;
+        auto text = name.toString();
+        if(JS_IsException(text)) return JS_EXCEPTION;
+        description += ", " + static_cast<std::string>(text);
+    }
+    if(!JS_IsUndefined(message))
+    {
+        Strong<String> quoted{ctx, JS_JSONStringify(ctx, message, JS_UNDEFINED, JS_UNDEFINED)};
+        if(JS_IsException(quoted)) return JS_EXCEPTION;
+        description += ", " + static_cast<std::string>(quoted);
+    }
+    description += ')';
+    return JS_NewStringLen(ctx, description.data(), description.size());
+}
+
+JSValue throws_bind(JSContext *ctx, bridge::Lambda lambda, JSValueConst type, JSValueConst message)
+{
+    using namespace bridge;
+    Strong<void> predicate{ctx, FunctionData<throws_call>::bind(ctx, lambda, type, message), false};
+    if(JS_IsException(predicate)) return JS_EXCEPTION;
+
+    Strong<void> description{ctx, FunctionData<throws_description>::bind(ctx, lambda, type, message), false};
+    if(JS_IsException(description)) return JS_EXCEPTION;
+
+    if(JS_DefinePropertyValueStr(ctx, predicate, "toString", description.release(), JS_PROP_CONFIGURABLE | JS_PROP_WRITABLE) < 0)
+        return JS_EXCEPTION;
+    return predicate.release();
+}
+
+JSValue throws_1(JSContext *ctx, bridge::Lambda lambda)
+{
+    return throws_bind(ctx, lambda, JS_UNDEFINED, JS_UNDEFINED);
 }
 
 JSValue throws_2(JSContext *ctx, bridge::Lambda lambda, bridge::String message)
 {
-    using namespace bridge;
-    if(auto res = lambda(); Promise::check(ctx, res))
-    {
-        auto p = Promise{ctx, res}.wrap(
-            [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv){
-                return JS_UNDEFINED;
-            },
-            [](JSContext *ctx, JSValueConst, int argc, JSValueConst *argv){
-                return argc ? JS_DupValue(ctx, argv[0]) : JS_UNDEFINED;
-            }
-        );
-
-        auto *ptr = Global::Context::ptr(ctx);
-        ptr->wait(ctx);
-
-        auto result = Strong<Error>{ctx, JS_PromiseResult(ctx, p)};
-        if(auto msg = result.message(); msg)
-        {
-            return static_cast<std::string_view const &>(message) == *msg ? JS_TRUE : JS_FALSE;
-        }
-    }
-    else if(!Error::check(ctx, res))
-    {
-        return JS_FALSE;
-    }
-    auto err = Strong<Error>(ctx, JS_GetException(ctx));
-    if(auto msg = err.message(); msg)
-    {
-        return static_cast<std::string_view const &>(message) == *msg ? JS_TRUE : JS_FALSE;
-    }
-
-    auto msg = Strong<String>(ctx, JS_ToString(ctx, err));
-    return static_cast<std::string_view const &>(message) == static_cast<std::string_view const &>(msg) ? JS_TRUE : JS_FALSE;
+    return throws_bind(ctx, lambda, JS_UNDEFINED, message);
 }
 
-using throws = bridge::Function<throws_1, throws_2>;
+JSValue throws_3(JSContext *ctx, bridge::Lambda lambda, bridge::Lambda type)
+{
+    return throws_bind(ctx, lambda, type, JS_UNDEFINED);
+}
+
+JSValue throws_4(JSContext *ctx, bridge::Lambda lambda, bridge::Lambda type, bridge::String message)
+{
+    return throws_bind(ctx, lambda, type, message);
+}
+
+using throws = bridge::Function<throws_1, throws_2, throws_3, throws_4>;
 
 JSCFunctionListEntry func[] = {
     JS_CFUNC_DEF("assert", 1, bridge::Function<assert>::invoke),

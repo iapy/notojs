@@ -4,13 +4,14 @@
 
 #include <nanodi.hpp>
 #include <plugin.hpp>
-#include <string>
+#include <filesystem>
 #include <memory>
+#include <string>
+#include <map>
 
 namespace notojs {
 
 class Cacher;
-class Config;
 class Engine;
 class Errors;
 class Folder;
@@ -19,7 +20,6 @@ class Server;
 
 class Plugin : public Requires<Cacher, Engine, Errors, Folder, Module, Server>, public IHost
 {
-private:
     void configure(detail::Config const &);
     friend class Config;
 
@@ -28,18 +28,18 @@ public:
     void run();
     void end();
 
-    void removed(std::string const &);
-    void updated(std::string const &);
+    void removed(std::filesystem::path const &);
+    void updated(std::filesystem::path const &);
 
 public:
-    bool exec(std::string const &, IContext &) override;
-    void clog(std::string &&, IHost::Args &&) override;
-    void load(std::string const &) override;
     void clog(std::string &&) override;
+    void clog(std::string &&, IHost::Args &&) override;
+    bool exec(std::string const &, IContext &) override;
+
     MDB_env *lmdb() override;
 
 private:
-    std::unordered_map<std::string, std::unique_ptr<IPlugin>> plugins;
+    std::map<std::string, std::unique_ptr<IPlugin>> plugins;
 };
 
 } // namespace notojs

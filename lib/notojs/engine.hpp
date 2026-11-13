@@ -16,15 +16,14 @@ struct JSValue;
 
 namespace notojs {
 
-class Config;
 class Folder;
 class Global;
 class Module;
 
 class Engine : public Requires<Global, Folder, Module>
 {
-    void configure(detail::Config const &);
     friend class Config;
+    void configure(detail::Config const &);
 
     std::unordered_set<std::string> cdn;
     boost::optional<std::filesystem::path> jspath;
@@ -66,9 +65,6 @@ public:
 
     void modules(
         boost::beast::http::response<boost::beast::http::string_body> &) const;
-
-    void set_sopath(std::filesystem::path &&path);
-    void set_jspath(std::filesystem::path &&path);
 
     JSContext *get_context() const;
     static void preprocess(std::string &code);

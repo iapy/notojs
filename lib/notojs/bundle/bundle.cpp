@@ -27,10 +27,11 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
-std::map<std::string, std::string> ALIASES;
 std::map<std::string, std::string> RESOURCES;
 std::map<std::string, std::string> const TYPES = {{"truetype", ".ttf"}};
 #endif
+
+std::map<std::string, std::string> ALIASES;
 
 using Resolver = boost::asio::ip::tcp::resolver;
 using Request = boost::beast::http::request<boost::beast::http::string_body>;
@@ -186,9 +187,6 @@ int server(boost::property_tree::ptree const &pt, int argc, char **argv)
 
     for(auto const &[name, node]: pt.get_child("sources"))
         RESOURCES[name] = node.get_value<std::string>();
-
-    for(auto const &[name, node]: pt.get_child("aliases"))
-        ALIASES[name] = node.get_value<std::string>();;
 
     std::ofstream output(BINARY_DIR / "bundle.cpp");
     output << "#include <string_view>\n";
@@ -432,13 +430,18 @@ int render(boost::property_tree::ptree const &pt, int argc, char **argv)
         std::filesystem::copy_options::update_existing);
 
     if(std::filesystem::is_regular_file(client)) std::filesystem::remove(client);
-    auto clientp = bp::process(worker.ctx(), esbuild.u8string(), {
+    auto client_args = std::vector<std::string>{
         "--bundle", client_src,
         "--legal-comments=none",
         "--minify-whitespace",
         "--format=esm",
         "--define:$THIS=\"notojs.Render/" + target.filename().u8string() + "\"",
-    }, bp::process_stdio{{}, boost::filesystem::path(client), {}});
+    };
+    for(auto const &[name, target]: ALIASES)
+        client_args.push_back("--alias:" + name + "=./" + target);
+
+    auto clientp = bp::process(worker.ctx(), esbuild.u8string(), client_args,
+        bp::process_stdio{{}, boost::filesystem::path(client), {}});
 
     auto const server = (target / "server.js");
     auto const server_src = boost::filesystem::unique_path("server-%%%%-%%%%.js").string();
@@ -446,14 +449,19 @@ int render(boost::property_tree::ptree const &pt, int argc, char **argv)
         std::filesystem::copy_options::update_existing);
 
     if(std::filesystem::is_regular_file(server)) std::filesystem::remove(server);
-    auto serverp = bp::process(worker.ctx(), esbuild.u8string(), {
+    auto server_args = std::vector<std::string>{
         "--bundle", server_src,
         "--legal-comments=none",
         "--minify-whitespace",
         "--format=esm",
         "--external:noto:render",
         "--define:$THIS=\"notojs.Render/" + target.filename().u8string() + "\"",
-    }, bp::process_stdio{{}, boost::filesystem::path(server), {}});
+    };
+    for(auto const &[name, target]: ALIASES)
+        server_args.push_back("--alias:" + name + "=./" + target);
+
+    auto serverp = bp::process(worker.ctx(), esbuild.u8string(), server_args,
+        bp::process_stdio{{}, boost::filesystem::path(server), {}});
 
     clientp.wait();
     serverp.wait();
@@ -461,6 +469,71 @@ int render(boost::property_tree::ptree const &pt, int argc, char **argv)
     std::filesystem::remove(client_src);
     std::filesystem::remove(server_src);
 
+    return EXIT_SUCCESS;
+}
+
+int script(boost::property_tree::ptree const &pt, int argc, char **argv)
+{
+    namespace po = boost::program_options;
+    po::options_description desc{"Options"};
+
+    std::filesystem::path cache;
+    std::filesystem::path esbuild;
+    std::filesystem::path target;
+
+    desc.add_options()
+        ("cache", po::value<std::filesystem::path>(&cache)->required())
+        ("esbuild", po::value<std::filesystem::path>(&esbuild)->required())
+        ("target", po::value<std::filesystem::path>(&target)->required())
+    ;
+
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
+
+    if(std::filesystem::exists(target)) VERIFY(std::filesystem::is_directory(target), "Expecting directory");
+
+    Worker worker(std::filesystem::absolute(cache));
+    if(auto sources = pt.get_child_optional("sources")) for(auto const &[name, node]: *sources) {
+        auto [text, path, cached] = worker.load(node.get_value<std::string>());
+        std::cout << (cached ? "Cached " : "Fetched ") << name << " - " << text.size() << "b\n";
+
+        auto const source = std::filesystem::path(name);
+        if(std::filesystem::is_symlink(source))
+        {
+            if(std::filesystem::read_symlink(source) == path) continue;
+            std::filesystem::remove(source);
+        }
+        std::filesystem::create_symlink(path, source);
+    }
+
+    namespace bp = boost::process::v2;
+    std::filesystem::create_directories(target);
+
+    auto const output = target / std::filesystem::path(argv[0]).filename();
+    auto const source = boost::filesystem::unique_path("script-%%%%-%%%%.js").string();
+    std::filesystem::copy(std::filesystem::path(argv[0]), source);
+
+    if(std::filesystem::is_regular_file(output)) std::filesystem::remove(output);
+    auto args = std::vector<std::string>{
+        "--bundle", source,
+        "--legal-comments=none",
+        "--minify-whitespace",
+        "--format=esm",
+    };
+    for(auto const &[name, target]: ALIASES)
+        args.push_back("--alias:" + name + "=./" + target);
+
+    auto process = bp::process(worker.ctx(), esbuild.u8string(), args,
+        bp::process_stdio{{}, boost::filesystem::path(output), {}});
+
+    process.wait();
+    std::filesystem::remove(source);
+    if(process.exit_code() != 0)
+    {
+        std::filesystem::remove(output);
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
 
@@ -476,6 +549,13 @@ int main(int argc, char **argv)
         boost::property_tree::ini_parser::read_ini(path / "bundle.ini", pt);
         worker = &render;
     }
+    else if(std::filesystem::is_regular_file(path) && path.extension() == ".js")
+    {
+        auto const config = path.parent_path() / "bundle.ini";
+        VERIFY(std::filesystem::is_regular_file(config), "Missing " + config.u8string());
+        boost::property_tree::ini_parser::read_ini(config, pt);
+        worker = &script;
+    }
 #ifndef STANDALONE
     else if(std::filesystem::is_regular_file(path))
     {
@@ -484,5 +564,9 @@ int main(int argc, char **argv)
     }
 #endif
     else VERIFY(false, "Bad argument " + path.u8string());
+
+    if(auto aliases = pt.get_child_optional("aliases")) for(auto const &[name, node]: *aliases)
+        ALIASES[name] = node.get_value<std::string>();
+
     return worker(pt, argc - 1, argv + 1);
 }

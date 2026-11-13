@@ -1,4 +1,5 @@
 #include <notojs/module/dom.hpp>
+#include <module.hpp>
 #include <notojs/module/dom/node.hpp>
 #include <notojs/module/dom/attr.hpp>
 #include <notojs/module/dom/dom_rect.hpp>
@@ -74,7 +75,7 @@ BOOST_FORCEINLINE std::int64_t u64(const char* s) {
 
     char *end;
     std::int64_t val = std::strtoull(s, &end, 10);
-    if(end == s || *end != '\0' || errno == ERANGE)
+    if(errno == ERANGE || end == s || *end != '\0')
         return -1;
 
     return val;

@@ -123,15 +123,15 @@ notojs::Task::Step Write<std::shared_ptr<std::vector<std::uint8_t>>>::step()
     return (pos += cnt) == data->size() ? Finish : Again;
 }
 
-struct GZip : bridge::Interface<GZip, std::pair<std::filesystem::path, bool>>
+struct GZip : bridge::Interface<GZip, noto::fs::Path::type>
 {
     using Base::Base;
 
     JSValue blob(JSContext *ctx)
     {
         std::error_code ec;
-        if(std::filesystem::is_regular_file(ref().first, ec))
-            return std::make_shared<Read<std::vector<std::uint8_t>>>(std::ifstream(ref().first, std::ios_base::in | std::ios_base::binary))->run(ctx);
+        if(std::filesystem::is_regular_file(ref().path, ec))
+            return std::make_shared<Read<std::vector<std::uint8_t>>>(std::ifstream(ref().path, std::ios_base::in | std::ios_base::binary))->run(ctx);
         else if(ec)
             return GZipError::throw_(ctx, std::move(ec));
         else
@@ -141,8 +141,8 @@ struct GZip : bridge::Interface<GZip, std::pair<std::filesystem::path, bool>>
     JSValue json(JSContext *ctx)
     {
         std::error_code ec;
-        if(std::filesystem::is_regular_file(ref().first, ec))
-            return std::make_shared<Read<bridge::Object>>(std::ifstream(ref().first, std::ios_base::in | std::ios_base::binary))->run(ctx);
+        if(std::filesystem::is_regular_file(ref().path, ec))
+            return std::make_shared<Read<bridge::Object>>(std::ifstream(ref().path, std::ios_base::in | std::ios_base::binary))->run(ctx);
         else if(ec)
             return GZipError::throw_(ctx, std::move(ec));
         else
@@ -152,8 +152,8 @@ struct GZip : bridge::Interface<GZip, std::pair<std::filesystem::path, bool>>
     JSValue text(JSContext *ctx)
     {
         std::error_code ec;
-        if(std::filesystem::is_regular_file(ref().first, ec))
-            return std::make_shared<Read<std::string>>(std::ifstream(ref().first, std::ios_base::in | std::ios_base::binary))->run(ctx);
+        if(std::filesystem::is_regular_file(ref().path, ec))
+            return std::make_shared<Read<std::string>>(std::ifstream(ref().path, std::ios_base::in | std::ios_base::binary))->run(ctx);
         else if(ec)
             return GZipError::throw_(ctx, std::move(ec));
         else
@@ -166,11 +166,11 @@ struct GZip : bridge::Interface<GZip, std::pair<std::filesystem::path, bool>>
     template<typename T>
     JSValue write_0(JSContext *ctx, T data)
     {
-        if(!ref().second) return GZipError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if(ref().flag != noto::fs::Path::RW) return GZipError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
         std::error_code ec;
-        if(!std::filesystem::exists(ref().first) || std::filesystem::is_regular_file(ref().first, ec))
-            return writer(ctx, std::ofstream(ref().first, std::ios_base::out | std::ios_base::binary), std::move(data));
+        if(!std::filesystem::exists(ref().path) || std::filesystem::is_regular_file(ref().path, ec))
+            return writer(ctx, std::ofstream(ref().path, std::ios_base::out | std::ios_base::binary), std::move(data));
         else if(ec)
             return GZipError::throw_(ctx, std::move(ec));
         else
@@ -213,17 +213,12 @@ JSValue gzip(JSContext *ctx, noto::fs::Path path)
     return GZip::from(ctx, path->native());
 }
 
-JSCFunctionListEntry func[] = {
-    JS_CFUNC_DEF("gzip", 1, bridge::Function<gzip>::invoke),
-};
-
 int init(JSContext *ctx, JSModuleDef *m)
 {
     JS_FreeValue(ctx, noto::import(ctx, "noto:fs"));
     GZipError::init(ctx, m);
     GZip::init(ctx, m);
-    JS_SetModuleExport(ctx, m, "default", JS_NewCFunction(ctx, bridge::Function<gzip>::invoke, "gzip", 1));
-    return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
+    return JS_SetModuleExport(ctx, m, "default", JS_NewCFunction(ctx, bridge::Function<gzip>::invoke, "gzip", 1));
 }
 
 } // namespace
@@ -236,7 +231,6 @@ JSModuleDef *js_init_module(JSContext *ctx, const char *name)
     if(!mod) return NULL;
 
     JS_AddModuleExport(ctx, mod, GZipError::name());
-    JS_AddModuleExportList(ctx, mod, func, sizeof(func)/sizeof(func[0]));
     JS_AddModuleExport(ctx, mod, "default");
     return mod;
 }

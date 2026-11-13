@@ -44,17 +44,6 @@ private:
     std::string output;
 
 protected:
-    Fixture()
-    {
-        if(auto p = std::filesystem::path(CMAKE_CURRENT_BINARY_DIR) / ".db"; std::filesystem::exists(p))
-            std::filesystem::remove_all(p);
-    }
-
-    void db()
-    {
-        folder->set_path(CMAKE_CURRENT_BINARY_DIR);
-    }
-
     std::optional<std::reference_wrapper<rapidjson::GenericValue<rapidjson::UTF8<>> const>> get_output()
     {
         if(!document)

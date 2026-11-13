@@ -7,12 +7,12 @@ namespace {
 
 JSValue clog(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv)
 {
-    return facade::clog(ctx, argc, argv);
+    return NOTOJS_VERSION_NS::clog(ctx, argc, argv);
 }
 
 JSValue log(JSContext *ctx, JSValueConst self, int argc, JSValueConst *argv)
 {
-    return facade::print(ctx, argc, argv);
+    return NOTOJS_VERSION_NS::print(ctx, argc, argv);
 }
 
 JSValue init(JSContext *ctx, bool cleanup)

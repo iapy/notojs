@@ -7,17 +7,17 @@ Renderer extensions add custom notebook output types to **NotoJS**. They are spl
 
 The built-in renderer extensions are:
 
-- `charts.js` — chart output powered by Apache ECharts
-- `tables.js` — table output for arrays and objects
+- `chart.js` — chart output powered by Apache ECharts
+- `table.js` — table output for arrays and objects
 
-## `tables.js`
+## `table.js`
 
-`tables.js` renders JavaScript objects and arrays as HTML tables.
+`table.js` renders JavaScript objects and arrays as HTML tables.
 
 Import it with:
 
 ```javascript
-import table from 'tables.js';
+import table from 'table.js';
 ```
 
 ### Arrays of objects
@@ -25,7 +25,7 @@ import table from 'tables.js';
 An array of objects becomes a table with one row per object. By default, column names are taken from the first object:
 
 ```javascript
-import table from 'tables.js';
+import table from 'table.js';
 print(table([
   { name: 'Alice', score: 12 },
   { name: 'Bob', score: 10 }
@@ -35,7 +35,7 @@ print(table([
 Pass a column list to choose column order:
 
 ```javascript
-import table from 'tables.js';
+import table from 'table.js';
 print(table([
   { name: 'Alice', score: 12 },
   { name: 'Bob', score: 10 }
@@ -45,7 +45,7 @@ print(table([
 Use `[key, title]` pairs to rename headers:
 
 ```javascript
-import table from 'tables.js';
+import table from 'table.js';
 print(table([
   { name: 'Alice', score: 12 },
   { name: 'Bob', score: 10 }
@@ -57,14 +57,14 @@ print(table([
 A plain object becomes a two-column key/value table:
 
 ```javascript
-import table from 'tables.js';
+import table from 'table.js';
 print(table({ name: 'Alice', score: 12 }));
 ```
 
 A column list can choose and rename keys:
 
 ```javascript
-import table from 'tables.js';
+import table from 'table.js';
 print(table({ name: 'Alice', score: 12 }, [
   ['name', 'Name'],
   ['score', 'Score']
@@ -77,7 +77,7 @@ If a table cell value is an object, the table renderer delegates it to the norma
 
 ```javascript
 import { markdown } from 'noto:core';
-import table from 'tables.js';
+import table from 'table.js';
 
 print(table([
   { item: 'docs', note: markdown('**done**') }
@@ -89,7 +89,7 @@ print(table([
 `table` uses the regex overload of `render()` from `noto:render`. It returns a callable proxy: accessing a valid view property returns a table function with fixed column widths and optional alignment:
 
 ```javascript
-import table from 'tables.js';
+import table from 'table.js';
 const rows = [
   { name: 'Alice', score: 12 },
   { name: 'Bob', score: 10 }
@@ -109,93 +109,317 @@ View syntax:
 
 Invalid view strings throw `TypeError`.
 
-## `charts.js`
+## `chart.js`
 
-`charts.js` renders **Apache ECharts** charts. It exports:
-
-- `chart(type, options)` — helper for common area, bar, and line charts
-- `echart(options)` — direct **ECharts** option passthrough
-
-Import it with:
+`chart.js` renders **Apache ECharts** charts. It exports the callable `chart` renderer as both a named and default export:
 
 ```javascript
-import { chart, echart } from 'charts.js';
+import chart from 'chart.js';
 ```
 
-### Common charts
+The callable accepts complete ECharts options directly and provides convenience methods for common chart types:
 
-`chart(type, options)` supports:
+- `chart.area(data, options)`
+- `chart.bar(data, options)`
+- `chart.donut(data, options)`
+- `chart.heatmap(data, options)`
+- `chart.line(data, options)`
+- `chart.pie(data, options)`
+- `chart.scatter(data, options)`
+- `chart(options)` — direct ECharts option passthrough
 
-- `area`
-- `bar`
-- `line`
+### XY charts
 
-Example:
+Area, bar, and line charts accept an object containing `x` and `y`. Both values may be any iterable. A single series uses an iterable of finite numbers:
 
 ```javascript
-import { chart } from 'charts.js';
+import chart from 'chart.js';
 
-const x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-print(chart('line', {
-  x,
-  y: x.map(x => x ** 2)
+print(chart.line({
+  x: [1, 2, 10],
+  y: [5, 8, 12]
 }));
 ```
 
-Multiple series are passed as an array of arrays in `y`:
+For line and area charts, finite numeric X values with finite numeric series values produce continuous value axes and `[x, y]` data points. Numeric spacing is therefore preserved in the example above. Both value axes use automatic scaled bounds instead of being forced to include zero. ECharts may expand either axis beyond the data extent to produce regular tick intervals. Strings produce a category axis instead:
 
 ```javascript
-import { chart } from 'charts.js';
+import chart from 'chart.js';
 
-print(chart('bar', {
+print(chart.line({
+  x: ['1', '2', '10'],
+  y: [5, 8, 12]
+}));
+```
+
+Set `continuous` to `false` to keep numeric X values as category labels:
+
+```javascript
+import chart from 'chart.js';
+
+print(chart.line({
+  x: [1, 2, 10],
+  y: [5, 8, 12],
+  continuous: false
+}));
+```
+
+When omitted, `continuous` is detected automatically. Setting it to `true` requires all X and series values to be finite numbers; setting it to `false` forces category behavior. Converting numeric labels with `x.map(String)` also forces category behavior. Bar charts always treat X values as categories. Series containing advanced ECharts data-item objects remain categorical during automatic detection and are rejected when continuous behavior is explicitly required.
+
+The X and Y collections must have the same length. Multiple series are represented by series descriptors whose `data` collections also match the X-axis length:
+
+```javascript
+import chart from 'chart.js';
+
+const plot = chart.bar({
   x: ['Q1', 'Q2', 'Q3'],
   y: [
-    [10, 12, 14],
-    [7, 9, 11]
-  ],
-  labels: ['Revenue', 'Cost']
+    {name: 'Revenue', data: [10, 12, 14]},
+    {name: 'Cost', data: [7, 9, 11]}
+  ]
+});
+
+plot.stacked = true;
+print(plot);
+```
+
+`stacked` accepts only a boolean and applies to bar and area series. Reading it returns `true` when the chart has compatible series and all of them currently have a stack assignment.
+
+### Heatmap charts
+
+Heatmaps accept categorical `x` and `y` axes plus `data` points in `[xIndex, yIndex, value]` form. Axis values must be strings or finite numbers, indices must address their corresponding axes, and values must be finite numbers:
+
+```javascript
+import chart from 'chart.js';
+
+print(chart.heatmap({
+  x: ['Morning', 'Afternoon', 'Evening'],
+  y: ['Monday', 'Tuesday'],
+  data: [
+    [0, 0, 5], [1, 0, 8], [2, 0, 3],
+    [0, 1, 7], [1, 1, 2], [2, 1, 9]
+  ]
 }));
 ```
 
-Area and bar/line options can use `stack`:
+The visual scale defaults to the minimum and maximum values in the dataset and is hidden by default. Pass `{visualMap: {show: true}}` as the second argument to display it. Other ECharts options can be overridden the same way. Like other chart factories, heatmaps support aspect-ratio views such as `chart.heatmap['1/1'](data)`.
+
+### Scatter, pie, and donut charts
+
+Scatter charts accept one series descriptor or an iterable of descriptors:
 
 ```javascript
-import { chart } from 'charts.js';
+import chart from 'chart.js';
 
-print(chart('area', {
+print(chart.scatter({
+  name: 'Samples',
+  data: [[1, 2], [2, 4], [3, 3]]
+}));
+```
+
+A scatter series descriptor may set `size` to a fixed number, a `[width, height]` pair, or a string expression. `size` is translated to the ECharts `symbolSize` option. String expressions receive the point data as `value`; use `value[index]` to read a dimension:
+
+```javascript
+print(chart.scatter({
+  name: 'Samples',
+  data: [[1, 2, 6], [2, 4, 10], [3, 3, 14]],
+  size: 'Math.max(8, value[2] * 2)'
+}));
+```
+
+Unlike chart formatters, `size` strings are raw expressions and must not be enclosed in `{...}`. They support the same restricted expression operations, including arithmetic, comparisons, conditionals, and supported `Math` functions and constants. When passing complete ECharts options to `chart(options)`, use `symbolSize` instead of the `size` convenience alias; string `symbolSize` values use the same expression syntax.
+
+Pie and donut charts accept a non-empty object with finite numeric values:
+
+```javascript
+import chart from 'chart.js';
+
+print(chart.donut({
+  Apples: 12,
+  Oranges: 8,
+  Pears: 5
+}));
+```
+
+### Modifying a chart
+
+Configure a chart before printing it. Its `series`, `xaxis`, and `yaxis` properties provide convenient access to the generated ECharts options:
+
+```javascript
+import chart from 'chart.js';
+
+const plot = chart.line({
+  x: ['Jan', 'Feb', 'Mar'],
+  y: [1200, 1800, 1500]
+});
+
+plot.series[0].name = 'Revenue';
+plot.series[0].smooth = true;
+plot.xaxis.bounds = [0, 2];
+plot.yaxis.bounds = [0, 2000];
+plot.yaxis.format = '${value.toFixed(2)}';
+
+print(plot);
+```
+
+On a category axis, numeric bounds are zero-based category indices, not numeric label values, and must be within the axis data range. A category axis already displays its complete data range by default. Continuous value axes interpret numeric bounds as coordinates.
+
+Assigning `area` to a series type creates an ECharts line series with area styling. The wrapper exposes its logical type as `area`, while the serialized ECharts option remains `type: 'line'` with `areaStyle`:
+
+```javascript
+import chart from 'chart.js';
+
+const plot = chart.line({
+  x: ['Jan', 'Feb', 'Mar'],
+  y: [1200, 1800, 1500]
+});
+plot.series[0].type = 'area';
+console.log(plot.series[0].type); // "area"
+print(plot);
+```
+
+Use `yaxis.add(series, position)` to move one or more series to an additional Y axis. Select a series by its integer index or unique name, or pass an array of selectors to move several series together. The position defaults to `right` for a Y axis and `top` for an X axis. Added axes disable ECharts' zero-crossing placement by default so the original and added axes remain on their configured sides; an explicit `axisLine.onZero` setting is preserved. The returned axis supports `format`, `bounds`, and a finite numeric `offset`:
+
+```javascript
+import chart from 'chart.js';
+
+const plot = chart.line({
   x: ['Jan', 'Feb', 'Mar'],
   y: [
-    [1, 2, 3],
-    [2, 1, 4]
-  ],
-  labels: ['A', 'B'],
-  stack: 'total'
+    {name: 'Revenue', data: [1200, 1800, 1500]},
+    {name: 'Margin', data: [20, 25, 22]}
+  ]
+});
+
+const marginAxis = plot.yaxis.add('Margin');
+marginAxis.offset = 40; // Override the automatically calculated offset.
+marginAxis.format = '{axis ? value.format("%.0f") : value.format("%.1f")}%';
+print(plot);
+```
+
+Additional axes on the same side are offset automatically. Each additional Y axis is placed 30 pixels beyond the largest existing offset on that side; each additional X axis uses a 20-pixel increment. The first axis on an unused side has offset zero. Assign a finite number to the returned axis' `offset` to override the calculated value.
+
+Set `plot.horizontal` to a boolean to switch an XY chart between vertical and horizontal orientation; reading it reports the current orientation. Axis collections, positions, and series axis assignments are translated together. After rotation, additional quantitative axes are accessed through `xaxis` instead of `yaxis`.
+
+### Formatters
+
+Formatter strings are parsed by the chart client without evaluating JavaScript. Supported expressions include:
+
+- `{value}`
+- `{axis}` — `true` for axis labels and pointers, `false` for tooltip values
+- `{value.toFixed(n)}`, where `n` is between 0 and 100
+- `{value.format("format")}` for date and number formatting
+
+Expressions may use arithmetic (`+`, `-`, `*`, `/`, `%`, `**`), ordering comparisons (`<`, `>`, `<=`, `>=`), equality comparisons (`==`, `!=`), short-circuit `&&` and `||`, unary `+`, `-`, `!`, and `~`, and the conditional `test ? consequent : alternate` operator.
+
+The formatter language's `==` and `!=` operators are non-coercing: they use strict equality internally, so `0 == "0"` is `false`. The JavaScript spellings `===` and `!==` are not part of the formatter language.
+
+Own `Math` functions and numeric constants are available, along with the whitelisted number methods `toExponential`, `toFixed`, `toPrecision`, and `toString`. General property access and computed members are not supported. Examples include:
+
+- `{value == null ? "N/A" : value.format("%.2f")}`
+- `{Math.abs(value) < 0.01 ? "≈0" : value.format("%.2f")}`
+- `{value >= 0 && value <= 100 ? value.format("%.1f") : "out of range"}`
+- `{(value / Math.PI).format("%.3f")}`
+
+Literal text may surround an expression:
+
+```javascript
+import chart from 'chart.js';
+
+const plot = chart.line({
+  x: ['2026-10-25', '2026-10-26', '2026-10-27'],
+  y: [1200, 1800, 1500]
+});
+plot.yaxis.format = '&dollar;{axis ? value.format("%.0f") : value.format("%.2f")}';
+plot.xaxis.format = '{axis ? value.format("MMM D") : value.format("YYYY-MM-DD")}';
+print(plot);
+```
+
+HTML character references in literal text are decoded when the formatter is compiled. For example, `{value.format("%.1f")} &deg;C` produces text such as `21.5 °C`; numeric references such as `&#176;` and `&#xB0;` are also supported.
+
+Formatter output remains plain text rather than trusted markup. When a formatted value is inserted into a custom HTML tooltip, HTML-sensitive characters in the axis value, series name, and complete formatter result are escaped. This allows character references such as `&deg;` while preventing formatter values or chart data from injecting HTML elements or event handlers.
+
+A format beginning with `%` is interpreted as a numeric format. Supported conversions are `%f`/`%F` for fixed-point, `%e`/`%E` for exponential, `%g`/`%G` for significant digits, and `%d`/`%i` for integers. Formats may include `-`, `+`, space, and `0` flags, a field width, and a precision:
+
+- `%.2f` — two digits after the decimal point
+- `%+8.2f` — sign, width eight, and two fractional digits
+- `%08.2f` — zero-padded width eight
+- `%.3e` — exponential notation with three fractional digits
+- `%.4g` — four significant digits
+
+A format not beginning with `%` is interpreted as a date format. Supported tokens are:
+
+- `YYYY` — four-digit year
+- `MMM`, `MM`, `M` — three-letter, two-digit, or unpadded month
+- `ddd` — three-letter weekday
+- `DD`, `D` — two-digit or unpadded day
+- `HH`, `H` — two-digit or unpadded 24-hour time
+- `hh`, `h` — two-digit or unpadded 12-hour time
+- `mm`, `m` — two-digit or unpadded minute
+- `ss`, `s` — two-digit or unpadded second
+- `SSS` — milliseconds
+- `A` — `AM` or `PM`
+
+Wrap literal date text in square brackets, for example `YYYY-MM-DD [at] HH:mm`. Weekday and month names use fixed English abbreviations; date formatting uses the browser's local timezone.
+
+Assigning a string to `yaxis.format` formats both the axis and tooltip. An array supplies one tooltip formatter per series and does not change the axis labels:
+
+```javascript
+import chart from 'chart.js';
+
+const plot = chart.line({
+  x: ['Jan', 'Feb', 'Mar'],
+  y: [
+    {name: 'Revenue', data: [1200, 1800, 1500]},
+    {name: 'Margin', data: [20, 25, 22]}
+  ]
+});
+plot.yaxis.format = [
+  '&dollar;{value.format("%.2f")}',
+  '{value.format("%.1f")}%'
+];
+print(plot);
+```
+
+For charts without value axes, such as pie, donut, and heatmap charts, assign the tooltip formatter to `plot.format`. Heatmap formatting receives the cell value rather than either category-axis index:
+
+```javascript
+const plot = chart.heatmap({
+  x: ['Morning', 'Evening'],
+  y: ['Monday', 'Tuesday'],
+  data: [[0, 0, 5.25], [1, 0, 8.5], [0, 1, 7.75], [1, 1, 2.5]]
+});
+plot.format = '{value.format("%.1f")}';
+print(plot);
+```
+
+### Additional ECharts options
+
+Pass an options object as the second argument to a convenience method to customize the generated ECharts configuration:
+
+```javascript
+import chart from 'chart.js';
+
+print(chart.line({
+  x: ['A', 'B', 'C'],
+  y: [5, 8, 6]
+}, {
+  legend: {top: 0},
+  xAxis: {axisLabel: {rotate: 30}}
 }));
 ```
 
-Formatters can be supplied as strings containing `{value}`:
+Charts use the shared notebook color palette exposed in the browser as `window.palette`. Set the ECharts `color` option to provide a chart-specific palette instead.
+
+Use `chart(options)` when complete control over the ECharts configuration is required:
 
 ```javascript
-import { chart } from 'charts.js';
+import chart from 'chart.js';
 
-print(chart('line', {
-  x: ['A', 'B'],
-  y: [1000, 2000],
-  format: { y: '${value}' }
-}));
-```
-
-### Direct ECharts options
-
-Use `echart(options)` when you need full ECharts control:
-
-```javascript
-import { echart } from 'charts.js';
-
-print(echart({
-  xAxis: { type: 'category', data: ['A', 'B', 'C'] },
-  yAxis: { type: 'value' },
-  series: [{ type: 'line', data: [5, 8, 6] }]
+print(chart({
+  xAxis: {type: 'category', data: ['A', 'B', 'C']},
+  yAxis: {type: 'value'},
+  series: [{type: 'line', data: [5, 8, 6]}]
 }));
 ```
 
@@ -203,22 +427,22 @@ Maps are supported by passing ECharts map registration data as `[name, data]` in
 
 ### Aspect ratio
 
-Both `chart` and `echart` use the regex overload of `render()` from `noto:render`. Access a `W/H` property on either callable proxy to set the chart aspect ratio:
+The direct renderer and each convenience method use the regex overload of `render()` from `noto:render`. Access a `W/H` property on the desired callable to set the chart aspect ratio:
 
 ```javascript
-import { chart, echart } from 'charts.js';
+import chart from 'chart.js';
 
-print(chart['16/9']('line', {
+print(chart.line['4/3']({
   x: ['A', 'B', 'C'],
   y: [1, 2, 3]
 }));
 
-print(echart['1/1']({
-  series: [{ type: 'pie', data: [{ value: 1, name: 'A' }] }]
+print(chart['1/1']({
+  series: [{type: 'pie', data: [{value: 1, name: 'A'}]}]
 }));
 ```
 
-The default aspect ratio is `4/3`. Invalid aspect-ratio properties throw `TypeError`.
+The default aspect ratio is `16/9`. Invalid aspect-ratio properties throw `TypeError`.
 
 ## How rendering works
 
@@ -276,16 +500,16 @@ This is a content checksum, not authentication or sanitization. Anyone can recom
 
 ### Loading renderer bundles
 
-Renderer client bundles are served from the JavaScript module search path (`[engine].jspath`). For a renderer named `charts.js`, **NotoJS** looks for:
+Renderer client bundles are served from the JavaScript module search path (`[engine].jspath`). For a renderer named `chart.js`, **NotoJS** looks for:
 
 ```text
-{jspath}/charts.js/client.js
+{jspath}/chart.js/client.js
 ```
 
 The browser loads it through:
 
 ```http
-GET /notojs.Render/charts.js
+GET /notojs.Render/chart.js
 ```
 
 Standalone HTML export and server-generated HTML responses embed the renderer client bundles used by the notebook output, so reports can render charts and tables without the live editor. Both paths also wrap the registered extension handlers with `verify()` before rendering output.
@@ -383,7 +607,28 @@ The class names passed to `grid.get()` become `nj-*` classes in the DOM. For exa
 dependency.js = https://example.com/dependency.esm.js
 ```
 
-The bundler fetches each source into its cache and makes it available to `server.js` or `client.js` by filename. The existing `charts.js` renderer uses this to fetch `echarts.min.js`.
+The bundler fetches each source into its cache and makes it available to `server.js` or `client.js` by filename. The existing `chart.js` renderer uses this to fetch `echarts.min.js`.
+
+## Bundling standalone scripts
+
+Use the SDK macro to bundle a JavaScript file with a sibling `bundle.ini` (which may be empty when no external sources are needed):
+
+```cmake
+notojs_script(test.js)
+```
+
+This adds the `test` target to the default build, writes `test.js` into the current binary directory, and installs it into `lib/notojs/script`.
+
+The equivalent direct bundler invocation is:
+
+```sh
+bundler path/to/test.js \
+  --cache path/to/cache \
+  --target path/to/build \
+  --esbuild path/to/esbuild
+```
+
+This produces `path/to/build/test.js` as an ES module bundle with legal comments removed and whitespace minified. As with renderer builds, `[sources]` entries are downloaded or reused from the cache and linked into the working directory, where a temporary copy of the entry script is bundled. Run the command from the build directory to keep these generated files out of the source tree. An esbuild failure returns a nonzero exit status and removes the failed output.
 
 ## Building renderer extensions
 

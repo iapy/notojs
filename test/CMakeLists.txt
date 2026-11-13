@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.12)
 find_package(Boost CONFIG REQUIRED COMPONENTS unit_test_framework)
 
 file(GLOB SRC
@@ -22,6 +21,7 @@ file(GLOB SRC
     test_extend.cpp
     test_fdata.cpp
     test_fs.cpp
+    test_functor.cpp
     test_getter.cpp
     test_global.cpp
     test_handle.cpp
@@ -35,7 +35,6 @@ file(GLOB SRC
     test_mixin.cpp
     test_noto.cpp
     test_notojs.cpp
-    test_pipeline.cpp
     test_primitive.cpp
     test_printable.cpp
     test_render.cpp
@@ -81,45 +80,34 @@ endif()
 
 add_test(NAME jstest COMMAND $<TARGET_FILE:jstest>)
 
-macro(test_library name)
+notojs_plugin(plugin    NOINSTALL)
+notojs_module(async     NOINSTALL)
+notojs_module(core      NOINSTALL)
+notojs_module(custom    NOINSTALL)
+notojs_module(db        NOINSTALL)
+notojs_module(errors    NOINSTALL)
+notojs_module(extend    NOINSTALL)
+notojs_module(fdata     NOINSTALL)
+notojs_module(fs        NOINSTALL)
+notojs_module(functor   NOINSTALL)
+notojs_module(getter    NOINSTALL)
+notojs_module(global    NOINSTALL)
+notojs_module(interface NOINSTALL)
+notojs_module(intern    NOINSTALL)
+notojs_module(jsdict    NOINSTALL)
+notojs_module(method    NOINSTALL)
+notojs_module(mixin     NOINSTALL)
+notojs_module(primitive NOINSTALL)
+notojs_module(printable NOINSTALL)
+notojs_module(setter    NOINSTALL)
+notojs_module(simple    NOINSTALL)
+notojs_module(static    NOINSTALL)
+notojs_module(storage   NOINSTALL)
+notojs_module(struct    NOINSTALL)
+notojs_module(validate  NOINSTALL)
+notojs_module(vararg    NOINSTALL)
 
-add_library(${name} SHARED ${name}.cpp)
-target_link_libraries(${name} Boost::boost)
-
-set_target_properties(${name} PROPERTIES
-    OUTPUT_NAME "${name}" PREFIX "" SUFFIX ".so"
-    POSITION_INDEPENDENT_CODE ON
-)
-
-if(APPLE)
-    set_target_properties(${name} PROPERTIES
-        LINK_FLAGS "-undefined dynamic_lookup"
-    )
-endif()
-
-endmacro()
-
-test_library(async)
-test_library(core)
-test_library(custom)
-test_library(errors)
-test_library(extend)
-test_library(fdata)
-test_library(fs)
-test_library(getter)
-test_library(global)
-test_library(interface)
-test_library(intern)
-test_library(jsdict)
-test_library(method)
-test_library(mixin)
-test_library(primitive)
-test_library(printable)
-test_library(setter)
-test_library(simple)
-test_library(static)
-test_library(struct)
-test_library(validate)
-test_library(vararg)
-
-enable_testing()
+target_include_directories(plugin PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/lmdb/libraries/liblmdb)
+target_include_directories(db PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/lmdb/libraries/liblmdb)

@@ -16,13 +16,18 @@ class Global;
 class Module;
 class Plugin;
 class Server;
-class Timers;
 
-class Config : public Requires<Engine, Global, Folder, Module, Plugin, Server, Timers>
+class Config : public Requires<Engine, Global, Folder, Module, Plugin, Server>
 {
 public:
     int main(int, char **);
     static bool kernel(int, char**);
+
+    template<typename Cfg, typename ...Ts>
+    static void configure(Cfg const &cfg, Ts& ...comp)
+    {
+        int result[] = {(comp.configure(cfg), 0)...};
+    }
 
     struct Kernel
     {

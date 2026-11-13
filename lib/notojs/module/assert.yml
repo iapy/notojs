@@ -25,7 +25,7 @@ text: |-
 
   For an arrow function of the form `() => expression`, only `expression` is included in the error message.
 
-  Throws `TypeError` if the function does not return a `Boolean`.
+  Throws `TypeError` if the function does not return a `Boolean`. Exceptions thrown by the assertion function are propagated.
 ---
 function: throws
 args:
@@ -34,8 +34,28 @@ args:
   -
     - Function
     - String
+  -
+    - Function
+    - Function
+  -
+    - Function
+    - Function
+    - String
 docs: throws
 text: |-
-  Returns `true` if function `arg0` throws an `Error` or returns a `Promise` that rejects with an error; otherwise returns `false`.
+  Returns a predicate function for use with `assert(throws(arg0))`. Calling `throws` does not execute `arg0`; invoking the returned predicate does.
 
-  If `arg1` is provided, returns `true` only when the error message exactly matches `arg1`.
+  The predicate returns `true` if `arg0` throws a value or returns a `Promise` that rejects, and `false` if it returns normally or its promise fulfills. Promise settlement is awaited internally, so the predicate returns a `Boolean`, not a `Promise`.
+
+  When `arg1` is a `String`, the thrown value's message must match it exactly. If the value has no string `message` property, its string representation is used instead.
+
+  When `arg1` is an error constructor, the thrown value must be an instance of that type (including subclasses). An optional `String` argument `arg2` additionally requires an exact message match.
+
+  ```javascript
+  import { assert, throws } from 'noto:assert';
+
+  assert(throws(() => { throw new Error('message'); }));
+  assert(throws(() => { throw new Error('message'); }, 'message'));
+  assert(throws(() => { throw new TypeError('message'); }, TypeError));
+  assert(throws(() => { throw new TypeError('message'); }, TypeError, 'message'));
+  ```

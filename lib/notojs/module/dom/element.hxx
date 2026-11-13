@@ -237,10 +237,10 @@ struct Element : bridge::Interface<Element, dom::Element, Node>
         dynamic_cast<dom::XMLBackend *>(self.doc.get())->nodes.erase(self);
     }
 
-    struct I : Base::I<I, XML::Interface>
+    struct I : Base::I<I, NOTOJS_VERSION_NS::core::XML>
     {
         using Base::Base;
-        std::string get() const override
+        std::string data() const override
         {
             if(!dynamic_cast<dom::XMLBackend*>(ref.doc.get()))
                 throw std::runtime_error("not an XML document");

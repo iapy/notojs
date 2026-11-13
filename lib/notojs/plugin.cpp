@@ -2,6 +2,7 @@
 #include <notojs/engine.hpp>
 #include <notojs/errors.hpp>
 #include <notojs/folder.hpp>
+#include <notojs/global.hpp>
 #include <notojs/logger.hpp>
 #include <notojs/module.hpp>
 #include <notojs/plugin.hpp>
@@ -33,7 +34,7 @@ struct Error : IPlugin
     , data{data}
     {}
 
-    bool run(IHost &) override
+    bool run() override
     {
         if(data)
             std::clog << name << notojs::values(message, *data);
@@ -42,12 +43,18 @@ struct Error : IPlugin
         return false;
     }
 
-    void end(IHost &) override {}
+    void end() override {}
+};
+
+struct Notebook
+{
+    std::unordered_set<IPlugin*> plugins;
+    std::optional<detail::Version> version = {};
 };
 
 std::shared_mutex mutex;
 thread_local Cacher::Cached cached;
-std::unordered_map<std::string, std::optional<detail::Version>> versions;
+std::unordered_map<std::string, Notebook> notebooks;
 
 } // namespace
 
@@ -59,40 +66,74 @@ void Plugin::configure(detail::Config const &cfg)
     constexpr std::string_view PLUGIN{"plugin:"};
     auto const sopath = std::filesystem::path{std::move(*path)};
 
+    JS_NewClassID(&IPlugin::cid);
     for(auto const& [sec, subtree] : cfg)
     {
         if(sec.size() > PLUGIN.size() && !sec.compare(0, PLUGIN.size(), PLUGIN))
         {
             auto const name = sec.substr(PLUGIN.size());
             auto const path = (sopath / name).string() + ".so";
-            if(void *handle = ::dlopen(path.c_str(), RTLD_NOW); handle)
+            std::unique_ptr<IPlugin> plugin;
+            if(void *handle = ::dlopen(path.c_str(), RTLD_NOW | RTLD_GLOBAL))
             {
-                if(IPlugin::Loader init = (IPlugin::Loader)::dlsym(handle, "notojs_plugin"); init)
+                std::ignore = ::dlerror();
+                if(auto init = reinterpret_cast<IPlugin::Loader>(::dlsym(handle, "notojs_plugin")))
                 {
-                    plugins.emplace(std::make_pair(name, init(subtree)));
+                    plugin.reset(init(subtree));
+                    if(!plugin) plugin = std::make_unique<Error>(name, "Init function returned null");
                 }
                 else
                 {
-                    plugins.emplace(std::make_pair(name, new Error{name, "No init function"}));
+                    plugin = std::make_unique<Error>(name, "No init function");
                 }
             }
             else
             {
-                plugins.emplace(std::make_pair(name, new Error{name, "Library not loaded", dlerror()}));
+                char const *error = ::dlerror();
+                plugin = std::make_unique<Error>(name, "Library not loaded", error ? error : "Unknown error");
             }
+            plugin->host = this;
+            plugins.emplace(name, std::move(plugin));
         }
     }
+
+    detail::iterate(get<Folder>().path, [this](auto &&path){
+        if(std::filesystem::is_regular_file(path) && ".notojs" == path.extension())
+        {
+            auto name = path.filename().u8string();
+            auto const stem = path.stem().u8string();
+            std::unordered_set<IPlugin*> p;
+
+            for(auto &[_, plugin] : plugins)
+            {
+                if(plugin->updated(stem)) p.insert(plugin.get());
+            }
+
+            if(!p.empty())
+            {
+                auto v = get<Folder>().load<detail::Version>(name);
+                notebooks[name].plugins.swap(p);
+                notebooks[name].version.swap(v);
+            }
+        }
+    });
 }
 
 void Plugin::run()
 {
     for(auto it = std::begin(plugins); it != std::end(plugins);)
     {
-        if(!it->second->run(*this))
+        if(!it->second->run())
         {
             if(auto jt = get<Module>().plugins.find(it->first); jt != std::end(get<Module>().plugins))
                 get<Module>().plugins.erase(jt);
             NOTOJS_LOG("Plugin failed", (it->first));
+            for(auto jt = std::begin(notebooks); jt != std::end(notebooks);)
+            {
+                jt->second.plugins.erase(it->second.get());
+                if(jt->second.plugins.empty()) jt = notebooks.erase(jt);
+                else ++jt;
+            }
             it = plugins.erase(it);
         }
         else
@@ -107,7 +148,7 @@ void Plugin::mod()
 {
     for(auto it = std::begin(plugins); it != std::end(plugins); ++it)
     {
-        if(auto def = it->second->mod(*this))
+        if(auto def = it->second->mod())
         {
             get<Module>().plugins.emplace(it->first, def);
             NOTOJS_LOG("Registered module", (it->first));
@@ -115,42 +156,60 @@ void Plugin::mod()
     }
 }
 
-void Plugin::removed(std::string const &name)
+void Plugin::removed(std::filesystem::path const &name)
 {
+    auto const stem = name.stem();
+    std::unordered_set<IPlugin*> p;
+
     std::unique_lock<std::shared_mutex> lock(mutex);
-    if(auto it = versions.find(name); it != std::end(versions))
-        it->second = std::nullopt;
+    if(auto it = notebooks.find(name); it != std::end(notebooks))
+    {
+        p.swap(it->second.plugins);
+        notebooks.erase(it);
+    }
+    lock.unlock();
+
+    for(auto *plugin: p) plugin->removed(stem);
 }
 
-void Plugin::updated(std::string const &name)
+void Plugin::updated(std::filesystem::path const &name)
 {
+    auto const stem = name.stem();
+    auto version = get<Folder>().load<detail::Version>(name);
+
     std::unique_lock<std::shared_mutex> lock(mutex);
-    if(auto it = versions.find(name); it != std::end(versions))
-        it->second = get<Folder>().load<detail::Version>(name);
+    notebooks[name].version = std::move(version);
+    lock.unlock();
+
+    std::unordered_set<IPlugin*> p;
+    for(auto &[_, plugin] : plugins)
+    {
+        if(plugin->updated(stem))
+            p.insert(plugin.get());
+    }
+
+    lock.lock();
+    if(p.empty()) notebooks.erase(name);
+    else notebooks[name].plugins.swap(p);
 }
 
 void Plugin::end()
 {
-    for(auto &[name, plugin]: plugins) {
-        plugin->end(*this);
-        NOTOJS_LOG("Plugin stopped", (name));
+    for(auto it = std::rbegin(plugins); it != std::rend(plugins); ++it)
+    {
+        it->second->end();
+        NOTOJS_LOG("Plugin stopped", (it->first));
     }
 }
 
-void Plugin::load(std::string const &name)
+bool Plugin::exec(std::string const &stem, IContext &context)
 {
-    std::unique_lock<std::shared_mutex> lock{mutex};
-    if(auto it = versions.find(name); it == std::end(versions))
-        versions.emplace(std::make_pair(name, get<Folder>().load<detail::Version>(name)));
-}
-
-bool Plugin::exec(std::string const &name, IContext &context)
-{
+    auto const name = stem + ".notojs";
     std::optional<detail::Version> version;
     {
         std::shared_lock<std::shared_mutex> lock{mutex};
-        if(auto it = versions.find(name); it != std::end(versions))
-            version = it->second;
+        if(auto it = notebooks.find(name); it != std::end(notebooks))
+            version = it->second.version;
     }
 
     if(!version)
@@ -158,16 +217,14 @@ bool Plugin::exec(std::string const &name, IContext &context)
         cached.erase(name);
         return false;
     }
+
     if(auto [it, id, ts] = get<Cacher>().cache(cached, *version, name); it != std::end(cached))
     {
         bridge::Context ctx{get<Engine>().get_context()};
 
-        JSValue glob = JS_GetGlobalObject(ctx.get());
-        JSValue input = JS_UNDEFINED;
-        context.input(ctx.get(), input);
-        if(!JS_IsUndefined(input))
-            JS_SetPropertyStr(ctx.get(), glob, "input", input);
-        JS_FreeValue(ctx.get(), glob);
+        JSValue value = JS_UNDEFINED;
+        context.set_context(ctx.get(), value);
+        Global::set_context(ctx.get(), stem, value);
 
         Silent::Output error;
         for(std::size_t i = 0; i < it->second.code->size(); ++i)
@@ -180,7 +237,9 @@ bool Plugin::exec(std::string const &name, IContext &context)
             }
         }
 
-        context.output(ctx.get());
+        Global::get_context(ctx.get(), value);
+        context.get_context(ctx.get(), value);
+        JS_FreeValue(ctx.get(), value);
         return true;
     }
     return false;
@@ -197,30 +256,23 @@ void Plugin::clog(std::string &&line, IHost::Args &&args)
         rapidjson::Writer<decltype(writer)> w(writer);
 
         w.StartArray();
-        for(auto const &arg: args)
-        {
-            std::visit(boost::hana::overload_linearly(
-                [&w](std::string const &s) {
-                    w.String(s.c_str(), s.size());
-                },
-                [&w](std::int64_t const &i) {
-                    w.Int64(i);
-                }
-            ), arg);
-        }
+        for(auto const &arg: args) std::visit([&w](auto const &a){
+            detail::Values::write(w, a);
+        }, arg);
         w.EndArray();
+
         w.Flush();
         ss << '\n';
     }
 
-    boost::asio::post(*get<Server>().disk, [line=std::move(ss.str())]{
+    if(get<Server>().disk) boost::asio::post(*get<Server>().disk, [line=std::move(ss.str())]{
         (std::clog << line).flush();
     });
 }
 
 void Plugin::clog(std::string &&line)
 {
-    boost::asio::post(*get<Server>().disk, [line=std::move(line)]{
+    if(get<Server>().disk) boost::asio::post(*get<Server>().disk, [line=std::move(line)]{
         (std::clog << line << '\n').flush();
     });
 }
@@ -230,12 +282,62 @@ MDB_env *Plugin::lmdb()
     return get<Folder>().env();
 }
 
-void IContext::input(JSContext *, JSValue &) {}
-void IContext::output(JSContext *) {}
+void IContext::set_context(JSContext *, JSValue &) {}
+void IContext::get_context(JSContext *, JSValue) {}
 
-IPlugin::Module IPlugin::mod(notojs::IHost &)
+auto IPlugin::mod() -> Module
 {
-    return NULL;
+    return {};
+}
+
+void IPlugin::removed(std::string const &) {}
+bool IPlugin::updated(std::string const &)
+{
+    return false;
+}
+
+std::uint32_t IPlugin::cid{0};
+
+JSModuleDef *IPlugin::def_module(JSContext *ctx, char const *name, JSInit fn)
+{
+    static_assert(std::is_same_v<JSInit, JSModuleInitFunc>);
+    if(JSRuntime *rt = JS_GetRuntime(ctx); !JS_IsRegisteredClass(rt, cid))
+    {
+        JSClassDef def{};
+        def.class_name = "Plugin";
+        if(JS_NewClass(rt, cid, &def) < 0)
+        {
+            JS_ThrowInternalError(ctx, "Cannot register class Plugin");
+            return NULL;
+        }
+    }
+
+    JSValue data = JS_NewObjectClass(ctx, cid);
+    if(JS_IsException(data))
+        return NULL;
+
+    JS_SetOpaque(data, this);
+    if(JSModuleDef *mod = JS_NewCModule(ctx, name, fn))
+    {
+        JS_SetModulePrivateValue(ctx, mod, data);
+        return mod;
+    }
+    else
+    {
+        JS_FreeValue(ctx, data);
+        return NULL;
+    }
+}
+
+IPlugin *IPlugin::get_plugin(JSValue v)
+{
+    return static_cast<IPlugin *>(JS_GetOpaque(v, cid));
+}
+
+std::pair<JSValue, IPlugin *> IPlugin::get_plugin(JSContext *ctx, JSModuleDef *m)
+{
+    JSValue v = JS_GetModulePrivateValue(ctx, m);
+    return {v, get_plugin(v)};
 }
 
 } // namespace notojs

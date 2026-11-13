@@ -1,4 +1,3 @@
-#include "quickjs/quickjs.h"
 #include <notojs/module/core.hpp>
 #include <notojs/global.hpp>
 #include <notojs/notojs.hpp>
@@ -26,22 +25,22 @@ JSValue image_1(JSContext *ctx, bridge::String url)
     return JS_ThrowTypeError(ctx, "Unsupported URL: %s", u.data());
 }
 
-JSValue image_2(JSContext *ctx, IURL::Interface::Impl u)
+JSValue image_2(JSContext *ctx, NOTOJS_VERSION_NS::URL u)
 {
     return Image::data(ctx, bridge::String{ctx, u->href()});
 }
 
-JSValue image_3(JSContext *ctx, SVG::Interface::Impl s)
+JSValue image_3(JSContext *ctx, NOTOJS_VERSION_NS::core::SVG s)
 {
-    return SVG::data(ctx, bridge::String{ctx, s->get()});
+    return SVG::data(ctx, bridge::String{ctx, s->data()});
 }
 
-JSValue image_4(JSContext *ctx, Image::Interface::Impl i)
+JSValue image_4(JSContext *ctx, NOTOJS_VERSION_NS::core::Image i)
 {
-    return Image::data(ctx, bridge::String{ctx, i->get()});
+    return Image::data(ctx, bridge::String{ctx, i->data()});
 }
 
-JSValue image_5(JSContext *ctx, IBlob::Interface::Impl blob)
+JSValue image_5(JSContext *ctx, NOTOJS_VERSION_NS::Blob blob)
 {
     auto type = blob->type();
     auto const [data, size] = blob->data();
@@ -81,13 +80,13 @@ JSValue icon(JSContext *ctx, bridge::String name)
             return SVG::data(ctx, bridge::String{ctx, std::move(data)});
     } catch(...) {}
 
-    auto u = facade::URL::parse(curl.data());
+    auto u = NOTOJS_VERSION_NS::URL::parse(curl.data());
     if(!u) return JS_ThrowTypeError(ctx, "icon: malformed url %s", curl.c_str());
 
     bridge::Strong<bridge::String> url{ctx, bridge::String{ctx, curl}};
     boost::beast::http::request<boost::beast::http::string_body> request{boost::beast::http::verb::get, u->path(), 11};
 
-    return bridge::Strong<bridge::Promise>{ctx, facade::fetch(ctx, std::move(request), std::move(*u),
+    return bridge::Strong<bridge::Promise>{ctx, NOTOJS_VERSION_NS::fetch(ctx, std::move(request), std::move(*u),
         +[](JSContext *ctx, JSValue resp, boost::beast::http::response<boost::beast::http::string_body> const &response) -> JSValue {
             if(auto const it = response.find(boost::beast::http::field::content_type);
                 boost::beast::http::status::ok == response.result()
@@ -137,9 +136,9 @@ JSValue html_0(JSContext *ctx, bridge::String str)
     return HTML::data(ctx, JS_DupValue(ctx, str));
 }
 
-JSValue html_1(JSContext *ctx, HTML::Interface::Impl h)
+JSValue html_1(JSContext *ctx, NOTOJS_VERSION_NS::core::HTML h)
 {
-    return HTML::data(ctx, bridge::String(ctx, h->get()), h->json());
+    return HTML::data(ctx, bridge::String(ctx, h->data()), h->json());
 }
 
 using html = bridge::Function<html_0, html_1>;
@@ -149,10 +148,10 @@ JSValue xml_0(JSContext *ctx, bridge::String str)
     return XML::data(ctx, JS_DupValue(ctx, str));
 }
 
-JSValue xml_1(JSContext *ctx, XML::Interface::Impl h)
+JSValue xml_1(JSContext *ctx, NOTOJS_VERSION_NS::core::XML h)
 {
     try {
-        std::string data = h->get();
+        std::string data = h->data();
         return XML::data(ctx, bridge::String(ctx, std::move(data)));
     } catch(std::runtime_error const &e) {
         return JS_ThrowTypeError(ctx, "Invalid XML: %s", e.what());
@@ -199,26 +198,21 @@ JSModuleDef *notojs_init_core(JSContext *ctx, const char *name)
     return mod;
 }
 
-JSValue core::facade::html(JSContext *ctx, std::string const &data)
+JSValue NOTOJS_VERSION_NS::core::HTML::make(JSContext *ctx, std::string const &data, bool json)
 {
-    return HTML::data(ctx, bridge::String{ctx, data});
+    return notojs::HTML::data(ctx, bridge::String{ctx, data}, json);
 }
 
-JSValue core::facade::html(JSContext *ctx, std::string const &data, bool json)
-{
-    return HTML::data(ctx, bridge::String{ctx, data}, json);
-}
-
-JSValue core::facade::image(JSContext *ctx, boost::urls::url const &url)
+JSValue NOTOJS_VERSION_NS::core::Image::make(JSContext *ctx, boost::urls::url const &url)
 {
     std::string_view view = url.buffer();
-    return Image::data(ctx, bridge::String{ctx, std::move(view)});
+    return notojs::Image::data(ctx, bridge::String{ctx, std::move(view)});
 }
 
-JSValue core::facade::image(JSContext *ctx, std::uint8_t const *data, std::size_t size, std::string const &mime)
+JSValue NOTOJS_VERSION_NS::core::Image::make(JSContext *ctx, std::uint8_t const *data, std::size_t size, std::string const &mime)
 {
     if(SVG_MIME == mime)
-        return SVG::data(ctx, bridge::String{ctx, std::string_view{reinterpret_cast<char const *>(data), size}});
+        return notojs::SVG::data(ctx, bridge::String{ctx, std::string_view{reinterpret_cast<char const *>(data), size}});
 
     std::string result;
     result.append("data:");
@@ -233,22 +227,22 @@ JSValue core::facade::image(JSContext *ctx, std::uint8_t const *data, std::size_
     base64.resize(boost::beast::detail::base64::encode(&base64[0], data, size));
     result.append(std::move(base64));
 
-    return Image::data(ctx, bridge::String{ctx, std::move(result)});
+    return notojs::Image::data(ctx, bridge::String{ctx, std::move(result)});
 }
 
-JSValue core::facade::markdown(JSContext *ctx, std::string const &data)
+JSValue NOTOJS_VERSION_NS::core::Markdown::make(JSContext *ctx, std::string const &data)
 {
-    return Markdown::data(ctx, bridge::String{ctx, data});
+    return notojs::Markdown::data(ctx, bridge::String{ctx, data});
 }
 
-JSValue core::facade::svg(JSContext *ctx, std::string const &data)
+JSValue NOTOJS_VERSION_NS::core::SVG::make(JSContext *ctx, std::string const &data)
 {
-    return SVG::data(ctx, bridge::String{ctx, data});
+    return notojs::SVG::data(ctx, bridge::String{ctx, data});
 }
 
-JSValue core::facade::xml(JSContext *ctx, std::string const &data)
+JSValue NOTOJS_VERSION_NS::core::XML::make(JSContext *ctx, std::string const &data)
 {
-    return XML::data(ctx, bridge::String{ctx, data});
+    return notojs::XML::data(ctx, bridge::String{ctx, data});
 }
 
 } // namespace notojs

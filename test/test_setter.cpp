@@ -10,7 +10,7 @@ import { assert, throws } from 'noto:assert';
 import { Variant } from 'setter.so';
 
 const v = new Variant();
-assert(() => throws(() =>  { v.value = {}; }, "Variant: no matching setter found"));
+assert(throws(() =>  { v.value = {}; }, TypeError, "Variant: no matching setter found"));
 
 v.value = 10;
 assert(() => "10" == v.value);

@@ -144,15 +144,57 @@ import { Markdown } from 'noto:core';
 ]]>
 assert(() => note instanceof Markdown);
 assert(() => Object.isFrozen(note));
-assert(() => throws(() => new Markdown(), 'Markdown: no constructor'));
-assert(() => throws(() => new Markdown('text'), 'Markdown: no constructor'));
-assert(() => throws(() => new Markdown({data: 'text'}), 'Markdown: no constructor'));
-assert(() => throws(() => new Markdown(note), 'Markdown: no constructor'));
+assert(throws(() => new Markdown(), TypeError, 'Markdown: no constructor'));
+assert(throws(() => new Markdown('text'), TypeError, 'Markdown: no constructor'));
+assert(throws(() => new Markdown({data: 'text'}), TypeError, 'Markdown: no constructor'));
+assert(throws(() => new Markdown(note), TypeError, 'Markdown: no constructor'));
 )JS"};
     notojs::Engine::preprocess(code);
     eval(code.c_str());
 
     BOOST_TEST(get_error() == std::nullopt);
+}
+
+BOOST_AUTO_TEST_CASE(SymbolDescriptions)
+{
+    eval(R"JS(
+import { assert } from 'noto:assert';
+const symbol = Symbol('allocator');
+const values = [symbol, {nested: Symbol.for('registered')}];
+const object = {[symbol]: 42};
+print(symbol, Symbol(), Symbol(''), Symbol.iterator);
+print(values, Object.getOwnPropertySymbols(object));
+print({toJSON() { return Symbol('serialized'); }});
+assert(() => values[0] === symbol);
+assert(() => JSON.stringify(values) === '[null,{}]');
+)JS");
+
+    BOOST_REQUIRE(get_error() == std::nullopt);
+    BOOST_REQUIRE(get_output() != std::nullopt);
+    auto const &out = get_output()->get();
+    BOOST_REQUIRE(out.Size() == 3u);
+    BOOST_REQUIRE(out[0].Size() == 4u);
+    BOOST_REQUIRE(out[1].Size() == 2u);
+    BOOST_REQUIRE(out[2].Size() == 1u);
+    BOOST_REQUIRE(out[0][0].IsString());
+    BOOST_REQUIRE(out[0][1].IsString());
+    BOOST_REQUIRE(out[0][2].IsString());
+    BOOST_REQUIRE(out[0][3].IsString());
+    BOOST_TEST(!strcmp(out[0][0].GetString(), "allocator"));
+    BOOST_TEST(!strcmp(out[0][1].GetString(), ""));
+    BOOST_TEST(!strcmp(out[0][2].GetString(), ""));
+    BOOST_TEST(!strcmp(out[0][3].GetString(), "Symbol.iterator"));
+    BOOST_REQUIRE(out[1][0].Size() == 2u);
+    BOOST_REQUIRE(out[1][0][0].IsString());
+    BOOST_REQUIRE(out[1][0][1].HasMember("nested"));
+    BOOST_REQUIRE(out[1][0][1]["nested"].IsString());
+    BOOST_TEST(!strcmp(out[1][0][0].GetString(), "allocator"));
+    BOOST_TEST(!strcmp(out[1][0][1]["nested"].GetString(), "registered"));
+    BOOST_REQUIRE(out[1][1].Size() == 1u);
+    BOOST_REQUIRE(out[1][1][0].IsString());
+    BOOST_TEST(!strcmp(out[1][1][0].GetString(), "allocator"));
+    BOOST_REQUIRE(out[2][0].IsString());
+    BOOST_TEST(!strcmp(out[2][0].GetString(), "serialized"));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

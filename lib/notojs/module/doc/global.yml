@@ -121,6 +121,44 @@ statics:
     text: |-
       Creates a JavaScript `File` from binary data, a name, a timestamp, and an optional MIME type.
 ---
+interface: noto::Print
+docs: noto::Print
+text: |-
+  Interface for native objects that provide custom notebook output.
+methods:
+  print:
+    sign:
+      - type: JSValue
+        args:
+          - JSContext *
+          - bridge::Array
+    docs: noto::Print.print
+    text: |-
+      Appends this object's custom representation to the current cell output array.
+---
+interface: noto::Storage
+docs: noto::Storage
+text: |-
+  Pointer-like facade for a host-owned JavaScript `Storage` object.
+
+  Native modules and plugins can use `get()` to access the underlying persistent
+  storage implementation while preserving the JavaScript object's namespace.
+also:
+  - Storage
+methods:
+  get:
+    sign:
+      - type: "type &"
+        args:
+          []
+    docs: noto::Storage.get
+    text: |-
+      Returns the underlying storage implementation.
+
+      Its `key`, `set`, `get`, `remove`, and `count` operations require the active
+      `JSContext`. The returned reference is owned by the JavaScript `Storage` object
+      and must not outlive it.
+---
 interface: noto::URL
 docs: noto::URL
 text: |-
@@ -205,3 +243,13 @@ text: |-
   Sends JavaScript values to the current cell output and returns `undefined`.
 also:
   - print
+---
+function: noto::version
+sign:
+  - type: JSValue
+    args:
+      - JSContext *
+      - const char *
+docs: noto::version
+text: |-
+  Creates a JavaScript `Version` from a `major.minor.patch` string, or returns `null` when the input is null or malformed.

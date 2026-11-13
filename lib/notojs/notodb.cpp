@@ -5,6 +5,8 @@
 #include <lmdbxx/lmdb++.h>
 
 #include <bridge.hpp>
+#include <global.hpp>
+#include <module.hpp>
 #include <notodb.hpp>
 
 #include <array>
@@ -123,16 +125,6 @@ DB::Data read_data(std::filesystem::path const &path)
 DB::DB(JSContext *ctx)
 : env{Global::ptr(ctx)->get<Folder>().env()}
 {}
-
-std::uint64_t DB::db_to_host(std::uint64_t v)
-{
-    return from_be_u64(v);
-}
-
-std::uint64_t DB::host_to_db(std::uint64_t v)
-{
-    return to_be_u64(v);
-}
 
 DB::Data DB::data(JSContext *ctx, std::filesystem::path path)
 {
@@ -389,7 +381,7 @@ void DB::backup(std::filesystem::path const &p) const
     lmdb::env_copy(env, p.u8string().c_str());
 }
 
-DB::Type DB::type(lmdb::val const &f)
+NOTOJS_VERSION_NS::db::Type NOTOJS_VERSION_NS::db::type(lmdb::val const &f)
 {
     if(!f.size()) return Type::String;
     if(!f.data()[0]) return Type::Number;
@@ -397,14 +389,14 @@ DB::Type DB::type(lmdb::val const &f)
     return Type::String;
 }
 
-void DB::set(lmdb::val &t, bridge::String &f)
+void NOTOJS_VERSION_NS::db::set(lmdb::val &t, bridge::String &f)
 {
     auto const &fv = static_cast<std::string_view const &>(f);
     t.assign(fv.data(), fv.size());
 }
 
 template<>
-void DB::set<bridge::Number>(lmdb::val &t, bridge::Number &f, DB::Allocator &a)
+void NOTOJS_VERSION_NS::db::set<bridge::Number>(lmdb::val &t, bridge::Number &f, Allocator &a)
 {
     auto &b = a.emplace<1>();
     encode_i64_key(static_cast<std::int64_t>(f), b);
@@ -412,14 +404,14 @@ void DB::set<bridge::Number>(lmdb::val &t, bridge::Number &f, DB::Allocator &a)
 }
 
 template<>
-void DB::set<bridge::String>(lmdb::val &t, bridge::String &f, DB::Allocator &)
+void NOTOJS_VERSION_NS::db::set<bridge::String>(lmdb::val &t, bridge::String &f, Allocator &)
 {
     auto const &fv = static_cast<std::string_view const &>(f);
     t.assign(fv.data(), fv.size());
 }
 
 template<>
-void DB::set<bridge::Value>(lmdb::val &t, bridge::Value &f, DB::Allocator &a)
+void NOTOJS_VERSION_NS::db::set<bridge::Value>(lmdb::val &t, bridge::Value &f, Allocator &a)
 {
     bridge::String j{f, JS_JSONStringify(f, f, JS_UNDEFINED, JS_UNDEFINED)};
     auto const &jv = static_cast<std::string_view const &>(j);
@@ -427,7 +419,7 @@ void DB::set<bridge::Value>(lmdb::val &t, bridge::Value &f, DB::Allocator &a)
     a.emplace<2>(f, std::move(j));
 }
 
-JSValue DB::get(JSContext *ctx, lmdb::val const &f)
+JSValue NOTOJS_VERSION_NS::db::get(JSContext *ctx, lmdb::val const &f)
 {
     switch(type(f))
     {
@@ -441,17 +433,27 @@ JSValue DB::get(JSContext *ctx, lmdb::val const &f)
     return JS_UNDEFINED;
 }
 
-DB::Storage::Storage(JSContext *ctx, std::string_view const &name)
-: DB{ctx}, ctx{ctx}, name{name.data(), name.size()}
+std::uint64_t NOTOJS_VERSION_NS::db::db_to_host(std::uint64_t v)
+{
+    return from_be_u64(v);
+}
+
+std::uint64_t NOTOJS_VERSION_NS::db::host_to_db(std::uint64_t v)
+{
+    return to_be_u64(v);
+}
+
+NOTOJS_VERSION_NS::Storage::type::type(std::string &&name)
+: name{"storage:" + name}
 {}
 
-JSValue DB::Storage::key(bridge::Number const &n) const
+JSValue NOTOJS_VERSION_NS::Storage::type::key(JSContext *ctx, bridge::Number const &n) const
 {
     JSValue rs = JS_NULL;
     lmdb::val k, v;
     std::int64_t m = static_cast<std::int64_t>(n);
 
-    auto [tx, db] = open(Access::RO, SYS, name);
+    auto [tx, db] = DB{ctx}.open(DB::RO, DB::SYS, name);
     auto cr = lmdb::cursor::open(tx, db);
     if(cr.get(k, v, MDB_FIRST)) do {
         if(!m--) {
@@ -465,68 +467,68 @@ JSValue DB::Storage::key(bridge::Number const &n) const
     return rs;
 }
 
-JSValue DB::Storage::get(bridge::String &k)
+JSValue NOTOJS_VERSION_NS::Storage::type::get(JSContext *ctx, bridge::String &k)
 {
     auto const &kv = static_cast<std::string_view const &>(k);
     lmdb::val lk{kv.data(), kv.size()};
 
     JSValue rs = JS_NULL;
 
-    auto [tx, db] = open(Access::RO, SYS, name);
+    auto [tx, db] = DB{ctx}.open(DB::RO, DB::SYS, name);
     if(lmdb::val v; db.get(tx, lk, v))
-        rs = DB::get(ctx, v);
+        rs = NOTOJS_VERSION_NS::db::get(ctx, v);
 
     tx.abort();
     return rs;
 }
 
-void DB::Storage::set(bridge::String &k, bridge::String &v)
+void NOTOJS_VERSION_NS::Storage::type::set(JSContext *ctx, bridge::String &k, bridge::String &v)
 {
     lmdb::val lk;
     lmdb::val lv;
 
-    DB::set(lk, k);
-    DB::set(lv, v);
+    NOTOJS_VERSION_NS::db::set(lk, k);
+    NOTOJS_VERSION_NS::db::set(lv, v);
 
-    auto [tx, db] = open(Access::RW, SYS, name);
+    auto [tx, db] = DB{ctx}.open(DB::RW, DB::SYS, name);
     db.put(tx, lk, lv);
     tx.commit();
 }
 
-void DB::Storage::set(bridge::String &k, bridge::Value &v)
+void NOTOJS_VERSION_NS::Storage::type::set(JSContext *ctx, bridge::String &k, bridge::Value &v)
 {
-    Allocator av;
+    NOTOJS_VERSION_NS::db::Allocator av;
     lmdb::val lk;
     lmdb::val lv;
 
-    DB::set(lk, k);
-    DB::set(lv, v, av);
+    NOTOJS_VERSION_NS::db::set(lk, k);
+    NOTOJS_VERSION_NS::db::set(lv, v, av);
 
-    auto [tx, db] = open(Access::RW, SYS, name);
+    auto [tx, db] = DB{ctx}.open(DB::RW, DB::SYS, name);
     db.put(tx, lk, lv);
     tx.commit();
 }
 
-void DB::Storage::remove(bridge::String &k)
+void NOTOJS_VERSION_NS::Storage::type::remove(JSContext *ctx, bridge::String &k)
 {
     auto const &kv = static_cast<std::string_view const &>(k);
     lmdb::val lk{kv.data(), kv.size()};
 
-    auto [tx, db] = open(Access::RW, SYS, name);
+    auto [tx, db] = DB{ctx}.open(DB::RW, DB::SYS, name);
     db.del(tx, lk);
     tx.commit();
 }
 
-void DB::Storage::remove() const
+void NOTOJS_VERSION_NS::Storage::type::remove(JSContext *ctx) const
 {
-    auto [tx, db] = open(Access::RW, SYS, name);
+    auto [tx, db] = DB{ctx}.open(DB::RW, DB::SYS, name);
     db.drop(tx, true);
     tx.commit();
 }
 
-std::uint64_t DB::Storage::count() const
+std::uint64_t NOTOJS_VERSION_NS::Storage::type::count(JSContext *ctx) const
 {
-    auto [tx, db] = open(Access::RO, SYS, name);
+    auto [tx, db] = DB{ctx}.open(DB::RO, DB::SYS, name);
     auto rs = static_cast<std::uint64_t>(db.stat(tx).ms_entries);
     tx.abort();
     return rs;

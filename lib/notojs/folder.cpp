@@ -3,7 +3,6 @@
 #include <notojs/engine.hpp>
 #include <notojs/logger.hpp>
 #include <notojs/plugin.hpp>
-#include <notojs/timers.hpp>
 #include <notojs/writer.hpp>
 
 #include <notojs/detail/module.hpp>
@@ -26,8 +25,6 @@
 #include <pwd.h>
 #include <stdexcept>
 #include <unistd.h>
-
-#define BOUNDARY "--notojs-313960ee-e195-4a1e-a796-e881cd5553c2"
 
 namespace notojs {
 namespace {
@@ -201,6 +198,7 @@ struct Parser : Writer, Base<M>
             }
             else if("application/json" == parser.type)
             {
+                if(parser.content.length()) parser.content.pop_back();
                 parser.Base<M>::body(parser.content);
                 if constexpr (M == Mode::Full)
                 {
@@ -379,23 +377,26 @@ void Folder::configure(detail::Config const &cfg)
 {
     if(auto path = cfg.get_optional<std::string>("folder.path"))
         this->path = std::move(*path);
+    else if(auto* pw = getpwuid(getuid()))
+        this->path = std::filesystem::path(pw->pw_dir) / "NotoJS";
     else
+        throw std::runtime_error("Cannot find user home directory");
+
+    if(path.empty() || !path.is_absolute())
+        throw std::invalid_argument("folder.path should be an absolute path");
+    else if(cfg.server)
     {
-        if (auto* pw = getpwuid(getuid()))
-            this->path = std::filesystem::path(pw->pw_dir) / "NotoJS";
-        else
-            throw std::runtime_error("Cannot find user home directory");
         if(!std::filesystem::exists(this->path))
             std::filesystem::create_directories(this->path);
+
+        if(auto const app = (path / "app"); !std::filesystem::exists(app))
+            std::filesystem::create_directory(app);
+
+        if(auto const lib = (path / "lib"); !std::filesystem::exists(lib))
+            std::filesystem::create_directory(lib);
     }
-    if(!std::filesystem::is_directory(path))
+    else if(!std::filesystem::is_directory(path))
         throw std::invalid_argument("folder.path should be a directory");
-
-    if(auto const app = (path / "app"); !std::filesystem::exists(app))
-        std::filesystem::create_directory(app);
-
-    if(auto const lib = (path / "lib"); !std::filesystem::exists(lib))
-        std::filesystem::create_directory(lib);
 
     if(auto size = cfg.get_optional<std::string>("folder.lmdb"); size)
     {
@@ -405,14 +406,7 @@ void Folder::configure(detail::Config const &cfg)
         else if("gb" == mult) this->size <<= 30;
         else throw std::runtime_error("Unknown database size multiplier " + mult);
     }
-
     init_db();
-}
-
-void Folder::set_path(std::filesystem::path &&path)
-{
-    this->path = std::move(path);
-    if(!env_) init_db();
 }
 
 std::optional<std::filesystem::path> Folder::lib(std::string const &name) const
@@ -443,7 +437,10 @@ boost::beast::http::status Folder::list(std::string &json) const
     writer.endArray();
     writer.startArray("libraries");
 
-    list(writer);
+    detail::iterate(this->path / "lib", [&writer](auto &&path){
+        if(".js" != path.extension()) return;
+        writer.string(path.stem().string());
+    });
 
     writer.endArray();
     writer.startArray("packages");
@@ -715,11 +712,7 @@ boost::beast::http::status Folder::save(std::string const &json, std::string con
             fs << BOUNDARY << "--";
             fs.close();
 
-            if(!library)
-            {
-                get<Plugin>().updated(path);
-                get<Timers>().updated(path);
-            }
+            if(!library) get<Plugin>().updated(p.filename());
             return boost::beast::http::status::ok;
         } catch(...) {
             std::filesystem::remove(f);
@@ -748,8 +741,8 @@ boost::beast::http::status Folder::move(std::string const &path, std::string nam
             std::filesystem::rename(f, this->path / name);
             if(!library)
             {
-                get<Plugin>().removed(path);
-                get<Timers>().removed(path);
+                get<Plugin>().removed(p.filename());
+                get<Plugin>().updated(name);
             }
             return boost::beast::http::status::ok;
         } catch(...) {
@@ -775,11 +768,7 @@ boost::beast::http::status Folder::remove(std::string const &path)
                 f = f.replace_extension(".js");
             }
             bool const removed = std::filesystem::remove(f);
-            if(removed && !library)
-            {
-                get<Plugin>().removed(path);
-                get<Timers>().removed(path);
-            }
+            if(removed && !library) get<Plugin>().removed(p.filename());
             return removed
                 ? boost::beast::http::status::ok
                 : boost::beast::http::status::internal_server_error

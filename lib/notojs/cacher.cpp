@@ -17,7 +17,7 @@ Cacher::Result Cacher::cache(Cached &cached, detail::Version const &version, std
     auto it = cached.find(name);
     auto const id = std::this_thread::get_id();
     auto const ts = std::chrono::system_clock::now();
-    if(it == std::end(cached) || it->second.version < version)
+    if(it == std::end(cached) || it->second.version != version)
     {
         std::promise<std::optional<detail::Textcode>> code;
         auto fut = code.get_future();

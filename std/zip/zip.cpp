@@ -227,32 +227,32 @@ private:
     std::unordered_map<std::string, std::string> errors;
 };
 
-struct Zip : bridge::Interface<Zip, std::pair<std::filesystem::path, bool>>
+struct Zip : bridge::Interface<Zip, noto::fs::Path::type>
 {
     using Base::Base;
 
     JSValue read(JSContext *ctx, bridge::Tail<0, bridge::String> names)
     {
-        if(!std::filesystem::exists(ref().first)) return ZipError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+        if(!std::filesystem::exists(ref().path)) return ZipError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
         std::unordered_set<std::string> entries;
         for(std::size_t i = 0; i < names.size(); ++i)
         {
             entries.insert(names[i]);
         }
-        return std::make_shared<Read>(ref().first, std::move(entries))->run(ctx);
+        return std::make_shared<Read>(ref().path, std::move(entries))->run(ctx);
     }
 
     JSValue remove(JSContext *ctx, bridge::Tail<1, bridge::String> names)
     {
-        if(!std::filesystem::exists(ref().first)) return ZipError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
-        if(!ref().second) return ZipError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if(!std::filesystem::exists(ref().path)) return ZipError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+        if(ref().flag != noto::fs::Path::RW) return ZipError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
         std::unordered_set<std::string> entries;
         for(std::size_t i = 0; i < names.size(); ++i)
         {
             entries.insert(names[i]);
         }
-        return std::make_shared<Remove>(ref().first, std::move(entries))->run(ctx);
+        return std::make_shared<Remove>(ref().path, std::move(entries))->run(ctx);
     }
 
     class Iterator
@@ -313,8 +313,8 @@ struct Zip : bridge::Interface<Zip, std::pair<std::filesystem::path, bool>>
 
     JSValue sym(JSValue self, JSContext *ctx)
     {
-        if(!std::filesystem::exists(ref().first)) return ZipError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
-        return bridge::Iterator<Iterator>::make(ctx, self, Iterator(ref().first), Iterator());
+        if(!std::filesystem::exists(ref().path)) return ZipError::throw_(ctx, std::make_error_code(std::errc::no_such_file_or_directory));
+        return bridge::Iterator<Iterator>::make(ctx, self, Iterator(ref().path), Iterator());
     }
 
     struct WriteOptions : bridge::Struct<WriteOptions>
@@ -328,7 +328,7 @@ struct Zip : bridge::Interface<Zip, std::pair<std::filesystem::path, bool>>
     template<int flags>
     JSValue write_0(JSContext *ctx, bridge::Object data)
     {
-        if(!ref().second) return ZipError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
+        if(ref().flag != noto::fs::Path::RW) return ZipError::throw_(ctx, std::make_error_code(std::errc::read_only_file_system));
 
         Write::Entries entries;
         for(auto it = std::begin(data); it; ++it)
@@ -352,7 +352,7 @@ struct Zip : bridge::Interface<Zip, std::pair<std::filesystem::path, bool>>
             else return ZipError::throw_(ctx, "Unsuported entry type at key " + std::string{it.key()});
         }
 
-        return std::make_shared<Write>(ref().first, flags, std::move(entries))->run(ctx);
+        return std::make_shared<Write>(ref().path, flags, std::move(entries))->run(ctx);
     }
 
     JSValue write_1(JSContext *ctx, bridge::Object data, WriteOptions opts)
@@ -364,7 +364,7 @@ struct Zip : bridge::Interface<Zip, std::pair<std::filesystem::path, bool>>
 
     JSValue toJSON(JSContext *ctx) const
     {
-        zip_t *handle = ::zip_open(ref().first.string().c_str(), ZIP_RDONLY, NULL);
+        zip_t *handle = ::zip_open(ref().path.string().c_str(), ZIP_RDONLY, NULL);
         if(!handle) return ZipError::throw_(ctx, std::make_error_code(std::errc::bad_file_descriptor));
 
         bridge::Object obj{ctx};
@@ -409,17 +409,12 @@ JSValue zip(JSContext *ctx, noto::fs::Path path)
     return Zip::from(ctx, path->native());
 }
 
-JSCFunctionListEntry func[] = {
-    JS_CFUNC_DEF("zip", 1, bridge::Function<zip>::invoke),
-};
-
 int init(JSContext *ctx, JSModuleDef *m)
 {
     JS_FreeValue(ctx, noto::import(ctx, "noto:fs"));
     ZipError::init(ctx, m);
     Zip::init(ctx, m);
-    JS_SetModuleExport(ctx, m, "default", JS_NewCFunction(ctx, bridge::Function<zip>::invoke, "zip", 1));
-    return JS_SetModuleExportList(ctx, m, func, sizeof(func)/sizeof(func[0]));
+    return JS_SetModuleExport(ctx, m, "default", JS_NewCFunction(ctx, bridge::Function<zip>::invoke, "zip", 1));
 }
 
 } // namespace
@@ -432,7 +427,6 @@ JSModuleDef *js_init_module(JSContext *ctx, const char *name)
     if(!mod) return NULL;
 
     JS_AddModuleExport(ctx, mod, ZipError::name());
-    JS_AddModuleExportList(ctx, mod, func, sizeof(func)/sizeof(func[0]));
     JS_AddModuleExport(ctx, mod, "default");
     return mod;
 }

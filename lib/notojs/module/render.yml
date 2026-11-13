@@ -1,0 +1,162 @@
+text: |-
+  `noto:render` creates renderer functions for custom notebook output.
+
+  A renderer callback produces the data for a signed content record. The renderer name identifies the browser bundle that handles the record when notebook output is displayed.
+
+  ###### Exports
+  - `class Block`
+  - `class Final`
+  - `function render` (also the default export)
+---
+class: Render
+docs: Render
+text: |-
+  Internal callable wrapper used by renderers that define view properties with a `RegExp`.
+
+  Calling the wrapper directly produces content without a `view`. Reading a matching string property returns another callable wrapper that adds that property name as the content record's `view`. Reading an unmatched property throws `TypeError`.
+
+  `Render` is not exported and cannot be constructed directly; use the `RegExp` overload of `render()`.
+ctor:
+  args:
+    -
+      []
+  docs: Render.constructor
+  text: |-
+    `Render` objects cannot be constructed directly. They are created internally by `render()` when a `RegExp` is supplied.
+---
+class: Block
+docs: Block
+text: |-
+  Marker class for renderer results that print as independent output blocks.
+
+  Pass `Block` to `render()` in place of the view `RegExp`. Calling the resulting renderer returns a `Block` containing the callback result in `data` and the renderer name in `type`. Printing it creates a signed content record in a new output block.
+
+  A `Block` can be printed more than once; each print appends another independent block. `Block` objects cannot be constructed directly.
+impl:
+  - noto::Print
+ctor:
+  args:
+    -
+      []
+  docs: Block.constructor
+  text: |-
+    `Block` objects cannot be constructed directly. Pass `Block` to `render()` to create a renderer that returns them.
+---
+class: Final
+docs: Final
+text: |-
+  Marker class for a renderer result that must be the final notebook output.
+
+  Pass `Final` to `render()` in place of the view `RegExp`. Calling the resulting renderer returns a `Final` containing the callback result in `data` and the renderer name in `type`. Printing it appends a signed content record in a new output block and prevents any further output from being appended.
+
+  A `Final` should therefore be printed only after all other output. Attempting to print again, or to print another value afterward, throws `TypeError` because the output collection is no longer extensible. `Final` objects cannot be constructed directly.
+impl:
+  - noto::Print
+ctor:
+  args:
+    -
+      []
+  docs: Final.constructor
+  text: |-
+    `Final` objects cannot be constructed directly. Pass `Final` to `render()` to create a renderer that returns them.
+---
+function: render
+args:
+  -
+    - String
+    - Function
+  -
+    - String
+    - Any
+    - Function
+  -
+    - Object
+    - String
+    - Function
+  -
+    - Object
+    - String
+    - Any
+    - Function
+docs: render
+text: |-
+  Creates and returns a renderer function. This function is exported as both `render` and the module's default export.
+
+  In the basic form, `arg0` is the renderer name and `arg1` is a callback:
+
+  ```javascript
+  import render from 'noto:render';
+
+  const message = render('notojs.Render/example.js', value => ({value}));
+  const result = message('Hello');
+  ```
+
+  Calling the renderer invokes the callback synchronously with all supplied arguments and wraps its return value in a content record. The record has the following fields:
+
+  - `data` — the callback's return value
+  - `type` — the renderer name
+  - `sign` — an eight-character lowercase hexadecimal content checksum
+  - `view` — present only for a view-specific call
+
+  The callback receives the renderer call's `this` value and arguments. Exceptions propagate unchanged. Promises are not awaited; a promise returned by the callback becomes `data`.
+
+  Each successful call records the renderer name in the current execution context so the corresponding client bundle can be included with serialized output.
+
+  ###### Views
+
+  In the three-argument form, `arg1` may be a `RegExp` and `arg2` is the callback. The returned callable accepts ordinary direct calls and view selection through matching properties:
+
+  ```javascript
+  const panel = render(
+    'notojs.Render/panel.js',
+    /^(compact|wide)$/,
+    value => value
+  );
+
+  panel({message: 'Default'});
+  panel.compact({message: 'Compact'});
+  panel.wide({message: 'Wide'});
+  ```
+
+  Reading a matching property does not invoke the callback. Calling the returned view function adds the property name as `view` and invokes the callback with `this` set to `undefined`. A direct renderer call forwards its receiver as the callback's `this` value.
+
+  Property matching uses `property.match(arg1)`. Use `^` and `$` anchors to require a complete match. Reading an unmatched string property throws `TypeError`; symbol properties are not treated as views.
+
+  ###### Independent and final blocks
+
+  In place of the `RegExp`, pass `Block` to create repeatable standalone output blocks or `Final` to create an output block after which no more output may be appended:
+
+  ```javascript
+  import render, {Block, Final} from 'noto:render';
+
+  const section = render('notojs.Render/section.js', Block, value => value);
+  const finish = render('notojs.Render/finish.js', Final, value => value);
+
+  print(section({part: 1}));
+  print(section({part: 2}));
+  print(finish({complete: true}));
+  ```
+
+  `Block` and `Final` results are converted to signed content records when printed rather than when their renderer is called.
+
+  ###### Custom result prototypes
+
+  Prefix any overload with an `Object` to use it as the prototype of generated content records:
+
+  ```javascript
+  const prototype = {
+    toJSON() {
+      return {type: this.type, data: this.data};
+    }
+  };
+
+  const message = render(
+    prototype,
+    'notojs.Render/example.js',
+    value => value
+  );
+  ```
+
+  For ordinary and view renderers, the prototype is applied when the renderer is called. For `Block` and `Final`, it is applied to the signed content record when the result is printed, while the deferred result itself remains an instance of `Block` or `Final`.
+
+  Throws `TypeError` for invalid argument types. The three- and four-argument overloads require their mode argument to be a `RegExp`, `Block`, or `Final` marker and require the final argument to be callable.

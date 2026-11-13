@@ -12,7 +12,7 @@ struct Printable : bridge::Interface<Printable, std::string>
         ref() = name;
     }
 
-    struct I : Base::I<I, notojs::IPrint>
+    struct I : Base::I<I, noto::Print>
     {
         using Base::Base;
 

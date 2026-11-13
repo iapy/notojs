@@ -17,30 +17,25 @@ struct MDB_env;
 namespace notojs {
 
 class Config;
+class Engine;
 class Plugin;
-class Timers;
 
-class Folder : public Requires<Plugin, Timers>
+class Folder : public Requires<Plugin>
 {
+    void configure(detail::Config const &);
+    friend class Config;
+    friend class Engine;
+    friend class Plugin;
+    friend class DB;
+
 public:
     ~Folder();
-    void set_path(std::filesystem::path &&path);
 
     template<typename R>
     std::optional<R> load(std::string const &path) const;
 
     std::optional<std::filesystem::path> lib(std::string const &name) const;
     boost::beast::http::status list(std::string &json) const;
-
-    template<typename W, bool E = false>
-    BOOST_FORCEINLINE void list(W &writer) const
-    {
-        detail::iterate(this->path / "lib", [&writer](auto &&path){
-            if(".js" != path.extension()) return;
-            else if constexpr (E) writer.string(path.filename().string());
-            else writer.string(path.stem().string());
-        });
-    }
 
     boost::beast::http::status eval(std::string &json, std::string const &path) const;
     boost::beast::http::status eval(std::string &json, std::string const &path, std::unordered_set<std::string> &) const;
@@ -81,10 +76,6 @@ public:
 
     BOOST_FORCEINLINE MDB_env *env() const { return env_; }
     BOOST_FORCEINLINE std::filesystem::path env(std::filesystem::path const &p) { return path / ".db" / p; };
-private:
-    void configure(detail::Config const &);
-    friend class Config;
-    friend class DB;
 
 private:
     void init_db();

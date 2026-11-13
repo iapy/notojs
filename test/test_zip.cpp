@@ -7,8 +7,8 @@ BOOST_AUTO_TEST_CASE(Zip)
 {
     eval(R"JS(
 import { assert, throws } from 'noto:assert';
+import zip, { ZipError } from 'zip.so';
 import * as fs from 'noto:fs';
-import { zip, ZipError } from 'zip.so';
 
 let error;
 try {
@@ -19,9 +19,9 @@ try {
 assert(() => error instanceof ZipError);
 assert(() => error instanceof Error);
 
-assert(() => throws(() => zip(fs.path('/ro/archive.zip')).write({}), 'Read-only file system'));
-assert(() => throws(() => zip(fs.path('/ro/archive.zip')).read(), 'No such file or directory'));
-assert(() => throws(() => zip(fs.path('/ro/archive.zip')).remove(''), 'No such file or directory'));
+assert(throws(() => zip(fs.path('/ro/archive.zip')).write({}), ZipError, 'Read-only file system'));
+assert(throws(() => zip(fs.path('/ro/archive.zip')).read(), ZipError, 'No such file or directory'));
+assert(throws(() => zip(fs.path('/ro/archive.zip')).remove(''), ZipError, 'No such file or directory'));
 
 await fs.path('/rw/foo.txt').write('This is foo.txt');
 await fs.path('/rw/bar.txt').write('This is bar.txt');
@@ -81,8 +81,8 @@ assert(() => 2 == Object.keys(f).length);
 
 for(const [name, size] of zip(fs.path('/rw/archive.zip'))) assert(() => (name in f));
 
-assert(() => throws(() => zip(fs.path('/ro/archive.zip')).remove('foo.txt'), 'Read-only file system'));
-assert(() => throws(() => zip(fs.path('/ro/archive.zip')).remove(), 'No matching function overload found'));
+assert(throws(() => zip(fs.path('/ro/archive.zip')).remove('foo.txt'), ZipError, 'Read-only file system'));
+assert(throws(() => zip(fs.path('/ro/archive.zip')).remove(), TypeError, 'No matching function overload found'));
 await zip(fs.path('/rw/archive.zip')).remove('foo.txt');
 
 const g = await zip(fs.path('/rw/archive.zip')).read();

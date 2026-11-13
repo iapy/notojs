@@ -18,7 +18,6 @@ Beyond its small size and efficiency, **NotoJS** provides:
 - rich cell output including HTML, Markdown, images, SVG, charts, tables, and configurable layouts
 - native server plugins and renderer extensions for integrating external services and custom output types
 - a client library for embedding complete notebooks or individual cells in other web pages
-- scheduled notebook execution with timers
 
 Internally, **NotoJS** is written entirely in C++, using asynchronous `boost::beast` for
 HTTP services and [RapidJSON](https://rapidjson.org/) for data serialization.
@@ -31,7 +30,6 @@ HTTP services and [RapidJSON](https://rapidjson.org/) for data serialization.
 - `doc('topic:lmdb')`
 - `doc('topic:markdown')`
 - `doc('topic:packages')`
-- `doc('topic:timers')`
 - `doc('topic:ui')`
 - `doc('print')`
 

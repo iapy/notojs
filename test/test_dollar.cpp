@@ -11,7 +11,7 @@ BOOST_AUTO_TEST_CASE(Error)
 import { assert, throws } from 'noto:assert';
 require('dollar');
 
-assert(() => throws(() => $.ajax({dataType: 'json'}), "$.ajax: url should be specified"));
+assert(throws(() => $.ajax({dataType: 'json'}), TypeError, "$.ajax: url should be specified"));
     )JS");
 
     BOOST_TEST(get_error() == std::nullopt);
@@ -78,8 +78,8 @@ require('dollar', {scope: 'notebook'});
 import { assert, throws } from 'noto:assert';
 assert(() => 'function' == typeof($.ajax));
 
-assert(() => throws(() => require('dollar', {scope: 1}), 'No matching function overload found'));
-assert(() => throws(() => require('dollar', {scope: 'foo'}), 'invalid scope [foo]'));
+assert(throws(() => require('dollar', {scope: 1}), TypeError, 'No matching function overload found'));
+assert(throws(() => require('dollar', {scope: 'foo'}), TypeError, 'invalid scope [foo]'));
     )JS", context.get(), "cell-004");
 
     BOOST_TEST(get_error() == std::nullopt);

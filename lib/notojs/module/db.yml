@@ -22,6 +22,8 @@ class: Handle
 docs: Handle
 text: |-
   `Handle` is a database handle inside a transaction.
+impl:
+  - noto::db::Handle
 properties:
   stat:
     getter: true
@@ -36,6 +38,14 @@ properties:
       - `overflow_pages` — Number of overflow pages
       - `psize` — Size of a database page. This is the same for all databases.
 methods:
+  "[Symbol.iterator]":
+    args:
+      -
+        []
+    docs: Handle.[Symbol.iterator]
+    text: |-
+      Returns an iterator over all entries in the current database in binary key order.
+      Each entry is a two-element array containing the key and value.
   del:
     args:
       -
@@ -227,6 +237,53 @@ methods:
 
       Returns the result of `arg0`. If `arg0` throws, the transaction is rolled back and the exception is rethrown.
 ---
+class: Custom
+docs: Custom
+text: |-
+  `Custom` provides transactional access to databases whose JavaScript handle type is supplied by a native plugin.
+
+  Instances are returned by `open()` when every requested `var:` database has an exactly matching registered handler.
+  Handles are valid only for the duration of the transaction callback.
+defs:
+  - type: Name
+    base: String
+    docs: Custom.Name
+    text: |-
+      A `var:` database name with an exact handler registered by a native plugin.
+      The part after `var:` must contain only English letters or `:`, must not start
+      or end with `:`, and must not contain `::`.
+properties:
+  length:
+    getter: true
+    docs: Custom.length
+    text: |-
+      Contains the number of databases associated with this object.
+methods:
+  ro:
+    args:
+      -
+        - Function
+    docs: Custom.ro
+    text: |-
+      Executes a read-only transaction across all databases associated with this object.
+
+      `arg0` is invoked with one plugin-defined handle per database specified when this object was created via `open()`.
+      Handle order matches database-name order. Handles become invalid when the callback returns.
+
+      Returns the result of `arg0` and rethrows any exception thrown by it.
+  rw:
+    args:
+      -
+        - Function
+    docs: Custom.rw
+    text: |-
+      Executes a read-write transaction across all databases associated with this object.
+
+      `arg0` is invoked with one plugin-defined handle per database specified when this object was created via `open()`.
+      Handle order matches database-name order. Handles become invalid when the callback returns.
+
+      Returns the result of `arg0`. If `arg0` throws, the transaction is rolled back and the exception is rethrown; otherwise it is committed.
+---
 class: System
 docs: System
 text: |-
@@ -338,7 +395,7 @@ methods:
 function: backup
 args:
   -
-    - fs::IPath
+    - noto::fs::Path
 docs: backup
 text: |-
   Backs up the **LMDB** environment.
@@ -361,6 +418,38 @@ text: |-
   - `maxreaders` — maximum number of reader slots
   - `numreaders` — number of reader slots currently in use
 ---
+function: open
+args:
+  -
+    - System.Name
+  -
+    - Tail:
+        - 1
+        - Database.Name
+  -
+    - Tail:
+        - 1
+        - Custom.Name
+docs: open
+text: |-
+  Opens a system database or one or more transactional databases.
+
+  - With one `System.Name`, returns:
+    - `ErrorLog` for `sys:errorlog`
+    - `HTTPData` for `sys:httpdata`
+    - `System` for any other `sys:` name or an unregistered `var:` name
+  - With one or more `Custom.Name` values, returns a `Custom` instance. Every name
+    must have an exactly matching handler registered by a native plugin.
+  - Otherwise, accepts one or more `Database.Name` values and returns a `Database`
+    instance for databases in the `usr:` namespace.
+
+  The returned `Database` or `Custom` object's `length` is the number of names supplied.
+  A call containing multiple names must match a single overload; custom and generic
+  database names cannot be mixed.
+
+  Throws `TypeError` if called without arguments, with non-string arguments, with an
+  invalid database name, or with a mixture of custom and generic database names.
+---
 function: stat
 args:
   -
@@ -376,25 +465,3 @@ text: |-
   - `leaf_pages` — Number of leaf pages
   - `overflow_pages` — Number of overflow pages
   - `psize` — Size of a database page. This is the same for all databases.
----
-function: open
-args:
-  -
-    - System.Name
-  -
-    - Tail:
-        - 1
-        - Database.Name
-docs: open
-text: |-
-  Opens a system database or one or more user databases.
-
-  - With one `System.Name` (a string beginning with `sys:` or `var:`), returns:
-    - `ErrorLog` for `sys:errorlog`
-    - `HTTPData` for `sys:httpdata`
-    - `System` for any other system database name
-  - Otherwise, accepts one or more `Database.Name` strings in the `usr:` namespace
-    and returns a `Database` instance. Its `length` is the number of names supplied.
-
-  Throws `TypeError` if called without arguments, with non-string arguments, or
-  with an invalid user database name.

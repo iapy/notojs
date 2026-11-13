@@ -5,7 +5,6 @@
 #include <notojs/module.hpp>
 #include <notojs/plugin.hpp>
 #include <notojs/server.hpp>
-#include <notojs/timers.hpp>
 
 #include <boost/property_tree/ini_parser.hpp>
 #include <notojs/detail/config.hpp>
@@ -44,9 +43,8 @@ int Config::main(int argc, char **argv)
 
     binary = std::filesystem::absolute(argv[0]);
 
-    detail::Config pt;
+    detail::Config pt{!kernel_, &config};
     boost::property_tree::ini_parser::read_ini<boost::property_tree::ptree>(config, pt);
-    pt.source = &config;
 
     get<Engine>().configure(pt);
     get<Folder>().configure(pt);
@@ -58,7 +56,6 @@ int Config::main(int argc, char **argv)
     {
         stdarg = {config.string(), "--kernel"};
         get<Server>().configure(pt);
-        get<Timers>().configure(pt);
     }
     return get<Server>().main();
 }

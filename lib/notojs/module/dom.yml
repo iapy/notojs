@@ -1441,7 +1441,7 @@ text: |-
 also:
   - https://developer.mozilla.org/en-US/docs/Web/API/Element
 impl:
-  - XML::Interface
+  - noto::core::XML
 defs:
   - type: Position
     base: String
@@ -1838,7 +1838,7 @@ text: |-
 also:
   - https://developer.mozilla.org/en-US/docs/Web/API/XMLDocument
 impl:
-  - XML::Interface
+  - noto::core::XML
 properties:
   documentElement:
     getter: true
@@ -2264,7 +2264,7 @@ text: |-
 also:
   - https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement
 impl:
-  - HTML::Interface
+  - noto::core::HTML
 properties:
   attributes:
     getter: true
@@ -3228,7 +3228,7 @@ also:
   - Image
   - image
 impl:
-  - Image::Interface
+  - noto::core::Image
 properties:
   alt:
     getter: true
@@ -4248,7 +4248,7 @@ also:
   - SVG
   - image
 impl:
-  - SVG::Interface
+  - noto::core::SVG
 properties:
   height:
     getter: true
@@ -6592,7 +6592,7 @@ text: |-
 also:
   - https://developer.mozilla.org/en-US/docs/Web/API/HTMLDocument
 impl:
-  - HTML::Interface
+  - noto::core::HTML
 properties:
   _live:
     getter: true
