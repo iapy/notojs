@@ -292,17 +292,30 @@ struct getter<f> : std::bool_constant<has_constructor<T>::value>
     }
 };
 
+template<typename T, JSValue(*f)(T const &, JSContext *, JSValue)>
+struct getter<f> : std::bool_constant<has_constructor<T>::value>
+{
+    BOOST_FORCEINLINE static JSValue invoke(JSContext *ctx, JSValueConst self)
+    {
+        if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
+            return f(*reinterpret_cast<T*>(JS_GetOpaque(self, T::cid)), ctx, self);
+        else if(auto it = T::upcast.find(cid); it != std::end(T::upcast))
+            return f(it->second(JS_GetOpaque(self, cid)), ctx, self);
+        return JS_ThrowTypeError(ctx, "%s: getter invoked on a wrong type", T::name());
+    }
+};
+
 template<auto>
 struct setter : std::false_type {};
 
-template<typename T, typename V, typename R, R(T::*f)(JSContext *, V)>
+template<typename T, typename V, typename R, R(*f)(T &, JSContext *, V)>
 struct setter<f> : std::disjunction<std::is_same<void, R>, std::is_same<JSValue, R>>
 {
     using Type = T;
 
     BOOST_FORCEINLINE static bool checka(JSContext *ctx, JSValue &arg)
     {
-        return V::check(ctx, &arg);
+        return std::decay_t<V>::check(ctx, &arg);
     }
 
     BOOST_FORCEINLINE static bool checks(JSValue self)
@@ -317,7 +330,7 @@ struct setter<f> : std::disjunction<std::is_same<void, R>, std::is_same<JSValue,
     BOOST_FORCEINLINE static auto valid(JSContext *ctx, JSValue &arg)
     {
         std::string error;
-        return V::valid(ctx, &arg, error) ? std::optional<std::string>{} : std::optional<std::string>(std::move(error));
+        return std::decay_t<V>::valid(ctx, &arg, error) ? std::optional<std::string>{} : std::optional<std::string>(std::move(error));
     }
 
     BOOST_FORCEINLINE static JSValue unsafe(JSContext *ctx, JSValueConst self, JSValue v)
@@ -327,26 +340,69 @@ struct setter<f> : std::disjunction<std::is_same<void, R>, std::is_same<JSValue,
             if constexpr (!has_constructor<T>::value)
             {
                 if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
-                    return (T{ctx, self}.*f)(ctx, V(ctx, v));
+                {
+                    T value{ctx, self};
+                    return f(value, ctx, std::decay_t<V>(ctx, v));
+                }
             }
             else if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
-                return (reinterpret_cast<T*>(JS_GetOpaque(self, T::cid))->*f)(ctx, V(ctx, v));
+                return f(*reinterpret_cast<T*>(JS_GetOpaque(self, T::cid)), ctx, std::decay_t<V>(ctx, v));
             else if(auto it = T::upcast.find(cid); it != std::end(T::upcast))
-                return (it->second(JS_GetOpaque(self, cid)).*f)(ctx, V(ctx, v));
+            {
+                T value = it->second(JS_GetOpaque(self, cid));
+                return f(value, ctx, std::decay_t<V>(ctx, v));
+            }
         }
         else
         {
             if constexpr (!has_constructor<T>::value)
             {
                 if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
-                    (T{ctx, self}.*f)(ctx, V(ctx, v));
+                {
+                    T value{ctx, self};
+                    f(value, ctx, std::decay_t<V>(ctx, v));
+                }
             }
             else if(JSClassID const cid = JS_GetClassID(self); T::cid == cid)
-                (reinterpret_cast<T*>(JS_GetOpaque(self, T::cid))->*f)(ctx, V(ctx, v));
+                f(*reinterpret_cast<T*>(JS_GetOpaque(self, T::cid)), ctx, std::decay_t<V>(ctx, v));
             else if(auto it = T::upcast.find(cid); it != std::end(T::upcast))
-                (it->second(JS_GetOpaque(self, cid)).*f)(ctx, V(ctx, v));
+            {
+                T value = it->second(JS_GetOpaque(self, cid));
+                f(value, ctx, std::decay_t<V>(ctx, v));
+            }
         }
         return JS_UNDEFINED;
+    }
+};
+
+template<typename T, typename V, typename R, R(T::*f)(JSContext *, V)>
+struct setter<f> : std::disjunction<std::is_same<void, R>, std::is_same<JSValue, R>>
+{
+    using Type = T;
+
+    static R invoke(T &object, JSContext *ctx, V &&value)
+    {
+        return (object.*f)(ctx, std::forward<V>(value));
+    }
+
+    BOOST_FORCEINLINE static bool checka(JSContext *ctx, JSValue &arg)
+    {
+        return setter<&invoke>::checka(ctx, arg);
+    }
+
+    BOOST_FORCEINLINE static bool checks(JSValue self)
+    {
+        return setter<&invoke>::checks(self);
+    }
+
+    BOOST_FORCEINLINE static auto valid(JSContext *ctx, JSValue &arg)
+    {
+        return setter<&invoke>::valid(ctx, arg);
+    }
+
+    BOOST_FORCEINLINE static JSValue unsafe(JSContext *ctx, JSValueConst self, JSValue v)
+    {
+        return setter<&invoke>::unsafe(ctx, self, v);
     }
 };
 
@@ -1258,7 +1314,7 @@ struct String : detail::Reference
 
     inline ~String()
     {
-        if(data) JS_FreeCString(ctx, data->data());
+        if(data && data->data()) JS_FreeCString(ctx, data->data());
     }
 
     inline operator std::string () const
@@ -1267,9 +1323,9 @@ struct String : detail::Reference
         {
             std::size_t len;
             const char *str = JS_ToCStringLen(ctx, &len, value);
-            data.emplace(str, len);
+            data.emplace(str, str ? len : 0);
         }
-        return std::string(data->data(), data->size());
+        return std::string{*data};
     }
 
     inline operator std::string_view const &() const
@@ -1278,7 +1334,7 @@ struct String : detail::Reference
         {
             std::size_t len;
             const char *str = JS_ToCStringLen(ctx, &len, value);
-            data.emplace(str, len);
+            data.emplace(str, str ? len : 0);
         }
         return *data;
     }
@@ -1571,7 +1627,7 @@ private:
             else return JS_ThrowTypeError(ctx, "%s: no matching setter found", detail::setter<G>::Type::name());
         }
         if(auto error = detail::setter<F>::valid(ctx, v); error)
-            return JS_ThrowTypeError(ctx, "%s: %s", detail::setter<F>::Type::name(), error->c_str());
+            return JS_ThrowTypeError(ctx, "%s: %s", detail::setter<G>::Type::name(), error->c_str());
 
         return detail::setter<G>::unsafe(ctx, self, v);
     }
@@ -2197,12 +2253,24 @@ template<typename Impl, typename Native_, typename Extends_>
 char const *Interface<Impl, Native_, Extends_>::name()
 {
     static_assert(sizeof(Base) == sizeof(Impl));
-    static std::string name = boost::core::demangle(typeid(Impl).name());
+    static std::string name = std::invoke([]{
+        std::string name = boost::core::demangle(typeid(Impl).name());
+        auto const scope = name.rfind(':');
 
-    if(auto const tmpl = name.rfind('>'); tmpl > name.rfind(':') && tmpl != std::string::npos)
-        name[tmpl] = '\0';
+        if(auto const tmpl = name.rfind('>'); tmpl != std::string::npos
+            && (scope == std::string::npos || tmpl > scope))
+        {
+            name.resize(tmpl);
+            while(!name.empty() && name.back() == '>') name.pop_back();
+        }
 
-    return name.c_str() + name.rfind(':') + 1;
+        if(auto const separator = name.find_last_of(":<"); separator != std::string::npos)
+            name.erase(0, separator + 1);
+        if(auto const suffix = name.find_first_of(" ,"); suffix != std::string::npos)
+            name.resize(suffix);
+        return name;
+    });
+    return name.c_str();
 }
 
 template<typename Impl, typename Native_, typename Extends_>

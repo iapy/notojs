@@ -267,7 +267,7 @@ JSValue Module::load(JSContext *ctx, decltype(SCRIPT), boost::urls::url &&url, c
     return http_request(ctx, name, std::move(url), get<Server>(), cache, boost::hana::overload_linearly(
         [this, ctx, name, ts](boost::urls::url &&url, std::string &&code) -> JSValue {
             JSValue fn = JS_Eval(ctx, code.c_str(), code.size(), name, JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_COMPILE_ONLY);
-            if(JS_IsError(ctx, fn)) return fn;
+            if(JS_IsException(fn)) return fn;
 
             NOTOJS_LOG("Script resolved",
                 (std::string(name))
