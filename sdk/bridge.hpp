@@ -2337,6 +2337,11 @@ void Interface<Impl, Native_, Extends_>::init(JSContext *ctx)
 #ifndef NOTOJS_INTERNAL_MODULE
     init();
     init(JS_GetRuntime(ctx));
+    if(JSValue proto = JS_GetClassProto(ctx, cid); !JS_IsNull(proto))
+    {
+        JS_FreeValue(ctx, proto);
+        return;
+    }
 #endif
     JS_FreeValue(ctx, make(ctx));
 }
@@ -2344,6 +2349,16 @@ void Interface<Impl, Native_, Extends_>::init(JSContext *ctx)
 template<typename Impl, typename Native_, typename Extends_>
 void Interface<Impl, Native_, Extends_>::init(JSContext *ctx, JSValue glob)
 {
+#ifndef NOTOJS_INTERNAL_MODULE
+    init();
+    init(JS_GetRuntime(ctx));
+    if(JSValue proto = JS_GetClassProto(ctx, cid); !JS_IsNull(proto))
+    {
+        JS_FreeValue(ctx, proto);
+        alias(ctx, glob, name());
+        return;
+    }
+#endif
     JS_SetPropertyStr(ctx, glob, name(), make(ctx));
 }
 
@@ -2353,6 +2368,12 @@ void Interface<Impl, Native_, Extends_>::init(JSContext *ctx, JSModuleDef *glob)
 #ifndef NOTOJS_INTERNAL_MODULE
     init();
     init(JS_GetRuntime(ctx));
+    if(JSValue proto = JS_GetClassProto(ctx, cid); !JS_IsNull(proto))
+    {
+        JS_FreeValue(ctx, proto);
+        alias(ctx, glob, name());
+        return;
+    }
 #endif
     JS_SetModuleExport(ctx, glob, name(), make(ctx));
 }

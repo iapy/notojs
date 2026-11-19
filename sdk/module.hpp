@@ -164,13 +164,13 @@ struct db final
 
         struct Interface_ : db::Interface_
         {
-            void init(JSContext *c) const override
-            {
-                Base::init(c);
-            }
             void init(JSRuntime *r) const override
             {
-                Base::init(r);
+                Impl::init(r);
+            }
+            void init(JSContext *c) const override
+            {
+                Impl::init(c);
             }
             Handle::type& from(JSValue value) const override
             {
@@ -182,6 +182,7 @@ struct db final
             }
         };
 
+        using Base::init;
         BOOST_FORCEINLINE static void init(std::string const &name)
         {
             db::init(name, std::make_unique<Interface_ const>());
